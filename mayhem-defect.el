@@ -73,19 +73,23 @@ Each frame's number and function, its source below; inlined calls follow."
           frame "\n")))
      frames "\n")))
 
-(defun mayhem-defect--evidence (source evidence)
-  "Return the vnodes of EVIDENCE of a defect from SOURCE, \"api\" or \"code\"."
+(defun mayhem-defect--split-command (cmd)
+  "Return shell command CMD with each of its commands on its own line.
+Lines end in a backslash, so the text still pastes into a shell whole.
+Quoting is ignored: Mayhem's command lines don't quote separators."
+  ;; The character before the separator keeps 2>&1 whole.
+  (replace-regexp-in-string "\\([^<>&|;]\\(?:;\\|&&?\\|||?\\)\\)[ \t]+"
+                            "\\1 \\\\\n  " cmd))
+
+(defun mayhem-defect--evidence-fields (source evidence)
+  "Return the fields of EVIDENCE of a defect from SOURCE, \"api\" or \"code\"."
   (pcase source
     ("api"
-     (vui-fragment
-      (when (alist-get 'path evidence)
-        (mayhem-field "Endpoint" (concat (alist-get 'method evidence) " "
-                                         (alist-get 'path evidence)
-                                         (when-let* ((name (alist-get 'endpoint_name evidence)))
-                                           (propertize (concat "  " name) 'face 'mayhem-label)))))
-      (mayhem-defect--block "Stack trace" (alist-get 'stacktrace evidence))
-      (mayhem-defect--block "Request" (alist-get 'request evidence))
-      (mayhem-defect--block "Response" (alist-get 'response evidence))))
+     (when (alist-get 'path evidence)
+       (mayhem-field "Endpoint" (concat (alist-get 'method evidence) " "
+                                        (alist-get 'path evidence)
+                                        (when-let* ((name (alist-get 'endpoint_name evidence)))
+                                          (propertize (concat "  " name) 'face 'mayhem-label))))))
     ("code"
      (vui-fragment
       (mayhem-field "Crash" (string-join
@@ -93,12 +97,26 @@ Each frame's number and function, its source below; inlined calls follow."
                                              (when-let* ((n (alist-get 'signal_number evidence)))
                                                (format "signal %s" n))))
                              ", "))
-      (mayhem-field "Test cases" (format "%s" (or (alist-get 'count evidence) 0)))
+      (mayhem-field "Test cases" (format "%s" (or (alist-get 'count evidence) 0)))))))
+
+(defun mayhem-defect--evidence-blocks (source evidence)
+  "Return the sections of EVIDENCE of a defect from SOURCE, trace last.
+SOURCE is \"api\" or \"code\"."
+  (pcase source
+    ("api"
+     (vui-fragment
+      (mayhem-defect--block "Request" (alist-get 'request evidence))
+      (mayhem-defect--block "Response" (alist-get 'response evidence))
+      (mayhem-defect--block "Stack trace" (alist-get 'stacktrace evidence))))
+    ("code"
+     (vui-fragment
+      (mayhem-defect--block "Reproduce"
+                            (when-let* ((cmd (alist-get 'repro_cmdline evidence)))
+                              (mayhem-defect--split-command cmd)))
       (mayhem-defect--block "Backtrace"
                             (if-let* ((frames (alist-get 'frames evidence)))
                                 (mayhem-defect--frames frames)
-                              (alist-get 'backtrace evidence)))
-      (mayhem-defect--block "Reproduce" (alist-get 'repro_cmdline evidence))))))
+                              (alist-get 'backtrace evidence)))))))
 
 (defun mayhem-defect--render (data)
   "Return the vnodes of a defect's page, showing DATA."
@@ -121,10 +139,11 @@ Each frame's number and function, its source below; inlined calls follow."
      (mayhem-field "Last seen" (mayhem--format-age (alist-get 'last_seen defect) now))
      (when-let* ((run (alist-get 'run data)))
        (mayhem-field "Run" (format "#%s" run)))
-     (mayhem-defect--evidence (alist-get 'source defect) (alist-get 'evidence data))
+     (mayhem-defect--evidence-fields (alist-get 'source defect) (alist-get 'evidence data))
      (mayhem-defect--block "Description"
                            (string-fill (or (alist-get 'description defect) "")
-                                        mayhem-defect--fill-width)))))
+                                        mayhem-defect--fill-width))
+     (mayhem-defect--evidence-blocks (alist-get 'source defect) (alist-get 'evidence data)))))
 
 (defun mayhem-defect--skeleton ()
   "Return grey bars shaped like a defect's page, shown until its data lands."
