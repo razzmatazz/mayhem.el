@@ -19,9 +19,11 @@ must pass before you send changes.
 
 ## Code conventions
 
-- **Mayhem only through the CLI.**  Run `mayhem` with `mayhem--run-async`;
-  parse its output in pure, tested functions in `mayhem-core.el`.  Prefer
-  `--format json` where a subcommand offers it.
+- **Mayhem through its REST API.**  Request with `mayhem--api-get` (or
+  `mayhem--api-get-all` for paged lists); shape responses in pure, tested
+  functions in `mayhem-core.el`.  `docs/mayhem-openapi.json` documents
+  part of the API; the web app uses more endpoints than it lists.  Fall
+  back to the `mayhem` CLI only for what the API cannot do.
 - **Entry points live in `mayhem.el`.**  Every `;;;###autoload` command is
   defined there, and `mayhem.el` `require`s every other file, so any
   command a user runs has everything loaded.  Put a new view's mode and

@@ -22,10 +22,10 @@ users expect.
 - **Loading** shows only in the mode line, `(Mayhem:loading)`.  Stale
   content stays until fresh data replaces it.  A section's count appears
   once known: `Projects`, then `Projects (3)`.
-- **Errors**: show the CLI's output where the data would be, after
-  `mayhem <command> failed:` in the `error` face.  An empty result shows
-  the CLI's own notice in `shadow`.
-- **Actions** (stop or start a run) never block on the CLI: show
+- **Errors**: show the error message where the data would be, after
+  `Fetching <what> failed:` in the `error` face.  An empty result shows
+  a notice such as `No projects` in `shadow`.
+- **Actions** (stop or start a run) never block on the API: show
   "Stopping…" in place of the button, refresh when it returns, and on
   failure restore the button and report in the echo area.
 

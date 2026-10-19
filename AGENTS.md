@@ -9,8 +9,8 @@ and [docs/using-vui.md](docs/using-vui.md) first.
 - **Never commit or modify git state.**  The developer handles commits.
 - **Run `make ci` after every change** and fix all errors and warnings.
   Run it once at a time: parallel runs clobber each other's output.
-- **Talk to Mayhem only through the `mayhem` CLI** (`mayhem--run-async`),
-  never its HTTP API.
+- **Talk to Mayhem through its REST API** (`mayhem--api-get`); use the
+  `mayhem` CLI only for what the API cannot do.
 - **Call only declared dependencies** (`Package-Requires` in `mayhem.el`).
 - **Keep comments minimal**: the why, not the what.  Docs should still
   tell a newcomer what a feature does, why, and how to use or extend it.

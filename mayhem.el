@@ -27,7 +27,7 @@
 ;;; Commentary:
 
 ;; An Emacs client for Mayhem (https://app.mayhem.security), driven by
-;; the `mayhem' CLI and rendered with vui.el.  `M-x mayhem' opens a
+;; its REST API and rendered with vui.el.  `M-x mayhem' opens a
 ;; dashboard of your projects and their targets.
 
 ;;; Code:
@@ -59,7 +59,7 @@
   "Major mode for the Mayhem dashboard.")
 
 (defun mayhem-dashboard--projects (projects)
-  "Return the vnodes listing PROJECTS, as from `mayhem--parse-list'."
+  "Return the vnodes listing PROJECTS, as from `mayhem--group-targets'."
   (apply #'vui-fragment
          (mapcan
           (lambda (project)
@@ -75,24 +75,23 @@
           projects)))
 
 (vui-defcomponent mayhem-dashboard ()
-  "The dashboard: projects and their targets, from `mayhem list'."
+  "The dashboard: every project visible to the user, with its targets."
   :state ((result nil))
   :on-mount
   (let ((buf (current-buffer)))
     (setq mode-line-process ":loading")
-    (mayhem--run-async
-     '("list")
-     (vui-async-callback (ok output)
+    (mayhem--fetch-projects
+     (vui-async-callback (ok data)
        (when (buffer-live-p buf)
          (with-current-buffer buf
            (setq mode-line-process nil)
            (force-mode-line-update)))
-       (vui-set-state :result (list ok output))))
+       (vui-set-state :result (list ok data))))
     nil)
   :render
   (let* ((ok (nth 0 result))
-         (output (nth 1 result))
-         (projects (and ok (mayhem--parse-list output))))
+         (data (nth 1 result))
+         (projects (and ok data)))
     (vui-fragment
      (vui-text (propertize "Mayhem" 'face 'mayhem-section-heading))
      (vui-newline)
@@ -103,11 +102,11 @@
                            'face 'mayhem-section-heading))
      (vui-newline)
      (cond ((null result) nil)
-           ((not ok) (vui-text (concat (propertize "mayhem list failed: "
+           ((not ok) (vui-text (concat (propertize "Fetching projects failed: "
                                                    'face 'error)
-                                       output "\n")))
+                                       data "\n")))
            (projects (mayhem-dashboard--projects projects))
-           (t (vui-text (concat "  " (propertize output 'face 'shadow)
+           (t (vui-text (concat "  " (propertize "No projects" 'face 'shadow)
                                 "\n")))))))
 
 ;;;###autoload
