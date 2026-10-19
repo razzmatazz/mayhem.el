@@ -300,6 +300,88 @@ each trimmed to the fields its page shows, or an error message."
                                                     data))))))))
             callback)))))))
 
+(defconst mayhem--defect-fields
+  '(defect_number title severity severity_level state source cwe_number
+                  cwe_type cwe_link defect_class_name description first_seen
+                  last_seen last_seen_run_number)
+  "Fields of a defect kept for its page.")
+
+(defconst mayhem--evidence-max 4000
+  "Most characters of a request, response or backtrace kept for a page.")
+
+(defun mayhem--decode-base64 (string)
+  "Return STRING, base64 of UTF-8 text, decoded and cut to `mayhem--evidence-max'.
+Return nil when STRING is nil or not base64."
+  (when-let* ((raw (and string (ignore-errors (base64-decode-string string)))))
+    (truncate-string-to-width (decode-coding-string raw 'utf-8) mayhem--evidence-max
+                              nil nil "…")))
+
+(defun mayhem--format-stacktrace (stacktrace)
+  "Return STACKTRACE, an API issue's frames, as text, or nil without frames.
+Each frame is \"path:line in function\", its source line indented below."
+  (when-let* ((frames (alist-get 'frames (alist-get 'V1 stacktrace))))
+    (truncate-string-to-width
+     (mapconcat (lambda (frame)
+                  (concat (format "%s:%s in %s"
+                                  (alist-get 'path frame) (alist-get 'line frame)
+                                  (alist-get 'function frame))
+                          (when-let* ((snippet (alist-get 'snippet frame)))
+                            (concat "\n    " snippet))))
+                frames "\n")
+     mayhem--evidence-max nil nil "…")))
+
+(defun mayhem--api-evidence (issue)
+  "Return the evidence of an API run's ISSUE.
+That is its endpoint, the server's stack trace and the HTTP exchange."
+  (append (mayhem--pick issue '(method path endpoint_name))
+          (list (cons 'stacktrace (mayhem--format-stacktrace (alist-get 'stacktrace issue)))
+                (cons 'request (mayhem--decode-base64 (alist-get 'request issue)))
+                (cons 'response (mayhem--decode-base64 (alist-get 'response issue))))))
+
+(defun mayhem--code-evidence (reports)
+  "Return the evidence of a code defect from its test case REPORTS.
+That is how many there are, and the first's crash and backtrace."
+  (let ((first (car (alist-get 'testcase_reports reports))))
+    (append (list (cons 'count (alist-get 'count reports)))
+            (mayhem--pick first '(crash_type signal_number repro_cmdline))
+            (list (cons 'backtrace
+                        (when-let* ((bt (alist-get 'backtrace first)))
+                          (truncate-string-to-width bt mayhem--evidence-max nil nil "…")))))))
+
+(defun mayhem--fetch-defect (owner project target number run callback)
+  "Fetch defect NUMBER of TARGET of PROJECT of OWNER, with its evidence.
+Call CALLBACK with (OK DATA): DATA is an alist with `defect' and
+`evidence', each trimmed to what its page shows, or an error message.
+An API defect's evidence is the HTTP exchange of RUN, a run number, or
+else of the last run that saw it; a code defect's, its first test
+case's crash."
+  (let ((path (mayhem--path "/api/v2/owner/%s/project/%s/target/%s"
+                            owner project target)))
+    (mayhem--api-get
+     (concat path (format "/defect/%s" number)) nil
+     (lambda (ok defect)
+       (if (not ok)
+           (funcall callback nil defect)
+         (let ((done (lambda (ok evidence)
+                       (funcall callback ok
+                                (if ok `((defect . ,(mayhem--pick defect mayhem--defect-fields))
+                                         (run . ,run)
+                                         (evidence . ,evidence))
+                                  evidence))))
+               ;; A defect gives its last run's id, but evidence needs a number.
+               (run (or run (alist-get 'last_seen_run_number defect))))
+           (cond
+            ((and (equal (alist-get 'source defect) "api") run)
+             (mayhem--api-get (concat path (format "/run/%s/api/rest/issue/%s" run number)) nil
+                              (lambda (ok issue)
+                                (funcall done ok (if ok (mayhem--api-evidence issue) issue)))))
+            ((equal (alist-get 'source defect) "code")
+             (mayhem--api-get (concat path (format "/defect/%s/testcase_report" number))
+                              '((per_page 1))
+                              (lambda (ok reports)
+                                (funcall done ok (if ok (mayhem--code-evidence reports) reports)))))
+            (t (funcall done t nil)))))))))
+
 (defun mayhem--format-duration (seconds)
   "Return SECONDS as \"1h 5m\", \"3m 20s\" or \"45s\"; nil gives nil."
   (when seconds

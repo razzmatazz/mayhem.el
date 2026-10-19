@@ -114,5 +114,29 @@
   (should (equal (mayhem--pick '((a . 1) (b . 2) (c . 3)) '(c a z))
                  '((c . 3) (a . 1) (z)))))
 
+(ert-deftest mayhem-core-test-decode-base64 ()
+  (should (equal (mayhem--decode-base64 (base64-encode-string "GET / HTTP/1.1")) "GET / HTTP/1.1"))
+  (should-not (mayhem--decode-base64 nil))
+  (should-not (mayhem--decode-base64 "not base64!")))
+
+(ert-deftest mayhem-core-test-code-evidence ()
+  (let ((evidence (mayhem--code-evidence
+                   '((count . 3)
+                     (testcase_reports ((crash_type . "abort") (backtrace . "#0 main")
+                                        (registers . "big"))
+                                       ((crash_type . "other")))))))
+    (should (equal (alist-get 'count evidence) 3))
+    (should (equal (alist-get 'crash_type evidence) "abort"))
+    (should (equal (alist-get 'backtrace evidence) "#0 main"))
+    (should-not (assq 'registers evidence))))
+
+(ert-deftest mayhem-core-test-format-stacktrace ()
+  (should (equal (mayhem--format-stacktrace
+                  '((V1 (frames ((path . "a.py") (line . 3) (function . "f")
+                                 (snippet . "x()"))
+                                ((path . "b.py") (line . 9) (function . "g"))))))
+                 "a.py:3 in f\n    x()\nb.py:9 in g"))
+  (should-not (mayhem--format-stacktrace nil)))
+
 (provide 'mayhem-core-tests)
 ;;; mayhem-core-tests.el ends here

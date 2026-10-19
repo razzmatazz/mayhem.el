@@ -160,7 +160,7 @@ ON-VISIT is a function of no arguments that RET calls.  HELP-ECHO reads
 
 (defun mayhem-field (label value)
   "Return a vnode for a LABEL: VALUE line of a page's header."
-  (vui-text (concat (propertize (format "%-10s" label) 'face 'mayhem-label)
+  (vui-text (concat (propertize (format "%-12s" label) 'face 'mayhem-label)
                     (or value "") "\n")))
 
 (defun mayhem-heading (text)

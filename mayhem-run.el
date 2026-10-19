@@ -10,7 +10,8 @@
 ;;; Commentary:
 
 ;; A run's page, `*mayhem: owner/project/target/N*': its status, commit
-;; and counts, its defects, and, for an API run, its endpoints.
+;; and counts, its defects, and, for an API run, its endpoints.  RET on
+;; a defect opens its page.
 
 ;;; Code:
 
@@ -18,6 +19,7 @@
 (require 'mayhem-core)
 (require 'mayhem-sync)
 (require 'mayhem-vui)
+(require 'mayhem-defect)
 
 (mayhem-sync-define-resource run (owner project target number)
   :fetch (lambda (done) (mayhem--fetch-run owner project target number done)))
@@ -25,31 +27,26 @@
 (define-derived-mode mayhem-run-mode mayhem-page-mode "Mayhem Run"
   "Major mode for a Mayhem run's page.")
 
-(defun mayhem-run--severity-face (level)
-  "Return the face for a defect of severity LEVEL, such as \"high\"."
-  (pcase level
-    ("high" 'error)
-    ("medium" 'warning)
-    (_ 'mayhem-label)))
-
-(defun mayhem-run--defects (defects)
-  "Return the vnodes listing DEFECTS."
+(defun mayhem-run--defects (owner project target run defects)
+  "Return the vnodes listing DEFECTS of RUN of TARGET of PROJECT of OWNER."
   (vui-fragment
    (mayhem-heading (format "Defects (%d)" (length defects)))
    (if (null defects)
        (mayhem-notice "No defects")
      (apply #'vui-fragment
             (mapcar (lambda (defect)
-                      (let ((level (or (alist-get 'severity_level defect) "")))
-                        (vui-text
+                      (let ((level (or (alist-get 'severity_level defect) ""))
+                            (number (alist-get 'defect_number defect)))
+                        (mayhem-row
                          (concat "  "
                                  (propertize (format "%-7s" level)
-                                             'face (mayhem-run--severity-face level))
+                                             'face (mayhem-defect-severity-face level))
                                  " "
                                  (or (alist-get 'title defect) "")
-                                 (propertize (format "  #%s" (alist-get 'defect_number defect))
-                                             'face 'mayhem-label)
-                                 "\n"))))
+                                 (propertize (format "  #%s" number) 'face 'mayhem-label)
+                                 "\n")
+                         (lambda () (mayhem-defect-open owner project target number run))
+                         "RET: open defect")))
                     defects)))))
 
 (defun mayhem-run--endpoints (endpoints)
@@ -74,8 +71,8 @@
                                "\n"))))
                   endpoints))))
 
-(defun mayhem-run--render (data)
-  "Return the vnodes of a run's page, showing DATA."
+(defun mayhem-run--render (owner project target number data)
+  "Return the vnodes of run NUMBER of TARGET of PROJECT of OWNER, showing DATA."
   (let* ((run (alist-get 'run data))
          (revision (alist-get 'revision run))
          (now (current-time)))
@@ -98,7 +95,7 @@
                                      (or (alist-get 'tests_run run) 0)
                                      (or (alist-get 'edges_covered run) 0))))
      (vui-newline)
-     (mayhem-run--defects (alist-get 'defects data))
+     (mayhem-run--defects owner project target number (alist-get 'defects data))
      (when (alist-get 'api_run run)
        (mayhem-run--endpoints (alist-get 'endpoints data))))))
 
@@ -124,7 +121,9 @@
                              (propertize target 'face 'mayhem-target)
                              (format " #%s" number)))
      (vui-newline)
-     (mayhem-snapshot-view snapshot "run" (mayhem-run--skeleton) #'mayhem-run--render))))
+     (mayhem-snapshot-view snapshot "run" (mayhem-run--skeleton)
+                           (lambda (data)
+                             (mayhem-run--render owner project target number data))))))
 
 (defun mayhem-run-open (owner project target number)
   "Open the page of run NUMBER of TARGET of PROJECT of OWNER."

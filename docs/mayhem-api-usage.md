@@ -44,6 +44,9 @@ fallback only for what the API cannot do (none so far).
 | `GET .../target/{target}/run/{number}` | run page |
 | `GET /api/v2/owner/{owner}/project/{project}/defect?run={run_id}` | run page's defects |
 | `GET .../run/{number}/endpoints` | an API run page's endpoints |
+| `GET .../target/{target}/defect/{number}` | defect page |
+| `GET .../target/{target}/run/{run}/api/rest/issue/{defect}` | API defect's stack trace, request and response (base64) |
+| `GET .../target/{target}/defect/{number}/testcase_report?per_page=1` | code defect's crash, backtrace and reproducer |
 
 - The defect list's `run` filter takes the run's `run_id`, not its
   number; with a number it silently returns nothing.
