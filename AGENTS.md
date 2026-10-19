@@ -37,7 +37,8 @@ error):
 ```elisp
 (let (results)
   (dolist (f (list "mayhem-core.el" "mayhem-sync.el" "mayhem-vui.el"
-                  "mayhem-project.el" "mayhem-target.el" "mayhem.el"))
+                  "mayhem-workspace.el" "mayhem-project.el" "mayhem-target.el"
+                  "mayhem.el"))
     (condition-case err
         (with-temp-buffer
           (insert-file-contents (expand-file-name f "/Users/bob/src/mayhem.el"))

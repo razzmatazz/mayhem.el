@@ -21,6 +21,7 @@
 
 ;;; Code:
 
+(require 'seq)
 (require 'subr-x)
 (require 'url-parse)
 (require 'vui)
@@ -43,7 +44,7 @@
   "Functions called with a resource's key and whether it is now loading.
 Loading changes no data, so pages show it in the mode line only.")
 
-(defconst mayhem-sync--schema 1
+(defconst mayhem-sync--schema 2
   "Version of the store's tables, kept in SQLite's `user_version'.
 Bump it also when a resource's data changes shape: the store is then
 recreated rather than read in the old shape.")
@@ -264,6 +265,24 @@ There is one when a refresh failed over shown data: the data stays."
     (format "Refresh failed: %s; g to retry"
             (car (split-string (plist-get snapshot :error) "\n" t)))))
 
+(defvar-local mayhem-sync--snapshots nil
+  "Alist of resource key to the snapshot on this buffer's page.")
+
+(defun mayhem-sync--show-notice (buf key snapshot)
+  "Record in BUF the SNAPSHOT of KEY on its page, nil for none.
+Put in its header line the notice of the first snapshot that has one."
+  (when (buffer-live-p buf)
+    (with-current-buffer buf
+      (setq mayhem-sync--snapshots
+            (if snapshot
+                (cons (cons key snapshot) (assoc-delete-all key mayhem-sync--snapshots))
+              (assoc-delete-all key mayhem-sync--snapshots)))
+      (setq header-line-format
+            (when-let* ((notice (seq-some (lambda (entry)
+                                            (mayhem-sync-header-notice (cdr entry)))
+                                          mayhem-sync--snapshots)))
+              (propertize notice 'face 'warning))))))
+
 (defun mayhem-sync-use-resource (spec)
   "Return the snapshot of SPEC, as `mayhem-sync-read' gives it.
 Opening the page fetches SPEC unless it was fetched just now; the page
@@ -288,14 +307,21 @@ like any hook."
                 (puthash key rest mayhem-sync--subscriptions)
               (remhash key mayhem-sync--subscriptions))))))
     (let ((snapshot (vui-use-memo (key v) (mayhem-sync-read spec))))
-      (vui-use-effect (snapshot)
-        (when (buffer-live-p buf)
-          (with-current-buffer buf
-            (setq header-line-format
-                  (when-let* ((notice (mayhem-sync-header-notice snapshot)))
-                    (propertize notice 'face 'warning)))))
-        nil)
+      (vui-use-effect (key snapshot)
+        (mayhem-sync--show-notice buf key snapshot)
+        (lambda () (mayhem-sync--show-notice buf key nil)))
       snapshot)))
+
+(defun mayhem-sync-combine (&rest snapshots)
+  "Return one snapshot of SNAPSHOTS, for a page part that needs them all.
+Its :data is the list of theirs; it is fetched once all are, loading
+while any is, and carries the first error."
+  (list :data (mapcar (lambda (s) (plist-get s :data)) snapshots)
+        :fetched-at (and (seq-every-p (lambda (s) (plist-get s :fetched-at)) snapshots)
+                         (apply #'min (mapcar (lambda (s) (plist-get s :fetched-at))
+                                              snapshots)))
+        :error (seq-some (lambda (s) (plist-get s :error)) snapshots)
+        :loading (seq-some (lambda (s) (plist-get s :loading)) snapshots)))
 
 (defun mayhem-sync-refresh (&optional buffer soft)
   "Fetch again each resource on the page in BUFFER, even if fetched just now.

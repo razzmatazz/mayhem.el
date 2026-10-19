@@ -129,14 +129,58 @@ message.  OFFSET and ITEMS carry the pages fetched so far."
                                   (+ offset mayhem--page-size)
                                   (append items page)))))))))
 
+(defconst mayhem--project-fields
+  '(owner slug project_name n_defects_active_high n_defects_active_medium
+          n_defects_active_low updated_at)
+  "Fields of a project kept in the list of every project.")
+
+(defun mayhem--project-summary (project)
+  "Return PROJECT, an alist, with only `mayhem--project-fields'."
+  (mapcar (lambda (field) (cons field (alist-get field project)))
+          mayhem--project-fields))
+
+(defun mayhem--fetch-projects (callback)
+  "Fetch every project visible to the user, across workspaces.
+Call CALLBACK with (OK DATA): DATA is a list of project alists, as
+`mayhem--project-summary' trims them, or an error message."
+  (mayhem--api-get
+   "/api/v2/user/me" nil
+   (lambda (ok me)
+     (if (not ok)
+         (funcall callback nil me)
+       (mayhem--api-get-all
+        (mayhem--path "/api/v2/user/%s/project" (alist-get 'slug me))
+        'projects
+        (lambda (ok projects)
+          (funcall callback ok (if ok (mapcar #'mayhem--project-summary projects)
+                                 projects))))))))
+
+(defun mayhem--workspaces (projects)
+  "Return the workspaces of PROJECTS as (OWNER . PROJECT-COUNT), by name."
+  (let (counts)
+    (dolist (project projects)
+      (let* ((owner (alist-get 'owner project))
+             (cell (assoc owner counts)))
+        (if cell
+            (setcdr cell (1+ (cdr cell)))
+          (push (cons owner 1) counts))))
+    (sort counts (lambda (a b) (string< (car a) (car b))))))
+
+(defun mayhem--fetch-workspace-targets (owner callback)
+  "Fetch every target of the workspace OWNER.
+Call CALLBACK with (OK DATA): DATA is a list of target alists, or an
+error message."
+  (mayhem--api-get-all (mayhem--path "/api/v2/owner/%s/target" owner)
+                       'targets callback))
+
 (defun mayhem--group-targets (projects targets)
   "Return PROJECTS with their TARGETS, as from the API.
-Each element is (LABEL . TARGET-SLUGS), LABEL being `owner/project';
-both keep the API's order.  Targets of other projects are dropped."
+Each element is (PROJECT-SLUG . TARGET-SLUGS); both keep the API's
+order.  Targets of other projects are dropped."
   (mapcar (lambda (project)
             (let ((owner (alist-get 'owner project))
                   (slug (alist-get 'slug project)))
-              (cons (concat owner "/" slug)
+              (cons slug
                     (delq nil
                           (mapcar (lambda (target)
                                     (and (equal (alist-get 'owner target) owner)
@@ -144,59 +188,6 @@ both keep the API's order.  Targets of other projects are dropped."
                                          (alist-get 'slug target)))
                                   targets)))))
           projects))
-
-(defconst mayhem--max-requests 4
-  "Most requests one fetch runs at once.")
-
-(defun mayhem--fetch-owner-targets (owners callback)
-  "Fetch the targets of each of OWNERS, up to `mayhem--max-requests' at once.
-Call CALLBACK with (OK DATA): DATA is all of them, in OWNERS' order, or
-the first error message."
-  (let ((queue owners) (running 0) (failed nil)
-        (results (make-hash-table :test #'equal)))
-    (letrec ((next
-              (lambda ()
-                (if (and (null queue) (zerop running))
-                    (funcall callback t (mapcan (lambda (owner)
-                                                  (copy-sequence (gethash owner results)))
-                                                owners))
-                  (while (and queue (< running mayhem--max-requests))
-                    (let ((owner (pop queue)))
-                      (setq running (1+ running))
-                      (mayhem--api-get-all
-                       (format "/api/v2/owner/%s/target" (url-hexify-string owner))
-                       'targets
-                       (lambda (ok data)
-                         (setq running (1- running))
-                         (cond (failed)
-                               ((not ok) (setq failed t) (funcall callback nil data))
-                               (t (puthash owner data results)
-                                  (funcall next)))))))))))
-      (funcall next))))
-
-(defun mayhem--fetch-projects (callback)
-  "Fetch every project visible to the user, with its targets.
-Call CALLBACK with (OK DATA): DATA is as from `mayhem--group-targets',
-or an error message."
-  (mayhem--api-get
-   "/api/v2/user/me" nil
-   (lambda (ok me)
-     (if (not ok)
-         (funcall callback nil me)
-       (mayhem--api-get-all
-        (format "/api/v2/user/%s/project"
-                (url-hexify-string (alist-get 'slug me)))
-        'projects
-        (lambda (ok projects)
-          (if (not ok)
-              (funcall callback nil projects)
-            ;; One request per owner rather than per project: far fewer.
-            (mayhem--fetch-owner-targets
-             (delete-dups (mapcar (lambda (p) (alist-get 'owner p)) projects))
-             (lambda (ok targets)
-               (if ok
-                   (funcall callback t (mayhem--group-targets projects targets))
-                 (funcall callback nil targets)))))))))))
 
 ;;;; Pages' data
 

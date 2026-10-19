@@ -53,6 +53,7 @@ users expect.
   page, deleting a window made for mayhem.el once it has no mayhem page
   left.  `g` refreshes; `mayhem-page-mode` sets `revert-buffer-function`,
   so `revert-buffer` (`gr` under Evil) does too.
-- Name buffers after what they show: `*mayhem*`, `*mayhem: project*`,
+- Name buffers after what they show: `*mayhem*`, `*mayhem: owner*`,
+  `*mayhem: project*`,
   `*mayhem: project/target*`, `*mayhem: project/target/N*`, each
   `project` qualified by its owner (`owner/project`).

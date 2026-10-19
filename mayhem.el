@@ -37,55 +37,46 @@
 (require 'mayhem-core)
 (require 'mayhem-sync)
 (require 'mayhem-vui)
+(require 'mayhem-workspace)
 (require 'mayhem-project)
 (require 'mayhem-target)
 
 (define-derived-mode mayhem-dashboard-mode mayhem-page-mode "Mayhem"
   "Major mode for the Mayhem dashboard.")
 
-(defun mayhem-dashboard--projects (projects)
-  "Return the vnodes listing PROJECTS, as from `mayhem--group-targets'."
+(defun mayhem-dashboard--workspaces (workspaces)
+  "Return the vnodes listing WORKSPACES, as from `mayhem--workspaces'."
   (apply #'vui-fragment
-         (mapcan
-          (lambda (project)
-            (pcase-let ((`(,owner ,slug) (split-string (car project) "/")))
-              (cons (mayhem-row (concat "  " (propertize (car project) 'face 'mayhem-project)
-                                        "\n")
-                                (lambda () (mayhem-project-open owner slug))
-                                "RET: open project")
-                    (mapcar (lambda (target)
-                              (mayhem-row (concat "    "
-                                                  (propertize target 'face 'mayhem-target)
-                                                  "\n")
-                                          (lambda () (mayhem-target-open owner slug target))
-                                          "RET: open target"))
-                            (cdr project)))))
-          projects)))
-
-(mayhem-sync-define-resource projects ()
-  :fetch #'mayhem--fetch-projects)
+         (mapcar (pcase-lambda (`(,owner . ,count))
+                   (mayhem-row (concat "  "
+                                       (propertize (format "%-30s" owner) 'face 'mayhem-project)
+                                       (propertize (format " %3d project%s" count
+                                                           (if (= count 1) "" "s"))
+                                                   'face 'mayhem-label)
+                                       "\n")
+                               (lambda () (mayhem-workspace-open owner))
+                               "RET: open workspace"))
+                 workspaces)))
 
 (vui-defcomponent mayhem-dashboard ()
-  "The dashboard: every project visible to the user, with its targets."
+  "The dashboard: the workspaces of every project visible to the user."
   :render
   (let* ((snapshot (mayhem-sync-use-resource '(projects)))
-         (fetched (plist-get snapshot :fetched-at))
-         (projects (plist-get snapshot :data)))
+         (workspaces (mayhem--workspaces (plist-get snapshot :data))))
     (vui-fragment
      (mayhem-heading "Mayhem")
      (vui-newline)
-     (mayhem-heading (if fetched
-                         (format "Projects (%d)" (length projects))
-                       "Projects"))
-     (mayhem-snapshot-view snapshot "projects"
-                           (mayhem-skeleton '(("  " 26) ("    " 14) ("    " 20)
-                                              ("  " 22) ("    " 10)
-                                              ("  " 30) ("    " 16) ("    " 12) ("    " 18)
-                                              ("  " 18) ("    " 14)))
-                           (lambda (projects)
-                             (if projects
-                                 (mayhem-dashboard--projects projects)
-                               (mayhem-notice "No projects")))))))
+     (mayhem-heading (if (plist-get snapshot :fetched-at)
+                         (format "Workspaces (%d)" (length workspaces))
+                       "Workspaces"))
+     (mayhem-snapshot-view snapshot "workspaces"
+                           (mayhem-skeleton '(("  " 14 "  " 11) ("  " 22 "  " 11)
+                                              ("  " 10 "  " 11) ("  " 18 "  " 11)
+                                              ("  " 12 "  " 11) ("  " 16 "  " 11)))
+                           (lambda (_)
+                             (if workspaces
+                                 (mayhem-dashboard--workspaces workspaces)
+                               (mayhem-notice "No workspaces")))))))
 
 ;;;###autoload
 (defun mayhem ()

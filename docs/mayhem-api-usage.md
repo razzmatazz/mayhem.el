@@ -35,13 +35,19 @@ fallback only for what the API cannot do (none so far).
 | Endpoint | For |
 |---|---|
 | `GET /api/v2/user/me` | the user's `slug` |
-| `GET /api/v2/user/{slug}/project` | dashboard: every project visible to the user |
-| `GET /api/v2/owner/{owner}/target` | dashboard: targets, one request per owner |
+| `GET /api/v2/user/{slug}/project` | every project visible to the user: dashboard (workspaces) and workspace pages |
+| `GET /api/v2/owner/{owner}/target` | a workspace page's targets |
+| `GET /api/v2/owner/{owner}/project/{project}` | project page |
+| `GET /api/v2/owner/{owner}/project/{project}/target` | project page's targets |
+| `GET /api/v2/owner/{owner}/project/{project}/target/{target}` | target page |
+| `GET .../target/{target}/run?per_page=20` | target page's latest runs |
 
-- The dashboard groups targets by `owner` + `project_slug` and drops
+- `GET /api/v2/owner/{owner}/project` answers only members of the
+  workspace (404 "No resource found ... has access to"), so workspace
+  pages filter the list of every visible project instead.  The
+  owner's target list has no such limit.
+- A workspace page groups targets by `owner` + `project_slug` and drops
   targets of projects the user can't see.
-- Per owner, not per project: ~23 requests instead of ~90, up to 4 at
-  once (`mayhem--max-requests`).  About 5 s for 90 projects.
 - Results are cached by `mayhem-sync.el`, so pages paint from the store
   and these requests run behind; see docs/using-vui.md.
 

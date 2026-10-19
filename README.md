@@ -4,8 +4,8 @@ An Emacs client for [Mayhem](https://mayhem.security/) ([app.mayhem.security](ht
 
 ## Status
 
-Early work in progress.  There is a dashboard of your projects and their
-targets, and a page for each project and target.
+Early work in progress.  There is a dashboard of workspaces, and a page
+for each workspace, project and target.
 
 ## Requirements
 
@@ -17,21 +17,22 @@ targets, and a page for each project and target.
 
 ## Usage
 
-`M-x mayhem` opens the dashboard (`*mayhem*`), listing every project
-visible to you as `owner/project` with its targets under it.  It paints
+`M-x mayhem` opens the dashboard (`*mayhem*`), listing the workspaces
+(users and orgs) that own the projects visible to you.  It paints
 at once from a local cache, then refetches from the Mayhem API in the
 background, showing `:loading` in the mode line meanwhile.  If a
 request fails, for example because the token is missing or expired, the
 error shows in place of the list, or in the header line over cached
 data.
 
-RET on a project or target opens its page in the same window; S-RET
-opens it in another window.  A project's page shows its details and
-targets; a target's page shows its latest runs.
+RET opens what is at point in the same window; S-RET opens it in
+another window.  A workspace's page lists its projects with their
+targets, a project's page its details and targets, and a target's page
+its latest runs.
 
 | Key | Command |
 |---|---|
-| `RET` | open the project or target at point |
+| `RET` | open the workspace, project or target at point |
 | `S-RET` | `mayhem-visit-other-window`: open it in another window |
 | `g` | `mayhem-refresh`: fetch again (`gr` under Evil) |
 | `q` | `mayhem-quit-window`: back to the previous page |

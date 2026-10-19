@@ -57,7 +57,17 @@
                     ((owner . "bob") (project_slug . "p") (slug . "c"))
                     ((owner . "acme") (project_slug . "hidden") (slug . "x"))
                     ((owner . "acme") (project_slug . "p") (slug . "b"))))
-                 '(("acme/p" "a" "b") ("bob/p" "c") ("acme/empty")))))
+                 '(("p" "a" "b") ("p" "c") ("empty")))))
+
+(ert-deftest mayhem-core-test-workspaces ()
+  (should (equal (mayhem--workspaces '(((owner . "zed")) ((owner . "acme"))
+                                       ((owner . "zed"))))
+                 '(("acme" . 1) ("zed" . 2)))))
+
+(ert-deftest mayhem-core-test-project-summary ()
+  (should (equal (alist-get 'slug (mayhem--project-summary '((slug . "p") (settings . big))))
+                 "p"))
+  (should-not (assq 'settings (mayhem--project-summary '((slug . "p") (settings . big))))))
 
 (ert-deftest mayhem-core-test-path-encodes-segments ()
   (should (equal (mayhem--path "/a/%s/b/%s" "x y" "z/w") "/a/x%20y/b/z%2Fw")))
