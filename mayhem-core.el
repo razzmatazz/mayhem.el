@@ -383,13 +383,37 @@ That is its endpoint, the server's stack trace and the HTTP exchange."
                 (cons 'request (mayhem--decode-base64 (alist-get 'request issue)))
                 (cons 'response (mayhem--decode-base64 (alist-get 'response issue))))))
 
+(defconst mayhem--frames-max 100
+  "Most frames of a parsed backtrace kept for a page.")
+
+(defun mayhem--backtrace-frames (parsed)
+  "Return PARSED, a test case's `parsed_backtrace', as frames, innermost first.
+Each frame is a list of calls (FUNCTION . SOURCE), innermost first: more
+than one when calls were inlined into it.  SOURCE is nil when unknown."
+  (let ((known (lambda (src) (and src (not (string-prefix-p "??" src)) src))))
+    (mapcar (lambda (frame)
+              ;; addr2line packs inlined calls into one name:
+              ;; "f at a.c:1 (inlined by) g at b.c:2 (inlined by) h".
+              (let* ((calls (split-string (or (alist-get 'fn frame) "?") " (inlined by) "))
+                     (inner (mapcar (lambda (call)
+                                      (if (string-match "\\`\\(.*\\) at \\([^ ]+\\)\\'" call)
+                                          (cons (match-string 1 call)
+                                                (funcall known (match-string 2 call)))
+                                        (cons call nil)))
+                                    (butlast calls))))
+                (append inner (list (cons (car (last calls))
+                                          (funcall known (alist-get 'src frame)))))))
+            (take mayhem--frames-max parsed))))
+
 (defun mayhem--code-evidence (reports)
   "Return the evidence of a code defect from its test case REPORTS.
-That is how many there are, and the first's crash and backtrace."
+That is how many there are, and the first's crash and backtrace, parsed
+into `frames' when the API did."
   (let ((first (car (alist-get 'testcase_reports reports))))
     (append (list (cons 'count (alist-get 'count reports)))
             (mayhem--pick first '(crash_type signal_number repro_cmdline))
-            (list (cons 'backtrace
+            (list (cons 'frames (mayhem--backtrace-frames (alist-get 'parsed_backtrace first)))
+                  (cons 'backtrace
                         (when-let* ((bt (alist-get 'backtrace first)))
                           (truncate-string-to-width bt mayhem--evidence-max nil nil "…")))))))
 

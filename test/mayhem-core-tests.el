@@ -143,7 +143,19 @@
     (should (equal (alist-get 'count evidence) 3))
     (should (equal (alist-get 'crash_type evidence) "abort"))
     (should (equal (alist-get 'backtrace evidence) "#0 main"))
+    (should-not (alist-get 'frames evidence))
     (should-not (assq 'registers evidence))))
+
+(ert-deftest mayhem-core-test-backtrace-frames ()
+  (should (equal (mayhem--backtrace-frames
+                  '(((fn . "main") (src . "/app/m.c:3:1") (ip . 1))
+                    ((fn . "f at a.c:1:2 (inlined by) g at b.c:3:4 (inlined by) h")
+                     (src . "c.c:5:6"))
+                    ((fn . "rust::x+0x1") (src . "??:0:0"))))
+                 '((("main" . "/app/m.c:3:1"))
+                   (("f" . "a.c:1:2") ("g" . "b.c:3:4") ("h" . "c.c:5:6"))
+                   (("rust::x+0x1")))))
+  (should-not (mayhem--backtrace-frames nil)))
 
 (ert-deftest mayhem-core-test-format-stacktrace ()
   (should (equal (mayhem--format-stacktrace

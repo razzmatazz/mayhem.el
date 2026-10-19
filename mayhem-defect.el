@@ -48,6 +48,31 @@ Nothing when TEXT is empty."
      (mayhem-heading title)
      (vui-text (concat (string-trim-right text) "\n")))))
 
+(defun mayhem-defect--frames (frames)
+  "Return FRAMES, as `mayhem--backtrace-frames' gives them, as text.
+Each frame's number and function, its source below; inlined calls follow."
+  (let ((n -1))
+    (mapconcat
+     (lambda (frame)
+       (setq n (1+ n))
+       (let ((first t))
+         (mapconcat
+          (pcase-lambda (`(,fn . ,src))
+            (concat (if (not first)
+                        (propertize "    inlined by " 'face 'mayhem-label)
+                      (setq first nil)
+                      (propertize (format "#%-3d" n) 'face 'mayhem-label))
+                    ;; Dim a Rust symbol's +0x offset.
+                    (if (string-match "\\+0x[[:xdigit:]]+\\'" fn)
+                        (concat (propertize (substring fn 0 (match-beginning 0))
+                                            'face 'mayhem-target)
+                                (propertize (match-string 0 fn) 'face 'mayhem-label))
+                      (propertize fn 'face 'mayhem-target))
+                    (when src
+                      (concat "\n      " (propertize src 'face 'mayhem-label)))))
+          frame "\n")))
+     frames "\n")))
+
 (defun mayhem-defect--evidence (source evidence)
   "Return the vnodes of EVIDENCE of a defect from SOURCE, \"api\" or \"code\"."
   (pcase source
@@ -69,7 +94,10 @@ Nothing when TEXT is empty."
                                                (format "signal %s" n))))
                              ", "))
       (mayhem-field "Test cases" (format "%s" (or (alist-get 'count evidence) 0)))
-      (mayhem-defect--block "Backtrace" (alist-get 'backtrace evidence))
+      (mayhem-defect--block "Backtrace"
+                            (if-let* ((frames (alist-get 'frames evidence)))
+                                (mayhem-defect--frames frames)
+                              (alist-get 'backtrace evidence)))
       (mayhem-defect--block "Reproduce" (alist-get 'repro_cmdline evidence))))))
 
 (defun mayhem-defect--render (data)
