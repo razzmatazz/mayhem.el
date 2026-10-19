@@ -162,7 +162,8 @@ its last run's, when the API names it."
                     #'mayhem-defect-mode
                     (lambda () (vui-component 'mayhem-defect-page
                                               :owner owner :project project
-                                              :target target :number number :run run))))
+                                              :target target :number number :run run))
+                    (list 'defect owner project target number run)))
 
 (provide 'mayhem-defect)
 ;;; mayhem-defect.el ends here

@@ -38,6 +38,7 @@ response of an API defect, or the backtrace and reproducer of a crash.
 | `RET` | open the workspace, project, target, run or defect at point |
 | `S-RET` | `mayhem-visit-other-window`: open it in another window |
 | `g` | `mayhem-refresh`: fetch again (`gr` under Evil) |
+| `C-c C-o` | `mayhem-browse`: open the page in the web app, in a browser |
 | `C-c C-j` | `mayhem-jump`: open a workspace, project or target, read with completion |
 | `q` | `mayhem-quit-window`: back to the previous page |
 
@@ -49,6 +50,12 @@ keystroke.  It works anywhere; bind it globally if you like:
 ```elisp
 (keymap-global-set "C-c m" #'mayhem-jump)
 ```
+
+Links to the web app (`https://app.mayhem.security/owner/project/target/1`,
+or a defect's `...?defect=N`) open in mayhem.el's page for them,
+wherever Emacs follows a link, once mayhem.el is loaded; links it has
+no page for still go to the browser.  `M-x mayhem-browse-url` opens a
+pasted one.  Set `mayhem-open-urls` to nil to turn this off.
 
 Set `mayhem-config-file` if your config lives elsewhere.  The cache is
 kept in `mayhem-sync-directory`; deleting it is safe.

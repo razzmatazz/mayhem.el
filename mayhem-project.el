@@ -100,7 +100,8 @@
   (mayhem-open-page (format "*mayhem: %s/%s*" owner project)
                     #'mayhem-project-mode
                     (lambda () (vui-component 'mayhem-project-page
-                                              :owner owner :project project))))
+                                              :owner owner :project project))
+                    (list 'project owner project)))
 
 (provide 'mayhem-project)
 ;;; mayhem-project.el ends here

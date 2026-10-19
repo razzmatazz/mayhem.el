@@ -85,7 +85,8 @@
   "Open the page of the workspace OWNER."
   (mayhem-open-page (format "*mayhem: %s*" owner)
                     #'mayhem-workspace-mode
-                    (lambda () (vui-component 'mayhem-workspace-page :owner owner))))
+                    (lambda () (vui-component 'mayhem-workspace-page :owner owner))
+                    (list 'workspace owner)))
 
 (provide 'mayhem-workspace)
 ;;; mayhem-workspace.el ends here

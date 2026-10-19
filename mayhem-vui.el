@@ -16,8 +16,10 @@
 
 ;;; Code:
 
+(require 'browse-url)
 (require 'seq)
 (require 'vui)
+(require 'mayhem-core)
 (require 'mayhem-sync)
 
 (defface mayhem-section-heading
@@ -120,11 +122,24 @@ other mayhem page it showed is left."
   (interactive)
   (mayhem-sync-refresh))
 
+(defvar-local mayhem-page nil
+  "The page this buffer shows, as (KIND ARGS...); see `mayhem--url-page'.")
+
+(defun mayhem-browse ()
+  "Open the page shown in the web app, in a browser.
+A browser even when `mayhem-open-urls' would bring the link back here."
+  (interactive)
+  (unless mayhem-page
+    (user-error "Mayhem: No web page for this buffer"))
+  (browse-url-with-browser-kind
+   'external (mayhem--page-url (alist-get 'url (mayhem--read-config)) mayhem-page)))
+
 (declare-function mayhem-jump "mayhem" ())
 
 (defvar-keymap mayhem-page-mode-map
   :parent vui-mode-map
   "C-c C-j" #'mayhem-jump
+  "C-c C-o" #'mayhem-browse
   "g" #'mayhem-refresh
   "q" #'mayhem-quit-window
   "S-<return>" #'mayhem-visit-other-window)
@@ -134,11 +149,12 @@ other mayhem page it showed is left."
   ;; So `revert-buffer', and `gr' under Evil, refresh as `g' does.
   (setq-local revert-buffer-function #'mayhem-sync-revert-buffer))
 
-(defun mayhem-open-page (name mode component)
+(defun mayhem-open-page (name mode component &optional page)
   "Show the page buffer NAME, in MODE, with COMPONENT's vnode.
 COMPONENT is a function returning it; it is mounted only the first
-time.  A page already open is shown as it is, and refetches what is
-not fresh, as opening a page does."
+time.  PAGE is what it shows, as (KIND ARGS...), for `mayhem-browse'.
+A page already open is shown as it is, and refetches what is not
+fresh, as opening a page does."
   (let ((buf (get-buffer name)))
     (if (and buf (vui-get-instance buf))
         (mayhem-sync-refresh buf t)
@@ -149,6 +165,8 @@ not fresh, as opening a page does."
       ;; `vui-mount' ends with `switch-to-buffer'; the window is ours.
       (save-window-excursion
         (vui-mount (funcall component) name)))
+    (with-current-buffer buf
+      (setq mayhem-page page))
     (mayhem-display-buffer buf)))
 
 (defun mayhem-row (line on-visit help-echo)

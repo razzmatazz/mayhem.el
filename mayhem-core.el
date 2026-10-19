@@ -194,6 +194,58 @@ order.  Targets of other projects are dropped."
                                   targets)))))
           projects))
 
+;;;; Web links
+
+;; A page is named by a list (KIND ARGS...): (dashboard), (workspace
+;; OWNER), (project OWNER PROJECT), (target OWNER PROJECT TARGET), (run
+;; OWNER PROJECT TARGET NUMBER) or (defect OWNER PROJECT TARGET NUMBER
+;; RUN).  Links to the web app map to pages and back.  Its routes come
+;; from its JS bundle; "-" starts a segment that is not a slug.
+
+(defun mayhem--url-number (string)
+  "Return STRING as a number if it is all digits, else nil."
+  (and string (string-match-p "\\`[0-9]+\\'" string) (string-to-number string)))
+
+(defun mayhem--url-page (url host)
+  "Return the page showing URL, a link to the web app on HOST, or nil.
+Nil also when URL is on another host, or shows something no page does."
+  (let ((parsed (url-generic-parse-url url)))
+    (when (and (member (url-type parsed) '("http" "https"))
+               (url-host parsed) host
+               (string-equal-ignore-case (url-host parsed) host))
+      (pcase-let* ((`(,path . ,query) (url-path-and-query parsed))
+                   (segs (mapcar #'url-unhex-string (split-string (or path "") "/" t)))
+                   (params (and query (url-parse-query-string query)))
+                   (defect (mayhem--url-number (cadr (assoc "defect" params)))))
+        (pcase segs
+          ((guard (member "-" segs))
+           (pcase segs
+             (`(,o ,p ,tg "-" "defects" ,(app mayhem--url-number (and d (pred identity))))
+              (list 'defect o p tg d nil))
+             (`(,o ,p ,tg "-" "defects" ,(app mayhem--url-number (and d (pred identity)))
+                   "runs" ,(app mayhem--url-number (and r (pred identity))))
+              (list 'defect o p tg d r))))
+          ('nil '(dashboard))
+          (`(,o) (list 'workspace o))
+          (`(,o ,p) (list 'project o p))
+          (`(,o ,p ,tg) (list 'target o p tg))
+          (`(,o ,p ,tg ,(app mayhem--url-number (and n (pred identity))) . ,(or 'nil '("defects")))
+           (if defect (list 'defect o p tg defect n) (list 'run o p tg n))))))))
+
+(defun mayhem--page-url (base page)
+  "Return the link to PAGE in the web app at BASE."
+  (concat
+   (string-trim-right base "/")
+   (pcase page
+     ('(dashboard) "/")
+     (`(defect ,o ,p ,tg ,n ,run)
+      (if run
+          (format "%s?defect=%s" (mayhem--path "/%s/%s/%s/%s" o p tg (format "%s" run)) n)
+        (mayhem--path "/%s/%s/%s/-/defects/%s" o p tg (format "%s" n))))
+     (`(,_ . ,args)
+      (apply #'mayhem--path (mapconcat (lambda (_) "/%s") args "")
+             (mapcar (lambda (a) (format "%s" a)) args))))))
+
 ;;;; Pages' data
 
 (defun mayhem--host ()

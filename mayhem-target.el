@@ -95,7 +95,8 @@
                     #'mayhem-target-mode
                     (lambda () (vui-component 'mayhem-target-page
                                               :owner owner :project project
-                                              :target target))))
+                                              :target target))
+                    (list 'target owner project target)))
 
 (provide 'mayhem-target)
 ;;; mayhem-target.el ends here

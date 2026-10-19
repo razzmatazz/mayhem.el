@@ -131,7 +131,8 @@
                     #'mayhem-run-mode
                     (lambda () (vui-component 'mayhem-run-page
                                               :owner owner :project project
-                                              :target target :number number))))
+                                              :target target :number number))
+                    (list 'run owner project target number)))
 
 (provide 'mayhem-run)
 ;;; mayhem-run.el ends here

@@ -33,6 +33,8 @@
 
 ;;; Code:
 
+(require 'browse-url)
+(require 'cl-lib)
 (require 'vui)
 (require 'mayhem-core)
 (require 'mayhem-sync)
@@ -94,7 +96,8 @@ HOST is the Mayhem server's, shown with the user logged in."
   "Open the Mayhem dashboard."
   (interactive)
   (mayhem-open-page "*mayhem*" #'mayhem-dashboard-mode
-                    (lambda () (vui-component 'mayhem-dashboard :host (mayhem--host)))))
+                    (lambda () (vui-component 'mayhem-dashboard :host (mayhem--host)))
+                    '(dashboard)))
 
 ;;;###autoload
 (defun mayhem-jump ()
@@ -102,6 +105,52 @@ HOST is the Mayhem server's, shown with the user logged in."
 Candidates are \"owner\", \"owner/project\" and \"owner/project/target\"."
   (interactive)
   (mayhem-search-open (mayhem-search-read "Mayhem: Jump to: ")))
+
+;;;; Web links
+
+;; Links to the Mayhem web app open in mayhem.el's pages, through
+;; `browse-url-handlers', wherever Emacs follows a link.  Links no page
+;; shows still go to the browser, as does `mayhem-browse' (C-c C-o).
+
+(defun mayhem-open (page)
+  "Open PAGE, as (KIND ARGS...); see `mayhem--url-page'."
+  (pcase page
+    ('(dashboard) (mayhem))
+    (`(workspace . ,args) (apply #'mayhem-workspace-open args))
+    (`(project . ,args) (apply #'mayhem-project-open args))
+    (`(target . ,args) (apply #'mayhem-target-open args))
+    (`(run . ,args) (apply #'mayhem-run-open args))
+    (`(defect . ,args) (apply #'mayhem-defect-open args))))
+
+(defun mayhem--url-handled-p (url)
+  "Return non-nil if URL is a link to a page of the configured web app."
+  (when-let* ((host (mayhem--host)))
+    (mayhem--url-page url host)))
+
+;;;###autoload
+(defun mayhem-browse-url (url &rest _)
+  "Open the page showing URL, a link to the Mayhem web app.
+`mayhem-open-urls' adds it to `browse-url-handlers'."
+  (interactive (list (read-string "Mayhem URL: ")))
+  (if-let* ((page (and (mayhem--host) (mayhem--url-page url (mayhem--host)))))
+      (mayhem-open page)
+    (user-error "Mayhem: No page for %s" url)))
+
+;; So `browse-url-with-browser-kind' skips it when asked for a browser.
+(function-put 'mayhem-browse-url 'browse-url-browser-kind 'internal)
+
+(defcustom mayhem-open-urls t
+  "Non-nil means `browse-url' opens links to the Mayhem web app here.
+That is, in mayhem.el's page for it, wherever Emacs follows the link.
+Links no page shows still go to the browser."
+  :type 'boolean
+  :group 'mayhem
+  :set (lambda (symbol value)
+         (set-default symbol value)
+         (setq browse-url-handlers
+               (cl-remove #'mayhem-browse-url browse-url-handlers :key #'cdr))
+         (when value
+           (push (cons #'mayhem--url-handled-p #'mayhem-browse-url) browse-url-handlers))))
 
 (provide 'mayhem)
 ;;; mayhem.el ends here
