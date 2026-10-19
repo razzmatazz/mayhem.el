@@ -21,9 +21,10 @@ must pass before you send changes.
 
 - **Mayhem through its REST API.**  Request with `mayhem--api-get` (or
   `mayhem--api-get-all` for paged lists); shape responses in pure, tested
-  functions in `mayhem-core.el`.  `docs/mayhem-openapi.json` documents
-  part of the API; the web app uses more endpoints than it lists.  Fall
-  back to the `mayhem` CLI only for what the API cannot do.
+  functions in `mayhem-core.el`.  See
+  [docs/mayhem-api-usage.md](docs/mayhem-api-usage.md) for how, and
+  `docs/mayhem-openapi.json` for part of the API.  Fall back to the
+  `mayhem` CLI only for what the API cannot do.
 - **Entry points live in `mayhem.el`.**  Every `;;;###autoload` command is
   defined there, and `mayhem.el` `require`s every other file, so any
   command a user runs has everything loaded.  Put a new view's mode and
