@@ -78,6 +78,10 @@
                          (format "Projects (%d)" (length projects))
                        "Projects"))
      (mayhem-snapshot-view snapshot "projects"
+                           (mayhem-skeleton '(("  " 26) ("    " 14) ("    " 20)
+                                              ("  " 22) ("    " 10)
+                                              ("  " 30) ("    " 16) ("    " 12) ("    " 18)
+                                              ("  " 18) ("    " 14)))
                            (lambda (projects)
                              (if projects
                                  (mayhem-dashboard--projects projects)

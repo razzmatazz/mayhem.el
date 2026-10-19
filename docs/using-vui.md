@@ -46,7 +46,8 @@ resource beside its page, and read it during render:
   changes it re-renders every page reading it, from the root, so a
   component reading a resource must not be `:memo`.
 - `:fetched-at` is nil until the first success; tell "no data yet"
-  from "empty" by it.  A failed refresh keeps the data and sets
+  from "empty" by it.  `mayhem-snapshot-view` does: it shows the data,
+  else a skeleton, else the error.  A failed refresh keeps the data and sets
   `:error`, shown in the header line.
 - Data is stored printed, so it must be plain Lisp data.  A change to
   its shape bumps `mayhem-sync--schema`, which recreates the store.

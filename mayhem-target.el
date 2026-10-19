@@ -61,6 +61,15 @@
      (when (> count (length runs))
        (mayhem-notice (format "%d older runs not shown" (- count (length runs))))))))
 
+(defun mayhem-target--skeleton ()
+  "Return grey bars shaped like a target's page, shown until its data lands."
+  (vui-fragment
+   (mayhem-field "Type" (mayhem-skeleton-bar 4))
+   (mayhem-field "Updated" (mayhem-skeleton-bar 12))
+   (vui-newline)
+   (mayhem-heading "Runs")
+   (mayhem-skeleton (make-list 8 '("  " 6 " " 10 " " 12 "  " 12 " " 12)))))
+
 (vui-defcomponent mayhem-target-page (owner project target)
   "The page of TARGET of PROJECT of OWNER."
   :render
@@ -70,7 +79,8 @@
                              "/"
                              (propertize target 'face 'mayhem-target)))
      (vui-newline)
-     (mayhem-snapshot-view snapshot "target" #'mayhem-target--render))))
+     (mayhem-snapshot-view snapshot "target" (mayhem-target--skeleton)
+                           #'mayhem-target--render))))
 
 (defun mayhem-target-open (owner project target)
   "Open the page of TARGET of PROJECT of OWNER."

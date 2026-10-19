@@ -20,7 +20,11 @@ users expect.
 ## Loading, errors, actions
 
 - **Loading** shows only in the mode line, `(Mayhem:loading)`.  Pages
-  paint cached data at once; it stays until fresh data replaces it.  A section's count appears
+  paint cached data at once; it stays until fresh data replaces it.
+- **No data yet**: a **skeleton**, grey bars (`mayhem-skeleton`, face
+  `mayhem-skeleton`) shaped like the content to come, with the real
+  labels and headings, so the layout doesn't jump when it lands.  Every
+  page part passes one to `mayhem-snapshot-view`.  A section's count appears
   once known: `Projects`, then `Projects (3)`.
 - **A failed refresh** over shown data keeps the data and says so in the
   header line: `Refresh failed: MSG; g to retry`.

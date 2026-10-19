@@ -73,6 +73,18 @@
                         targets))
        (mayhem-notice "No targets")))))
 
+(defun mayhem-project--skeleton ()
+  "Return grey bars shaped like a project's page, shown until its data lands."
+  (vui-fragment
+   (mayhem-field "Branch" (mayhem-skeleton-bar 8))
+   (mayhem-field "Defects" (mayhem-skeleton-bar 26))
+   (mayhem-field "Updated" (mayhem-skeleton-bar 12))
+   (vui-newline)
+   (mayhem-heading "Targets")
+   (mayhem-skeleton '(("  " 30 " " 5 "  " 9 "  " 20)
+                      ("  " 24 "       " 5 "  " 9 "  " 18)
+                      ("  " 28 "   " 5 "  " 9 "  " 22)))))
+
 (vui-defcomponent mayhem-project-page (owner project)
   "The page of PROJECT of OWNER."
   :render
@@ -80,7 +92,7 @@
     (vui-fragment
      (mayhem-heading (propertize (concat owner "/" project) 'face 'mayhem-project))
      (vui-newline)
-     (mayhem-snapshot-view snapshot "project"
+     (mayhem-snapshot-view snapshot "project" (mayhem-project--skeleton)
                            (lambda (data) (mayhem-project--render owner project data))))))
 
 (defun mayhem-project-open (owner project)

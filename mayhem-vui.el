@@ -35,6 +35,13 @@
   "Face for target names."
   :group 'mayhem)
 
+(defface mayhem-skeleton
+  '((((class color) (background dark)) :background "gray25")
+    (((class color) (background light)) :background "gray88")
+    (t :inverse-video t))
+  "Face for the grey bars standing in for content that is still loading."
+  :group 'mayhem)
+
 (defface mayhem-label
   '((t :inherit shadow))
   "Face for field labels and secondary text."
@@ -164,14 +171,31 @@ ON-VISIT is a function of no arguments that RET calls.  HELP-ECHO reads
   "Return a vnode for TEXT where data would be, in FACE or `shadow'."
   (vui-text (concat "  " (propertize text 'face (or face 'shadow)) "\n")))
 
-(defun mayhem-snapshot-view (snapshot what render)
+(defun mayhem-skeleton-bar (width)
+  "Return a grey bar WIDTH columns wide, as a string."
+  (propertize (make-string (max 1 width) ?\s) 'face 'mayhem-skeleton))
+
+(defun mayhem-skeleton (rows)
+  "Return a vnode of grey bars standing in for content still loading.
+ROWS are lines, each a list of bar widths and literal strings, such as
+an indent or a field label."
+  (vui-text (mapconcat (lambda (row)
+                         (concat (mapconcat (lambda (x)
+                                              (if (numberp x) (mayhem-skeleton-bar x) x))
+                                            row "")
+                                 "\n"))
+                       rows "")))
+
+(defun mayhem-snapshot-view (snapshot what skeleton render)
   "Return the vnode of a page part showing SNAPSHOT, a sync snapshot.
-RENDER is called with the data once there is some.  Before that, it is
-empty while loading, or says fetching WHAT failed."
+RENDER is called with the data once there is some.  Before that, it
+shows SKELETON, a vnode shaped like the data to come, unless the fetch
+failed: then it says fetching WHAT failed."
   (cond ((plist-get snapshot :fetched-at) (funcall render (plist-get snapshot :data)))
-        ((plist-get snapshot :error)
+        ((and (plist-get snapshot :error) (not (plist-get snapshot :loading)))
          (vui-text (concat (propertize (format "Fetching %s failed: " what) 'face 'error)
-                           (plist-get snapshot :error) "\n")))))
+                           (plist-get snapshot :error) "\n")))
+        (t skeleton)))
 
 (provide 'mayhem-vui)
 ;;; mayhem-vui.el ends here
