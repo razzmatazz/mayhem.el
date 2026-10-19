@@ -40,6 +40,7 @@
 (require 'mayhem-workspace)
 (require 'mayhem-project)
 (require 'mayhem-target)
+(require 'mayhem-run)
 
 (define-derived-mode mayhem-dashboard-mode mayhem-page-mode "Mayhem"
   "Major mode for the Mayhem dashboard.")

@@ -10,7 +10,7 @@
 ;;; Commentary:
 
 ;; A target's page, `*mayhem: owner/project/target*': its details and
-;; its latest runs.
+;; its latest runs.  RET on a run opens its page.
 
 ;;; Code:
 
@@ -24,6 +24,8 @@
 
 (define-derived-mode mayhem-target-mode mayhem-page-mode "Mayhem Target"
   "Major mode for a Mayhem target's page.")
+
+(declare-function mayhem-run-open "mayhem-run" (owner project target number))
 
 (defun mayhem-target--run-line (run now)
   "Return the line of RUN, an alist, as of NOW."
@@ -40,8 +42,8 @@
                       'help-echo (alist-get 'created_at run))
           "\n"))
 
-(defun mayhem-target--render (data)
-  "Return the vnodes of a target's page, showing DATA."
+(defun mayhem-target--render (owner project target data)
+  "Return the vnodes of TARGET of PROJECT of OWNER's page, showing DATA."
   (let* ((info (alist-get 'target data))
          (runs (alist-get 'runs (alist-get 'runs data)))
          (count (or (alist-get 'count (alist-get 'runs data)) (length runs)))
@@ -55,7 +57,11 @@
      (mayhem-heading (format "Runs (%d)" count))
      (if runs
          (apply #'vui-fragment
-                (mapcar (lambda (run) (vui-text (mayhem-target--run-line run now)))
+                (mapcar (lambda (run)
+                          (let ((number (alist-get 'run_number run)))
+                            (mayhem-row (mayhem-target--run-line run now)
+                                        (lambda () (mayhem-run-open owner project target number))
+                                        "RET: open run")))
                         runs))
        (mayhem-notice "No runs"))
      (when (> count (length runs))
@@ -80,7 +86,8 @@
                              (propertize target 'face 'mayhem-target)))
      (vui-newline)
      (mayhem-snapshot-view snapshot "target" (mayhem-target--skeleton)
-                           #'mayhem-target--render))))
+                           (lambda (data)
+                             (mayhem-target--render owner project target data))))))
 
 (defun mayhem-target-open (owner project target)
   "Open the page of TARGET of PROJECT of OWNER."

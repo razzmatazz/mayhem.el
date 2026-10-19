@@ -111,13 +111,13 @@ parsed JSON (objects as alists, arrays as lists) or an error message."
                       nil t t))
     (error (run-at-time 0 nil callback nil (error-message-string err)))))
 
-(defun mayhem--api-get-all (path key callback &optional offset items)
-  "GET every page of the list under KEY at PATH.
+(defun mayhem--api-get-all (path key callback &optional params offset items)
+  "GET every page of the list under KEY at PATH, with query PARAMS.
 Call CALLBACK with (OK DATA): DATA is all the items, or an error
 message.  OFFSET and ITEMS carry the pages fetched so far."
   (let ((offset (or offset 0)))
     (mayhem--api-get
-     path `((per_page ,mayhem--page-size) (offset ,offset))
+     path `((per_page ,mayhem--page-size) (offset ,offset) ,@params)
      (lambda (ok data)
        (if (not ok)
            (funcall callback nil data)
@@ -125,9 +125,13 @@ message.  OFFSET and ITEMS carry the pages fetched so far."
            ;; Not every list reports a total count, so stop on a short page.
            (if (< (length page) mayhem--page-size)
                (funcall callback t (append items page))
-             (mayhem--api-get-all path key callback
+             (mayhem--api-get-all path key callback params
                                   (+ offset mayhem--page-size)
                                   (append items page)))))))))
+
+(defun mayhem--pick (alist fields)
+  "Return ALIST with only FIELDS, in their order."
+  (mapcar (lambda (field) (cons field (alist-get field alist))) fields))
 
 (defconst mayhem--project-fields
   '(owner slug project_name n_defects_active_high n_defects_active_medium
@@ -136,8 +140,7 @@ message.  OFFSET and ITEMS carry the pages fetched so far."
 
 (defun mayhem--project-summary (project)
   "Return PROJECT, an alist, with only `mayhem--project-fields'."
-  (mapcar (lambda (field) (cons field (alist-get field project)))
-          mayhem--project-fields))
+  (mayhem--pick project mayhem--project-fields))
 
 (defun mayhem--fetch-projects (callback)
   "Fetch every project visible to the user, across workspaces.
@@ -244,6 +247,66 @@ message."
                   (mayhem--api-get (concat path "/run")
                                    `((per_page ,mayhem--runs-shown)) cb))))
      callback)))
+
+(defconst mayhem--run-fields
+  '(run_id run_number description pending started stopped ended failed
+           started_at ended_at duration started_by branch_name revision
+           scm_commit_subject n_defects tests_run edges_covered api_run)
+  "Fields of a run kept for its page.")
+
+(defun mayhem--fetch-run (owner project target number callback)
+  "Fetch run NUMBER of TARGET of PROJECT of OWNER, with its defects.
+An API run's endpoints come too.  Call CALLBACK with (OK DATA): DATA is
+an alist with `run', `defects' and `endpoints' (nil for a code run),
+each trimmed to the fields its page shows, or an error message."
+  (let ((path (mayhem--path "/api/v2/owner/%s/project/%s/target/%s/run/%s"
+                            owner project target (format "%s" number))))
+    (mayhem--api-get
+     path nil
+     (lambda (ok run)
+       (if (not ok)
+           (funcall callback nil run)
+         (let ((api (alist-get 'api_run run)))
+           (mayhem--fetch-each
+            `((run . ,(lambda (cb)
+                        (funcall cb t (mayhem--pick
+                                       (cons (cons 'api_run (and api t)) run)
+                                       mayhem--run-fields))))
+              ;; Defects filter on the run's id, not its number.
+              (defects . ,(lambda (cb)
+                            (mayhem--api-get-all
+                             (mayhem--path "/api/v2/owner/%s/project/%s/defect"
+                                           owner project)
+                             'defects
+                             (lambda (ok data)
+                               (funcall cb ok (if ok (mapcar (lambda (d)
+                                                               (mayhem--pick
+                                                                d '(defect_number severity_level
+                                                                    title state)))
+                                                             data)
+                                                data)))
+                             `((run ,(alist-get 'run_id run))))))
+              (endpoints . ,(lambda (cb)
+                              (if (not api)
+                                  (funcall cb t nil)
+                                (mayhem--api-get-all
+                                 (concat path "/endpoints") 'endpoints
+                                 (lambda (ok data)
+                                   (funcall cb ok (if ok (mapcar (lambda (e)
+                                                                   (mayhem--pick
+                                                                    e '(method path passing
+                                                                        covered defects_total)))
+                                                                 data)
+                                                    data))))))))
+            callback)))))))
+
+(defun mayhem--format-duration (seconds)
+  "Return SECONDS as \"1h 5m\", \"3m 20s\" or \"45s\"; nil gives nil."
+  (when seconds
+    (let* ((s (truncate seconds)) (h (/ s 3600)) (m (/ (% s 3600) 60)) (sec (% s 60)))
+      (cond ((> h 0) (format "%dh %dm" h m))
+            ((> m 0) (format "%dm %ds" m sec))
+            (t (format "%ds" sec))))))
 
 (defun mayhem--run-status (run)
   "Return the status of RUN, an alist as the API gives it, as a string."

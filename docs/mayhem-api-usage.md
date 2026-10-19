@@ -41,6 +41,12 @@ fallback only for what the API cannot do (none so far).
 | `GET /api/v2/owner/{owner}/project/{project}/target` | project page's targets |
 | `GET /api/v2/owner/{owner}/project/{project}/target/{target}` | target page |
 | `GET .../target/{target}/run?per_page=20` | target page's latest runs |
+| `GET .../target/{target}/run/{number}` | run page |
+| `GET /api/v2/owner/{owner}/project/{project}/defect?run={run_id}` | run page's defects |
+| `GET .../run/{number}/endpoints` | an API run page's endpoints |
+
+- The defect list's `run` filter takes the run's `run_id`, not its
+  number; with a number it silently returns nothing.
 
 - `GET /api/v2/owner/{owner}/project` answers only members of the
   workspace (404 "No resource found ... has access to"), so workspace

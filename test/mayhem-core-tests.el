@@ -104,5 +104,15 @@
     (should (equal (mayhem--format-age "2024-10-01T12:00:00+00:00" now) "2 years ago"))
     (should-not (mayhem--format-age nil now))))
 
+(ert-deftest mayhem-core-test-format-duration ()
+  (should (equal (mayhem--format-duration 45) "45s"))
+  (should (equal (mayhem--format-duration 200) "3m 20s"))
+  (should (equal (mayhem--format-duration 3900) "1h 5m"))
+  (should-not (mayhem--format-duration nil)))
+
+(ert-deftest mayhem-core-test-pick ()
+  (should (equal (mayhem--pick '((a . 1) (b . 2) (c . 3)) '(c a z))
+                 '((c . 3) (a . 1) (z)))))
+
 (provide 'mayhem-core-tests)
 ;;; mayhem-core-tests.el ends here
