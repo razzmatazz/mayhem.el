@@ -4,8 +4,8 @@ An Emacs client for [Mayhem](https://mayhem.security/) ([app.mayhem.security](ht
 
 ## Status
 
-Early work in progress.  For now there is a single view: a dashboard of
-your projects and their targets.
+Early work in progress.  There is a dashboard of your projects and their
+targets, and a page for each project and target.
 
 ## Requirements
 
@@ -25,10 +25,16 @@ request fails, for example because the token is missing or expired, the
 error shows in place of the list, or in the header line over cached
 data.
 
+RET on a project or target opens its page in the same window; S-RET
+opens it in another window.  A project's page shows its details and
+targets; a target's page shows its latest runs.
+
 | Key | Command |
 |---|---|
-| `g` | `mayhem-dashboard-refresh`: fetch again |
-| `q` | quit the window |
+| `RET` | open the project or target at point |
+| `S-RET` | `mayhem-visit-other-window`: open it in another window |
+| `g` | `mayhem-refresh`: fetch again (`gr` under Evil) |
+| `q` | `mayhem-quit-window`: back to the previous page |
 
 Set `mayhem-config-file` if your config lives elsewhere.  The cache is
 kept in `mayhem-sync-directory`; deleting it is safe.

@@ -38,10 +38,17 @@ users expect.
 
 ## Windows and buffers
 
-- Open pages via `display-buffer`; from a mayhem page, reuse the selected
-  window so RET drills down in place.
-- `q` quits the window (back to the previous page), `g` refreshes.  Each
-  page's mode sets `revert-buffer-function` to `mayhem-sync-revert-buffer`,
-  so `revert-buffer` (`gr` under Evil) refreshes too.
+- Open pages with `mayhem-open-page` (through `mayhem-display-buffer`);
+  from a mayhem page it reuses the selected window, so RET drills down in
+  place.  `S-RET` (`mayhem-visit-other-window`) runs whatever RET does at
+  point with the page shown in another window, so new rows need nothing
+  extra.
+- Every page's mode derives from `mayhem-page-mode`, which binds `g`, `q`
+  and `S-RET`.
+- `q` (`mayhem-quit-window`) quits the window, back to the previous
+  page, deleting a window made for mayhem.el once it has no mayhem page
+  left.  `g` refreshes; `mayhem-page-mode` sets `revert-buffer-function`,
+  so `revert-buffer` (`gr` under Evil) does too.
 - Name buffers after what they show: `*mayhem*`, `*mayhem: project*`,
-  `*mayhem: project/target*`, `*mayhem: project/target/N*`.
+  `*mayhem: project/target*`, `*mayhem: project/target/N*`, each
+  `project` qualified by its owner (`owner/project`).

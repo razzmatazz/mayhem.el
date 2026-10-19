@@ -28,7 +28,8 @@ must pass before you send changes.
 - **Entry points live in `mayhem.el`.**  Every `;;;###autoload` command is
   defined there, and `mayhem.el` `require`s every other file, so any
   command a user runs has everything loaded.  Put a new view's mode and
-  logic in its own `mayhem-<feature>.el`.
+  logic in its own `mayhem-<feature>.el`, deriving from `mayhem-page-mode`
+  and opened with `mayhem-open-page` (`mayhem-vui.el`).
 - **vui.el for every buffer.**  Each page is a vui component in a mode
   derived from `vui-mode`.  Read [docs/using-vui.md](docs/using-vui.md)
   first.

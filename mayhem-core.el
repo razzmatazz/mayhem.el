@@ -18,6 +18,7 @@
 (require 'subr-x)
 (require 'url)
 (require 'url-http)
+(require 'iso8601)
 
 (defvar url-http-response-status)
 (defvar url-http-end-of-headers)
@@ -196,6 +197,88 @@ or an error message."
                (if ok
                    (funcall callback t (mayhem--group-targets projects targets))
                  (funcall callback nil targets)))))))))))
+
+;;;; Pages' data
+
+(defun mayhem--path (format-string &rest segments)
+  "Return FORMAT-STRING with SEGMENTS, each URL-encoded, in place of its %s."
+  (apply #'format format-string (mapcar #'url-hexify-string segments)))
+
+(defun mayhem--fetch-each (fetches callback)
+  "Run FETCHES at once, each (KEY . FUNCTION).
+FUNCTION is called with a callback for (OK DATA).  Call CALLBACK
+with (OK DATA): DATA is an alist of each KEY to its data, in FETCHES' order,
+or the first error message."
+  (let ((left (length fetches)) (results nil) (failed nil))
+    (if (zerop left)
+        (funcall callback t nil)
+      (pcase-dolist (`(,key . ,fn) fetches)
+        (funcall fn (lambda (ok data)
+                      (cond (failed)
+                            ((not ok) (setq failed t) (funcall callback nil data))
+                            (t (push (cons key data) results)
+                               (when (zerop (setq left (1- left)))
+                                 (funcall callback t
+                                          (mapcar (lambda (f) (assq (car f) results))
+                                                  fetches)))))))))))
+
+(defun mayhem--fetch-project (owner project callback)
+  "Fetch PROJECT of OWNER with its targets.
+Call CALLBACK with (OK DATA): DATA is an alist with `project' and
+`targets', or an error message."
+  (mayhem--fetch-each
+   `((project . ,(lambda (cb)
+                   (mayhem--api-get (mayhem--path "/api/v2/owner/%s/project/%s"
+                                                  owner project)
+                                    nil cb)))
+     (targets . ,(lambda (cb)
+                   (mayhem--api-get-all (mayhem--path "/api/v2/owner/%s/project/%s/target"
+                                                      owner project)
+                                        'targets cb))))
+   callback))
+
+(defconst mayhem--runs-shown 20
+  "How many of a target's latest runs its page shows.")
+
+(defun mayhem--fetch-target (owner project target callback)
+  "Fetch TARGET of PROJECT of OWNER, with its latest run list.
+Call CALLBACK with (OK DATA): DATA is an alist with `target' and `runs',
+the latter as the API lists them (`count' and `runs'), or an error
+message."
+  (let ((path (mayhem--path "/api/v2/owner/%s/project/%s/target/%s"
+                            owner project target)))
+    (mayhem--fetch-each
+     `((target . ,(lambda (cb) (mayhem--api-get path nil cb)))
+       (runs . ,(lambda (cb)
+                  (mayhem--api-get (concat path "/run")
+                                   `((per_page ,mayhem--runs-shown)) cb))))
+     callback)))
+
+(defun mayhem--run-status (run)
+  "Return the status of RUN, an alist as the API gives it, as a string."
+  (cond ((alist-get 'failed run) "failed")
+        ((alist-get 'stopped run) "stopped")
+        ((alist-get 'ended run) "completed")
+        ((alist-get 'started run) "running")
+        ((alist-get 'pending run) "pending")
+        (t "unknown")))
+
+(defun mayhem--format-age (timestamp now)
+  "Return how long before NOW, a time value, TIMESTAMP was, as \"3 days ago\".
+TIMESTAMP is an ISO 8601 string, as the API gives; nil gives nil."
+  (when timestamp
+    (let ((secs (float-time (time-subtract now (encode-time (iso8601-parse timestamp))))))
+      (pcase-let ((`(,n ,unit)
+                   (cond ((< secs 60) '(0 nil))
+                         ((< secs 3600) (list (/ secs 60) "minute"))
+                         ((< secs 86400) (list (/ secs 3600) "hour"))
+                         ((< secs (* 30 86400)) (list (/ secs 86400) "day"))
+                         ((< secs (* 365 86400)) (list (/ secs (* 30 86400)) "month"))
+                         (t (list (/ secs (* 365 86400)) "year")))))
+        (if (null unit)
+            "just now"
+          (let ((n (truncate n)))
+            (format "%d %s%s ago" n unit (if (= n 1) "" "s"))))))))
 
 (provide 'mayhem-core)
 ;;; mayhem-core.el ends here

@@ -297,14 +297,15 @@ like any hook."
         nil)
       snapshot)))
 
-(defun mayhem-sync-refresh (&optional buffer)
+(defun mayhem-sync-refresh (&optional buffer soft)
   "Fetch again each resource on the page in BUFFER, even if fetched just now.
-BUFFER defaults to the current one.  The page stays as it is until the
-new data lands."
+BUFFER defaults to the current one.  With SOFT, skip those fetched just
+now, as opening a page does.  The page stays as it is until the new
+data lands."
   (let ((buf (or buffer (current-buffer))))
     (maphash (lambda (key entries)
                (when (assq buf entries)
-                 (mayhem-sync-request (car (read-from-string key)) t)))
+                 (mayhem-sync-request (car (read-from-string key)) (not soft))))
              mayhem-sync--subscriptions)))
 
 (defun mayhem-sync-revert-buffer (&rest _)

@@ -36,45 +36,30 @@
 (require 'vui)
 (require 'mayhem-core)
 (require 'mayhem-sync)
+(require 'mayhem-vui)
+(require 'mayhem-project)
+(require 'mayhem-target)
 
-(defface mayhem-section-heading
-  '((t :inherit bold))
-  "Face for section headings."
-  :group 'mayhem)
-
-(defface mayhem-project
-  '((t :inherit font-lock-type-face))
-  "Face for project names."
-  :group 'mayhem)
-
-(defface mayhem-target
-  '((t :inherit font-lock-function-name-face))
-  "Face for target names."
-  :group 'mayhem)
-
-(defvar-keymap mayhem-dashboard-mode-map
-  :parent vui-mode-map
-  "g" #'mayhem-dashboard-refresh
-  "q" #'quit-window)
-
-(define-derived-mode mayhem-dashboard-mode vui-mode "Mayhem"
-  "Major mode for the Mayhem dashboard."
-  (setq-local revert-buffer-function #'mayhem-sync-revert-buffer))
+(define-derived-mode mayhem-dashboard-mode mayhem-page-mode "Mayhem"
+  "Major mode for the Mayhem dashboard.")
 
 (defun mayhem-dashboard--projects (projects)
   "Return the vnodes listing PROJECTS, as from `mayhem--group-targets'."
   (apply #'vui-fragment
          (mapcan
           (lambda (project)
-            (cons (vui-text (concat "  " (propertize (car project)
-                                                     'face 'mayhem-project)
-                                    "\n"))
-                  (mapcar (lambda (target)
-                            (vui-text (concat "    "
-                                              (propertize target
-                                                          'face 'mayhem-target)
-                                              "\n")))
-                          (cdr project))))
+            (pcase-let ((`(,owner ,slug) (split-string (car project) "/")))
+              (cons (mayhem-row (concat "  " (propertize (car project) 'face 'mayhem-project)
+                                        "\n")
+                                (lambda () (mayhem-project-open owner slug))
+                                "RET: open project")
+                    (mapcar (lambda (target)
+                              (mayhem-row (concat "    "
+                                                  (propertize target 'face 'mayhem-target)
+                                                  "\n")
+                                          (lambda () (mayhem-target-open owner slug target))
+                                          "RET: open target"))
+                            (cdr project)))))
           projects)))
 
 (mayhem-sync-define-resource projects ()
@@ -85,38 +70,25 @@
   :render
   (let* ((snapshot (mayhem-sync-use-resource '(projects)))
          (fetched (plist-get snapshot :fetched-at))
-         (projects (plist-get snapshot :data))
-         (failure (plist-get snapshot :error)))
+         (projects (plist-get snapshot :data)))
     (vui-fragment
-     (vui-text (propertize "Mayhem" 'face 'mayhem-section-heading))
+     (mayhem-heading "Mayhem")
      (vui-newline)
-     (vui-newline)
-     (vui-text (propertize (if fetched
-                               (format "Projects (%d)" (length projects))
-                             "Projects")
-                           'face 'mayhem-section-heading))
-     (vui-newline)
-     (cond (projects (mayhem-dashboard--projects projects))
-           (fetched (vui-text (concat "  " (propertize "No projects" 'face 'shadow)
-                                      "\n")))
-           (failure (vui-text (concat (propertize "Fetching projects failed: "
-                                                'face 'error)
-                                    failure "\n")))))))
+     (mayhem-heading (if fetched
+                         (format "Projects (%d)" (length projects))
+                       "Projects"))
+     (mayhem-snapshot-view snapshot "projects"
+                           (lambda (projects)
+                             (if projects
+                                 (mayhem-dashboard--projects projects)
+                               (mayhem-notice "No projects")))))))
 
 ;;;###autoload
 (defun mayhem ()
   "Open the Mayhem dashboard."
   (interactive)
-  (let ((buf (get-buffer-create "*mayhem*")))
-    (with-current-buffer buf
-      (unless (derived-mode-p 'mayhem-dashboard-mode)
-        (mayhem-dashboard-mode)))
-    (vui-mount (vui-component 'mayhem-dashboard) (buffer-name buf))))
-
-(defun mayhem-dashboard-refresh ()
-  "Fetch the dashboard afresh; it stays shown until the new data lands."
-  (interactive)
-  (mayhem-sync-refresh))
+  (mayhem-open-page "*mayhem*" #'mayhem-dashboard-mode
+                    (lambda () (vui-component 'mayhem-dashboard))))
 
 (provide 'mayhem)
 ;;; mayhem.el ends here
