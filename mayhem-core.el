@@ -15,9 +15,11 @@
 
 ;;; Code:
 
+(require 'seq)
 (require 'subr-x)
 (require 'url)
 (require 'url-http)
+(require 'url-parse)
 (require 'iso8601)
 
 (defvar url-http-response-status)
@@ -193,6 +195,49 @@ order.  Targets of other projects are dropped."
           projects))
 
 ;;;; Pages' data
+
+(defun mayhem--host ()
+  "Return the host of the configured Mayhem server, or nil without a config."
+  (ignore-errors
+    (url-host (url-generic-parse-url (alist-get 'url (mayhem--read-config))))))
+
+(defun mayhem--fetch-me (callback)
+  "Fetch the user logged in.
+Call CALLBACK with (OK DATA): DATA is the user's `slug', `username',
+`first_name' and `last_name', or an error message."
+  (mayhem--api-get "/api/v2/user/me" nil
+                   (lambda (ok me)
+                     (funcall callback ok
+                              (if ok (mayhem--pick me '(slug username first_name last_name))
+                                me)))))
+
+(defun mayhem--user-label (user)
+  "Return USER, as from `mayhem--fetch-me', as \"First Last (username)\".
+Without a name, just the username."
+  (let ((name (string-join (delq nil (list (alist-get 'first_name user)
+                                           (alist-get 'last_name user)))
+                           " "))
+        (username (or (alist-get 'username user) (alist-get 'slug user))))
+    (if (string-empty-p name)
+        username
+      (format "%s (%s)" name username))))
+
+(defun mayhem--search-candidates (projects targets)
+  "Return the workspaces, projects and targets of PROJECTS, to search.
+TARGETS is an alist of each owner to its targets, as from the API.
+Each is \"owner\", \"owner/project\" or \"owner/project/target\",
+each workspace followed by its projects, each by its targets."
+  (mapcan (pcase-lambda (`(,owner . ,_))
+            (cons owner
+                  (mapcan (pcase-lambda (`(,project . ,slugs))
+                            (let ((path (concat owner "/" project)))
+                              (cons path (mapcar (lambda (slug) (concat path "/" slug))
+                                                 slugs))))
+                          (mayhem--group-targets
+                           (seq-filter (lambda (p) (equal (alist-get 'owner p) owner))
+                                       projects)
+                           (cdr (assoc owner targets))))))
+          (mayhem--workspaces projects)))
 
 (defun mayhem--path (format-string &rest segments)
   "Return FORMAT-STRING with SEGMENTS, each URL-encoded, in place of its %s."

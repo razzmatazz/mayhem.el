@@ -38,7 +38,7 @@ error):
 (let (results)
   (dolist (f (list "mayhem-core.el" "mayhem-sync.el" "mayhem-vui.el"
                   "mayhem-workspace.el" "mayhem-project.el" "mayhem-target.el"
-                  "mayhem-defect.el" "mayhem-run.el" "mayhem.el"))
+                  "mayhem-defect.el" "mayhem-run.el" "mayhem-search.el" "mayhem.el"))
     (condition-case err
         (with-temp-buffer
           (insert-file-contents (expand-file-name f "/Users/bob/src/mayhem.el"))

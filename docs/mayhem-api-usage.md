@@ -34,7 +34,7 @@ fallback only for what the API cannot do (none so far).
 
 | Endpoint | For |
 |---|---|
-| `GET /api/v2/user/me` | the user's `slug` |
+| `GET /api/v2/user/me` | the user's `slug`; their name and username on the dashboard |
 | `GET /api/v2/user/{slug}/project` | every project visible to the user: dashboard (workspaces) and workspace pages |
 | `GET /api/v2/owner/{owner}/target` | a workspace page's targets |
 | `GET /api/v2/owner/{owner}/project/{project}` | project page |
@@ -57,6 +57,8 @@ fallback only for what the API cannot do (none so far).
   owner's target list has no such limit.
 - A workspace page groups targets by `owner` + `project_slug` and drops
   targets of projects the user can't see.
+- There is no search endpoint: `mayhem-jump` completes on the cached
+  project list and each workspace's targets (`mayhem-search.el`).
 - Results are cached by `mayhem-sync.el`, so pages paint from the store
   and these requests run behind; see docs/using-vui.md.
 

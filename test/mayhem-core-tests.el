@@ -64,6 +64,21 @@
                                        ((owner . "zed"))))
                  '(("acme" . 1) ("zed" . 2)))))
 
+(ert-deftest mayhem-core-test-search-candidates ()
+  (should (equal (mayhem--search-candidates
+                  '(((owner . "zed") (slug . "p"))
+                    ((owner . "acme") (slug . "q"))
+                    ((owner . "acme") (slug . "r")))
+                  '(("acme" ((owner . "acme") (project_slug . "q") (slug . "t")))
+                    ("zed" ((owner . "zed") (project_slug . "other") (slug . "x")))))
+                 '("acme" "acme/q" "acme/q/t" "acme/r" "zed" "zed/p"))))
+
+(ert-deftest mayhem-core-test-user-label ()
+  (should (equal (mayhem--user-label '((username . "jd") (first_name . "Jo")
+                                       (last_name . "Doe")))
+                 "Jo Doe (jd)"))
+  (should (equal (mayhem--user-label '((slug . "jd") (username . "jd"))) "jd")))
+
 (ert-deftest mayhem-core-test-project-summary ()
   (should (equal (alist-get 'slug (mayhem--project-summary '((slug . "p") (settings . big))))
                  "p"))

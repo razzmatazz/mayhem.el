@@ -23,7 +23,6 @@
 
 (require 'seq)
 (require 'subr-x)
-(require 'url-parse)
 (require 'vui)
 (require 'mayhem-core)
 
@@ -72,9 +71,7 @@ Signal a `user-error' when DB was made by a newer mayhem.el."
 
 (defun mayhem-sync--host ()
   "Return the host of the configured Mayhem server, or \"default\"."
-  (or (ignore-errors
-        (url-host (url-generic-parse-url (alist-get 'url (mayhem--read-config)))))
-      "default"))
+  (or (mayhem--host) "default"))
 
 (defun mayhem-sync--db ()
   "Return the store, opening it on first use."

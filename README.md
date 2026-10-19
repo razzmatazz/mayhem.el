@@ -38,7 +38,17 @@ response of an API defect, or the backtrace and reproducer of a crash.
 | `RET` | open the workspace, project, target, run or defect at point |
 | `S-RET` | `mayhem-visit-other-window`: open it in another window |
 | `g` | `mayhem-refresh`: fetch again (`gr` under Evil) |
+| `C-c C-j` | `mayhem-jump`: open a workspace, project or target, read with completion |
 | `q` | `mayhem-quit-window`: back to the previous page |
+
+The dashboard shows who you are logged in as, and the host.
+`mayhem-jump` completes on the cache, as the API has no search, and
+refetches it behind the prompt: what lands shows on the next
+keystroke.  It works anywhere; bind it globally if you like:
+
+```elisp
+(keymap-global-set "C-c m" #'mayhem-jump)
+```
 
 Set `mayhem-config-file` if your config lives elsewhere.  The cache is
 kept in `mayhem-sync-directory`; deleting it is safe.

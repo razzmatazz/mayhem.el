@@ -42,6 +42,10 @@
 (require 'mayhem-target)
 (require 'mayhem-defect)
 (require 'mayhem-run)
+(require 'mayhem-search)
+
+(mayhem-sync-define-resource me ()
+  :fetch #'mayhem--fetch-me)
 
 (define-derived-mode mayhem-dashboard-mode mayhem-page-mode "Mayhem"
   "Major mode for the Mayhem dashboard.")
@@ -60,13 +64,18 @@
                                "RET: open workspace"))
                  workspaces)))
 
-(vui-defcomponent mayhem-dashboard ()
-  "The dashboard: the workspaces of every project visible to the user."
+(vui-defcomponent mayhem-dashboard (host)
+  "The dashboard: the workspaces of every project visible to the user.
+HOST is the Mayhem server's, shown with the user logged in."
   :render
   (let* ((snapshot (mayhem-sync-use-resource '(projects)))
          (workspaces (mayhem--workspaces (plist-get snapshot :data))))
     (vui-fragment
      (mayhem-heading "Mayhem")
+     (mayhem-snapshot-view (mayhem-sync-use-resource '(me)) "user"
+                           (mayhem-skeleton '(("User        " 30)))
+                           (lambda (me) (mayhem-field "User" (mayhem--user-label me))))
+     (mayhem-field "Host" host)
      (vui-newline)
      (mayhem-heading (if (plist-get snapshot :fetched-at)
                          (format "Workspaces (%d)" (length workspaces))
@@ -85,7 +94,14 @@
   "Open the Mayhem dashboard."
   (interactive)
   (mayhem-open-page "*mayhem*" #'mayhem-dashboard-mode
-                    (lambda () (vui-component 'mayhem-dashboard))))
+                    (lambda () (vui-component 'mayhem-dashboard :host (mayhem--host)))))
+
+;;;###autoload
+(defun mayhem-jump ()
+  "Open the page of a workspace, project or target, read with completion.
+Candidates are \"owner\", \"owner/project\" and \"owner/project/target\"."
+  (interactive)
+  (mayhem-search-open (mayhem-search-read "Mayhem: Jump to: ")))
 
 (provide 'mayhem)
 ;;; mayhem.el ends here

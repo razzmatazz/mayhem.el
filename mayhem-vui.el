@@ -120,8 +120,11 @@ other mayhem page it showed is left."
   (interactive)
   (mayhem-sync-refresh))
 
+(declare-function mayhem-jump "mayhem" ())
+
 (defvar-keymap mayhem-page-mode-map
   :parent vui-mode-map
+  "C-c C-j" #'mayhem-jump
   "g" #'mayhem-refresh
   "q" #'mayhem-quit-window
   "S-<return>" #'mayhem-visit-other-window)
