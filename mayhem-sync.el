@@ -307,5 +307,10 @@ new data lands."
                  (mayhem-sync-request (car (read-from-string key)) t)))
              mayhem-sync--subscriptions)))
 
+(defun mayhem-sync-revert-buffer (&rest _)
+  "Refetch the page's resources, as `revert-buffer-function'.
+So `revert-buffer', and `gr' under Evil, refresh a page as `g' does."
+  (mayhem-sync-refresh))
+
 (provide 'mayhem-sync)
 ;;; mayhem-sync.el ends here

@@ -40,6 +40,8 @@ users expect.
 
 - Open pages via `display-buffer`; from a mayhem page, reuse the selected
   window so RET drills down in place.
-- `q` quits the window (back to the previous page), `g` refreshes.
+- `q` quits the window (back to the previous page), `g` refreshes.  Each
+  page's mode sets `revert-buffer-function` to `mayhem-sync-revert-buffer`,
+  so `revert-buffer` (`gr` under Evil) refreshes too.
 - Name buffers after what they show: `*mayhem*`, `*mayhem: project*`,
   `*mayhem: project/target*`, `*mayhem: project/target/N*`.

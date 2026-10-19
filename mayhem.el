@@ -58,7 +58,8 @@
   "q" #'quit-window)
 
 (define-derived-mode mayhem-dashboard-mode vui-mode "Mayhem"
-  "Major mode for the Mayhem dashboard.")
+  "Major mode for the Mayhem dashboard."
+  (setq-local revert-buffer-function #'mayhem-sync-revert-buffer))
 
 (defun mayhem-dashboard--projects (projects)
   "Return the vnodes listing PROJECTS, as from `mayhem--group-targets'."
