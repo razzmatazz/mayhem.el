@@ -1,0 +1,85 @@
+;;; mayhem-sync-tests.el --- Tests for mayhem-sync.el  -*- lexical-binding: t; -*-
+
+;;; Commentary:
+
+;; Tests for the sync store and requests, on an in-memory database.
+
+;;; Code:
+
+(require 'ert)
+(require 'mayhem-sync)
+
+(defmacro mayhem-sync-tests--with-db (&rest body)
+  "Run BODY with a fresh in-memory store and no loading resources."
+  (declare (indent 0))
+  `(let ((mayhem-sync--db (mayhem-sync--create (sqlite-open nil)))
+         (mayhem-sync--loading (make-hash-table :test #'equal))
+         (mayhem-sync--resources (make-hash-table :test #'eq))
+         (mayhem-sync-change-functions nil)
+         (mayhem-sync-loading-functions nil))
+     ,@body))
+
+(ert-deftest mayhem-sync-test-write-round-trips ()
+  (mayhem-sync-tests--with-db
+    (should (mayhem-sync--write mayhem-sync--db "k" '(("a/p" "t")) 10.0))
+    (should (equal (mayhem-sync--read mayhem-sync--db "k")
+                   '((("a/p" "t")) 10.0 nil)))))
+
+(ert-deftest mayhem-sync-test-unchanged-write-reports-nothing ()
+  (mayhem-sync-tests--with-db
+    (mayhem-sync--write mayhem-sync--db "k" '(1 2) 10.0)
+    (should-not (mayhem-sync--write mayhem-sync--db "k" '(1 2) 20.0))
+    (should (equal (nth 1 (mayhem-sync--read mayhem-sync--db "k")) 20.0))))
+
+(ert-deftest mayhem-sync-test-error-keeps-data-until-success ()
+  (mayhem-sync-tests--with-db
+    (mayhem-sync--write mayhem-sync--db "k" '(1) 10.0)
+    (should (mayhem-sync--write-error mayhem-sync--db "k" "HTTP 500: oops"))
+    (should-not (mayhem-sync--write-error mayhem-sync--db "k" "HTTP 500: oops"))
+    (should (equal (mayhem-sync--read mayhem-sync--db "k") '((1) 10.0 "HTTP 500: oops")))
+    ;; Same data, but the error clears, so the snapshot changed.
+    (should (mayhem-sync--write mayhem-sync--db "k" '(1) 20.0))
+    (should (equal (mayhem-sync--read mayhem-sync--db "k") '((1) 20.0 nil)))))
+
+(ert-deftest mayhem-sync-test-newer-schema-signals ()
+  (let ((db (sqlite-open nil)))
+    (sqlite-execute db (format "PRAGMA user_version = %d" (1+ mayhem-sync--schema)))
+    (should-error (mayhem-sync--create db) :type 'user-error)))
+
+(ert-deftest mayhem-sync-test-request-stores-and-notifies ()
+  (mayhem-sync-tests--with-db
+    (let ((fetches 0) changed done)
+      (mayhem-sync-define-resource thing ()
+        :fetch (lambda (cb) (setq fetches (1+ fetches)) (setq done cb)))
+      (add-hook 'mayhem-sync-change-functions (lambda (keys) (setq changed keys)))
+      (mayhem-sync-request '(thing))
+      (should (plist-get (mayhem-sync-read '(thing)) :loading))
+      ;; A second request while loading joins the first.
+      (mayhem-sync-request '(thing))
+      (should (= fetches 1))
+      (funcall done t '(42))
+      (should (equal changed '("(thing)")))
+      (should (equal (plist-get (mayhem-sync-read '(thing)) :data) '(42)))
+      (should-not (plist-get (mayhem-sync-read '(thing)) :loading))
+      ;; Fetched just now: only a forced request fetches again.
+      (mayhem-sync-request '(thing))
+      (should (= fetches 1))
+      (mayhem-sync-request '(thing) t)
+      (should (= fetches 2)))))
+
+(ert-deftest mayhem-sync-test-fetch-that-signals-records-error ()
+  (mayhem-sync-tests--with-db
+    (mayhem-sync-define-resource broken () :fetch (lambda (_cb) (error "Boom")))
+    (mayhem-sync-request '(broken))
+    (let ((snapshot (mayhem-sync-read '(broken))))
+      (should (equal (plist-get snapshot :error) "Boom"))
+      (should-not (plist-get snapshot :loading)))))
+
+(ert-deftest mayhem-sync-test-header-notice ()
+  (should-not (mayhem-sync-header-notice '(:error "x")))
+  (should-not (mayhem-sync-header-notice '(:fetched-at 1.0 :error "x" :loading t)))
+  (should (equal (mayhem-sync-header-notice '(:fetched-at 1.0 :error "HTTP 500: a\nb"))
+                 "Refresh failed: HTTP 500: a; g to retry")))
+
+(provide 'mayhem-sync-tests)
+;;; mayhem-sync-tests.el ends here

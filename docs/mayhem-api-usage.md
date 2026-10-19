@@ -40,7 +40,10 @@ fallback only for what the API cannot do (none so far).
 
 - The dashboard groups targets by `owner` + `project_slug` and drops
   targets of projects the user can't see.
-- Per owner, not per project: ~23 requests instead of ~90.
+- Per owner, not per project: ~23 requests instead of ~90, up to 4 at
+  once (`mayhem--max-requests`).  About 5 s for 90 projects.
+- Results are cached by `mayhem-sync.el`, so pages paint from the store
+  and these requests run behind; see docs/using-vui.md.
 
 ## Finding endpoints
 

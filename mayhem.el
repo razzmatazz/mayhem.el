@@ -28,12 +28,14 @@
 
 ;; An Emacs client for Mayhem (https://app.mayhem.security), driven by
 ;; its REST API and rendered with vui.el.  `M-x mayhem' opens a
-;; dashboard of your projects and their targets.
+;; dashboard of your projects and their targets.  Data is cached in a
+;; local SQLite store (see mayhem-sync.el), so pages paint at once.
 
 ;;; Code:
 
 (require 'vui)
 (require 'mayhem-core)
+(require 'mayhem-sync)
 
 (defface mayhem-section-heading
   '((t :inherit bold))
@@ -74,40 +76,31 @@
                           (cdr project))))
           projects)))
 
+(mayhem-sync-define-resource projects ()
+  :fetch #'mayhem--fetch-projects)
+
 (vui-defcomponent mayhem-dashboard ()
   "The dashboard: every project visible to the user, with its targets."
-  :state ((result nil))
-  :on-mount
-  (let ((buf (current-buffer)))
-    (setq mode-line-process ":loading")
-    (mayhem--fetch-projects
-     (vui-async-callback (ok data)
-       (when (buffer-live-p buf)
-         (with-current-buffer buf
-           (setq mode-line-process nil)
-           (force-mode-line-update)))
-       (vui-set-state :result (list ok data))))
-    nil)
   :render
-  (let* ((ok (nth 0 result))
-         (data (nth 1 result))
-         (projects (and ok data)))
+  (let* ((snapshot (mayhem-sync-use-resource '(projects)))
+         (fetched (plist-get snapshot :fetched-at))
+         (projects (plist-get snapshot :data))
+         (failure (plist-get snapshot :error)))
     (vui-fragment
      (vui-text (propertize "Mayhem" 'face 'mayhem-section-heading))
      (vui-newline)
      (vui-newline)
-     (vui-text (propertize (if result
+     (vui-text (propertize (if fetched
                                (format "Projects (%d)" (length projects))
                              "Projects")
                            'face 'mayhem-section-heading))
      (vui-newline)
-     (cond ((null result) nil)
-           ((not ok) (vui-text (concat (propertize "Fetching projects failed: "
-                                                   'face 'error)
-                                       data "\n")))
-           (projects (mayhem-dashboard--projects projects))
-           (t (vui-text (concat "  " (propertize "No projects" 'face 'shadow)
-                                "\n")))))))
+     (cond (projects (mayhem-dashboard--projects projects))
+           (fetched (vui-text (concat "  " (propertize "No projects" 'face 'shadow)
+                                      "\n")))
+           (failure (vui-text (concat (propertize "Fetching projects failed: "
+                                                'face 'error)
+                                    failure "\n")))))))
 
 ;;;###autoload
 (defun mayhem ()
@@ -120,9 +113,9 @@
     (vui-mount (vui-component 'mayhem-dashboard) (buffer-name buf))))
 
 (defun mayhem-dashboard-refresh ()
-  "Fetch the dashboard afresh."
+  "Fetch the dashboard afresh; it stays shown until the new data lands."
   (interactive)
-  (mayhem))
+  (mayhem-sync-refresh))
 
 (provide 'mayhem)
 ;;; mayhem.el ends here

@@ -22,7 +22,7 @@ and [docs/using-vui.md](docs/using-vui.md) first.
 Before reloading or `make ci`, check every edited file:
 
 ```bash
-python3 tools/el-outline.py mayhem.el mayhem-core.el
+python3 tools/el-outline.py mayhem.el mayhem-core.el mayhem-sync.el
 ```
 
 It exits 1 on unbalanced files and marks `← UNCLOSED` or `← SPANS INTO
@@ -36,7 +36,7 @@ error):
 
 ```elisp
 (let (results)
-  (dolist (f (list "mayhem-core.el" "mayhem.el"))
+  (dolist (f (list "mayhem-core.el" "mayhem-sync.el" "mayhem.el"))
     (condition-case err
         (with-temp-buffer
           (insert-file-contents (expand-file-name f "/Users/bob/src/mayhem.el"))
@@ -47,7 +47,7 @@ error):
   (nreverse results))
 ```
 
-- Load `mayhem-core.el` first and `mayhem.el` last.
+- Load `mayhem-core.el` first, then `mayhem-sync.el`, and `mayhem.el` last.
 - Don't kill the user's buffers; tell them to press `g`.  Kill only when a
   keymap changed (and `makunbound` the map first, as `defvar` won't
   rebind it) or a stale `.elc` shadows the source.  Say if you did.

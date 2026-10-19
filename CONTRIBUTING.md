@@ -37,6 +37,9 @@ must pass before you send changes.
   callbacks.  Render code must not select windows, move point, change
   global state or prompt: vui re-renders from timers, often in an
   unselected window.
+- **Pages read the sync store** (`mayhem-sync-use-resource`), never
+  fetch directly, so they paint at once from cache; see
+  [docs/using-vui.md](docs/using-vui.md).
 - **Loading shows in the mode line** (`mode-line-process`), never by
   clearing the buffer: stale content stays until fresh data arrives.
 - **Dependencies** are exactly the `Package-Requires` of `mayhem.el`,

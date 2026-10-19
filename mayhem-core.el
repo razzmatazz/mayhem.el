@@ -144,20 +144,34 @@ both keep the API's order.  Targets of other projects are dropped."
                                   targets)))))
           projects))
 
-(defun mayhem--fetch-owner-targets (owners callback &optional targets)
-  "Fetch the targets of each of OWNERS in turn.
-Call CALLBACK with (OK DATA): DATA is all of them, or an error
-message.  TARGETS carries those fetched so far."
-  (if (null owners)
-      (funcall callback t targets)
-    (mayhem--api-get-all
-     (format "/api/v2/owner/%s/target" (url-hexify-string (car owners)))
-     'targets
-     (lambda (ok data)
-       (if ok
-           (mayhem--fetch-owner-targets (cdr owners) callback
-                                        (append targets data))
-         (funcall callback nil data))))))
+(defconst mayhem--max-requests 4
+  "Most requests one fetch runs at once.")
+
+(defun mayhem--fetch-owner-targets (owners callback)
+  "Fetch the targets of each of OWNERS, up to `mayhem--max-requests' at once.
+Call CALLBACK with (OK DATA): DATA is all of them, in OWNERS' order, or
+the first error message."
+  (let ((queue owners) (running 0) (failed nil)
+        (results (make-hash-table :test #'equal)))
+    (letrec ((next
+              (lambda ()
+                (if (and (null queue) (zerop running))
+                    (funcall callback t (mapcan (lambda (owner)
+                                                  (copy-sequence (gethash owner results)))
+                                                owners))
+                  (while (and queue (< running mayhem--max-requests))
+                    (let ((owner (pop queue)))
+                      (setq running (1+ running))
+                      (mayhem--api-get-all
+                       (format "/api/v2/owner/%s/target" (url-hexify-string owner))
+                       'targets
+                       (lambda (ok data)
+                         (setq running (1- running))
+                         (cond (failed)
+                               ((not ok) (setq failed t) (funcall callback nil data))
+                               (t (puthash owner data results)
+                                  (funcall next)))))))))))
+      (funcall next))))
 
 (defun mayhem--fetch-projects (callback)
   "Fetch every project visible to the user, with its targets.

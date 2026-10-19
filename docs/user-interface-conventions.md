@@ -19,10 +19,12 @@ users expect.
 
 ## Loading, errors, actions
 
-- **Loading** shows only in the mode line, `(Mayhem:loading)`.  Stale
-  content stays until fresh data replaces it.  A section's count appears
+- **Loading** shows only in the mode line, `(Mayhem:loading)`.  Pages
+  paint cached data at once; it stays until fresh data replaces it.  A section's count appears
   once known: `Projects`, then `Projects (3)`.
-- **Errors**: show the error message where the data would be, after
+- **A failed refresh** over shown data keeps the data and says so in the
+  header line: `Refresh failed: MSG; g to retry`.
+- **Errors** with no data: show the error message where the data would be, after
   `Fetching <what> failed:` in the `error` face.  An empty result shows
   a notice such as `No projects` in `shadow`.
 - **Actions** (stop or start a run) never block on the API: show
