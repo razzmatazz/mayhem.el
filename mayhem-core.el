@@ -482,7 +482,8 @@ message."
 
 (defconst mayhem--scm-fields
   '(scm_remote_origin branch_name merge_base_branch_name revision
-                     scm_commit_subject scm_commit_author ci_type ci_url)
+                     scm_commit_subject scm_commit_author scm_commit_author_email
+                     ci_type ci_url)
   "Fields of a run naming its source and the CI build that started it.")
 
 (defun mayhem--clean-url (url)
@@ -555,10 +556,57 @@ such as a Mayhem server's own, which have no page."
            n_exploitability_factors_passing n_exploitability_factors_total
            n_testcase_reports n_regression_testcase_reports
            n_regression_defect_reports n_optimized_set_testcases
+           elapsed_real_time cputime created_at updated_at build_id
+           cli_version parent_revision is_mayhem_bot has_critical_errors
+           mayhemfile_flat overrides env_vars run_files phases
+           tests_run_mfuzz tests_run_libfuzz tests_run_honggfuzz
+           tests_run_symexec current_workers desired_workers
+           n_desired_cpu n_desired_memory n_crash_reports
+           n_behavior_crash_reports n_regression_crash_reports
+           n_valgrind_errors n_behavior_valgrind_errors
+           n_regression_valgrind_errors n_starting_testcases
            ;; From its `run_attributes'.
            n_lines_covered n_lines_total n_blocks_covered n_blocks_total
-           n_functions_covered n_functions_total)
+           n_functions_covered n_functions_total
+           n_defects_active_high n_defects_active_medium n_defects_active_low
+           n_defects_fixed_high n_defects_fixed_medium n_defects_fixed_low
+           n_optimized_testsuite_size n_total_testsuite_size triage_queue_size
+           n_initial_coverage_collection_processed
+           n_initial_coverage_collection_total)
   "Fields of a run kept for its page.")
+
+(defconst mayhem--run-phase-fields
+  '(phase_name status failed stopped started_at ended_at elapsed_real_time)
+  "Fields of each of a run's `phases' kept for its page.")
+
+(defun mayhem--run-summary (run)
+  "Return RUN, as the API gives it, with only `mayhem--run-fields'.
+Its `run_attributes' are merged in; `api_run' is t for an API run, and
+its phases and files are trimmed too."
+  (let ((summary (mayhem--pick (append (list (cons 'api_run (and (alist-get 'api_run run) t)))
+                                       run (alist-get 'run_attributes run))
+                               mayhem--run-fields)))
+    (setf (alist-get 'phases summary)
+          (mapcar (lambda (phase) (mayhem--pick phase mayhem--run-phase-fields))
+                  (alist-get 'phases summary)))
+    (setf (alist-get 'run_files summary)
+          (mapcar (lambda (file) (mayhem--pick file '(path sha256)))
+                  (alist-get 'run_files summary)))
+    summary))
+
+(defun mayhem--format-value (value)
+  "Return VALUE, parsed from JSON, as one line of text.
+A list of strings or numbers is joined with commas; an object, or
+anything else, is written as JSON."
+  (cond ((stringp value) value)
+        ((numberp value) (number-to-string value))
+        ((eq value t) "true")
+        ((null value) "")
+        ((and (listp value) (seq-every-p (lambda (v) (or (stringp v) (numberp v))) value))
+         (mapconcat #'mayhem--format-value value ", "))
+        (t (condition-case nil
+               (json-serialize value :null-object nil)
+             (error (format "%S" value))))))
 
 (defun mayhem--counts (data)
   "Return the `stats' of DATA, a count over time, as (TIMESTAMP . COUNT)."
@@ -592,10 +640,7 @@ to the fields its page shows, or an error message."
          (let ((api (alist-get 'api_run run)))
            (mayhem--fetch-each
             `((run . ,(lambda (cb)
-                        (funcall cb t (mayhem--pick
-                                       (append (list (cons 'api_run (and api t)))
-                                               run (alist-get 'run_attributes run))
-                                       mayhem--run-fields))))
+                        (funcall cb t (mayhem--run-summary run))))
               ;; Defects filter on the run's id, not its number.
               (defects . ,(lambda (cb)
                             (mayhem--api-get-all

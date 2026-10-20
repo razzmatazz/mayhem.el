@@ -10,10 +10,12 @@
 ;;; Commentary:
 
 ;; A run's page, `*mayhem: owner/project/target/N*': its status, commit
-;; and image; for a code run, a chart of its progress, as the web app's
-;; run page has.  Below, in tabs: its defects; for a code run its tests
-;; (counts and failing test cases) and coverage, for an API run its
-;; endpoints; and its event log, shown first for a failed run.  RET on a defect or test case opens
+;; and image, and its Mayhemfile, which RET shows as a file; for a code
+;; run, a chart of its progress, as the web app's run page has.  Below,
+;; in tabs: its defects; for a code run its tests (counts and failing
+;; test cases) and coverage, for an API run its endpoints; its details
+;; (how it was started, and each task's status); and its event log,
+;; shown first for a failed run.  RET on a defect or test case opens
 ;; its page.  While the run is going, the page refetches every
 ;; `mayhem-run-refresh-interval' seconds.
 
@@ -59,9 +61,17 @@ often as other data.")
 (define-derived-mode mayhem-run-mode mayhem-page-mode "Mayhem Run"
   "Major mode for a Mayhem run's page.")
 
-(defun mayhem-run--defects (owner project target run defects)
-  "Return the vnodes listing DEFECTS of RUN of TARGET of PROJECT of OWNER."
+(defun mayhem-run--defects (owner project target run defects &optional counts)
+  "Return the vnodes listing DEFECTS of RUN of TARGET of PROJECT of OWNER.
+COUNTS, the run's alist, gives how many are active and fixed by severity."
   (vui-fragment
+   (when-let* ((active (mayhem-severity-counts counts)))
+     (mayhem-field "Active" active))
+   (when-let* ((fixed (mayhem-severity-counts counts "fixed")))
+     (mayhem-field "Fixed" fixed))
+   (when (and defects (or (mayhem-severity-counts counts)
+                          (mayhem-severity-counts counts "fixed")))
+     (vui-newline))
    (if (null defects)
        (mayhem-notice "No defects")
      (apply #'vui-fragment
@@ -135,7 +145,21 @@ The exact time is its `help-echo' and `mayhem-ts', as for an age."
    (mayhem-field "Inputs" (concat (format "%s tested" (or (alist-get 'tests_run run) 0))
                                   (when-let* ((rate (alist-get 'tests_per_second run)))
                                     (propertize (format "  %s per second" rate)
-                                                'face 'mayhem-label))))))
+                                                'face 'mayhem-label))))
+   (when-let* ((engines (mayhem-run--engines run)))
+     (mayhem-field "Engines" engines))))
+
+(defun mayhem-run--engines (run)
+  "Return how many inputs each engine of RUN tested, or nil if none did."
+  (let ((parts (delq nil
+                     (mapcar (pcase-lambda (`(,key . ,name))
+                               (let ((n (or (alist-get key run) 0)))
+                                 (when (> n 0) (format "%s %d" name n))))
+                             '((tests_run_mfuzz . "Mayhem fuzzer")
+                               (tests_run_libfuzz . "libFuzzer")
+                               (tests_run_honggfuzz . "honggfuzz")
+                               (tests_run_symexec . "symbolic execution"))))))
+    (and parts (string-join parts ", "))))
 
 (defun mayhem-run--test-counts (owner project target number run)
   "Return the vnodes of how many test cases RUN, a code run, has, by kind.
@@ -143,11 +167,39 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
   (let* ((all (or (alist-get 'n_testcase_reports run) 0))
          (regression (or (alist-get 'n_regression_testcase_reports run) 0))
          (failing (or (alist-get 'n_regression_defect_reports run) 0))
-         (optimized (alist-get 'n_optimized_set_testcases run)))
+         (optimized (alist-get 'n_optimized_set_testcases run))
+         (starting (alist-get 'n_starting_testcases run))
+         (measured (alist-get 'n_initial_coverage_collection_processed run))
+         (to-measure (alist-get 'n_initial_coverage_collection_total run))
+         (corpus (alist-get 'n_total_testsuite_size run))
+         (queued (alist-get 'triage_queue_size run))
+         (split (lambda (key)
+                  (propertize (format "  %d new, %d regression"
+                                      (or (alist-get (intern (format "n_behavior_%s" key)) run) 0)
+                                      (or (alist-get (intern (format "n_regression_%s" key)) run) 0))
+                              'face 'mayhem-label))))
     (vui-fragment
      (mayhem-field "All" (format "%d test case%s" all (if (= all 1) "" "s")))
      (mayhem-field "Regression" (format "%d of %d passing" (- regression failing) regression))
      (mayhem-field "New" (format "%d discovered" (- all regression)))
+     (when starting
+       (mayhem-field "Starting" (format "%d test case%s" starting (if (= starting 1) "" "s"))
+                     (when (and to-measure (> to-measure 0))
+                       (propertize (format "  coverage of %d of %d measured"
+                                           (or measured 0) to-measure)
+                                   'face 'mayhem-label))))
+     (when-let* ((n (alist-get 'n_crash_reports run)))
+       (mayhem-field "Crashes" (format "%d" n) (funcall split "crash_reports")))
+     (when-let* ((n (alist-get 'n_valgrind_errors run)))
+       (mayhem-field "Memory" (format "%d Valgrind error%s" n (if (= n 1) "" "s"))
+                     (funcall split "valgrind_errors")))
+     (when (and corpus (> corpus 0))
+       (mayhem-field "Corpus" (format "%d test case%s" corpus (if (= corpus 1) "" "s"))
+                     (when-let* ((kept (alist-get 'n_optimized_testsuite_size run)))
+                       (propertize (format "  %d after optimizing" kept) 'face 'mayhem-label))))
+     ;; Only a live run's queue says anything about its progress.
+     (when (and queued (> queued 0) (mayhem-run--live-p run))
+       (mayhem-field "Triage" (format "%d test case%s queued" queued (if (= queued 1) "" "s"))))
      (when optimized
        (mayhem-field "Optimized"
                      (mayhem-page-link (format "%d test case%s" optimized
@@ -317,6 +369,138 @@ component so a run's test case results are fetched only once it shows."
                    "\n")))
        events "")))))
 
+(defun mayhem-run--duration (run)
+  "Return how long RUN went on for, with its time limit beside it."
+  (let ((real (mayhem--format-duration (alist-get 'elapsed_real_time run)))
+        (limit (mayhem--format-duration (alist-get 'duration run))))
+    (concat (or real "")
+            (when limit
+              (propertize (concat (if real "  " "") "limit " limit) 'face 'mayhem-label)))))
+
+(defun mayhem-run--yaml-mode ()
+  "Return the major mode the user gives YAML files, or nil."
+  (let ((mode (assoc-default "Mayhemfile.yaml" auto-mode-alist #'string-match)))
+    (when (consp mode) (setq mode (car mode)))
+    (and (functionp mode) mode)))
+
+(defun mayhem-run-show-mayhemfile (owner project target number text)
+  "Show TEXT, the Mayhemfile of run NUMBER of TARGET of PROJECT of OWNER.
+It is read-only, in the mode YAML files get; `q' goes back."
+  (let ((buffer (get-buffer-create (format "*mayhem: %s/%s/%s/%s Mayhemfile*"
+                                           owner project target number))))
+    (with-current-buffer buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert text))
+      (let ((mode (mayhem-run--yaml-mode)))
+        (if (and mode (not (eq major-mode mode)))
+            (funcall mode)
+          (unless mode (fundamental-mode))))
+      (goto-char (point-min))
+      (set-buffer-modified-p nil)
+      (view-mode 1))
+    (mayhem-display-buffer buffer)))
+
+(defun mayhem-run--mayhemfile-field (owner project target number run)
+  "Return the Mayhemfile field of RUN, run NUMBER of TARGET of PROJECT of OWNER.
+It opens the Mayhemfile and names what the CLI overrode in it."
+  (when-let* ((text (alist-get 'mayhemfile_flat run)))
+    (let ((lines (length (split-string (string-trim-right text) "\n")))
+          (overrides (mapcar (lambda (o) (symbol-name (car o))) (alist-get 'overrides run))))
+      (mayhem-field "Mayhemfile"
+                    (mayhem-page-link (format "%d line%s" lines (if (= lines 1) "" "s"))
+                                      "RET: view Mayhemfile"
+                                      (lambda ()
+                                        (mayhem-run-show-mayhemfile owner project target
+                                                                    number text)))
+                    (when overrides
+                      (propertize (concat "  overridden: " (string-join overrides ", "))
+                                  'face 'mayhem-label))))))
+
+(defun mayhem-run--task-face (phase)
+  "Return the face of the status of PHASE, one of a run's tasks."
+  (cond ((alist-get 'failed phase) 'error)
+        ((alist-get 'stopped phase) 'mayhem-label)
+        ((equal (alist-get 'status phase) "completed") 'success)
+        ((equal (alist-get 'status phase) "running") 'warning)
+        (t 'mayhem-label)))
+
+(defun mayhem-run--tasks (run)
+  "Return the vnodes of the tasks of RUN, in the order they started."
+  (when-let* ((phases (alist-get 'phases run)))
+    (let ((start (alist-get 'started_at run))
+          (phases (sort (copy-sequence phases)
+                        (lambda (a b)
+                          (let ((a (alist-get 'started_at a)) (b (alist-get 'started_at b)))
+                            (and a (or (not b) (string< a b))))))))
+      (vui-fragment
+       (vui-newline)
+       (mayhem-heading "Tasks")
+       (apply #'vui-fragment
+              (mapcar
+               (lambda (phase)
+                 (let ((status (cond ((alist-get 'failed phase) "failed")
+                                     ((alist-get 'stopped phase) "stopped")
+                                     (t (or (alist-get 'status phase) "pending")))))
+                   (mayhem-line
+                    (list (format "%-16s" (mayhem-run--phase (alist-get 'phase_name phase)))
+                          (propertize (format "%-11s" status)
+                                      'face (mayhem-run--task-face phase))
+                          (when-let* ((at (alist-get 'started_at phase)))
+                            (concat (propertize "started " 'face 'mayhem-label)
+                                    (mayhem-run--elapsed-text at start)))
+                          (when-let* ((took (mayhem--format-duration
+                                             (or (alist-get 'elapsed_real_time phase)
+                                                 (when-let* ((from (alist-get 'started_at phase))
+                                                             (to (alist-get 'ended_at phase)))
+                                                   (mayhem--elapsed to from))))))
+                            (propertize (concat "  took " took) 'face 'mayhem-label))))))
+               phases))))))
+
+(defun mayhem-run--pairs (title pairs &optional separator)
+  "Return a section TITLE of PAIRS, an alist, as KEY VALUE lines.
+SEPARATOR goes between them; without it, the values line up.  Nothing
+when PAIRS is empty.  The lines start at column 0, for copying."
+  (when pairs
+    (let ((width (apply #'max (mapcar (lambda (pair) (string-width (format "%s" (car pair))))
+                                      pairs))))
+      (vui-fragment
+       (vui-newline)
+       (mayhem-heading title)
+       (vui-text (mapconcat (pcase-lambda (`(,key . ,value))
+                              (concat (if separator
+                                          (format "%s%s" key separator)
+                                        (string-pad (format "%s" key) (+ width 2)))
+                                      (mayhem--format-value value) "\n"))
+                            pairs ""))))))
+
+(defun mayhem-run--details (run now)
+  "Return the vnodes of how RUN was started and went, as of NOW."
+  (let ((repo (mayhem--repo (alist-get 'scm_remote_origin run)))
+        (parent (alist-get 'parent_revision run))
+        (cpu (alist-get 'cputime run)))
+    (vui-fragment
+     (mayhem-field "Queued" (mayhem--format-age (alist-get 'created_at run) now))
+     (mayhem-field "Updated" (mayhem--format-age (alist-get 'updated_at run) now))
+     (when-let* ((build (alist-get 'build_id run)))
+       (mayhem-field "Build" (format "%s" build)))
+     (when parent
+       (mayhem-field "Parent" (mayhem-repo-link repo (substring parent 0 (min 7 (length parent)))
+                                                'commit parent)))
+     (when-let* ((cli (alist-get 'cli_version run)))
+       (mayhem-field "CLI" (concat "mayhem " cli)))
+     (when (and cpu (> cpu 0))
+       (mayhem-field "CPU time" (mayhem--format-duration cpu)))
+     (when (mayhem-run--live-p run)
+       (mayhem-field "Workers" (format "%d of %d" (or (alist-get 'current_workers run) 0)
+                                       (or (alist-get 'desired_workers run) 0))))
+     (mayhem-run--tasks run)
+     (mayhem-run--pairs "Overridden by the CLI" (alist-get 'overrides run))
+     (mayhem-run--pairs "Environment" (alist-get 'env_vars run) "=")
+     (mayhem-run--pairs "Files" (mapcar (lambda (f)
+                                          (cons (alist-get 'path f) (alist-get 'sha256 f)))
+                                        (alist-get 'run_files run))))))
+
 (defun mayhem-run--tabs (run data)
   "Return the tabs of the page of RUN, showing DATA, as (KEY LABEL).
 RUN is the alist from DATA's `run'."
@@ -325,17 +509,20 @@ RUN is the alist from DATA's `run'."
     (if (alist-get 'api_run run)
         `((defects ,(funcall count "Defects" 'defects))
           (endpoints ,(funcall count "Endpoints" 'endpoints))
+          (details "Details")
           (events ,(funcall count "Log" 'events)))
       `((defects ,(funcall count "Defects" 'defects))
         (tests ,(format "Tests (%d)" (or (alist-get 'n_testcase_reports run) 0)))
         (coverage "Coverage")
+        (details "Details")
         (events ,(funcall count "Log" 'events))))))
 
-(defun mayhem-run--tab (owner project target number run data tab)
-  "Return the vnodes of TAB, a key of `mayhem-run--tabs', of RUN.
+(defun mayhem-run--tab (owner project target number run data tab now)
+  "Return the vnodes of TAB, a key of `mayhem-run--tabs', of RUN, as of NOW.
 RUN is run NUMBER of TARGET of PROJECT of OWNER, from DATA."
   (pcase tab
-    ('defects (mayhem-run--defects owner project target number (alist-get 'defects data)))
+    ('defects (mayhem-run--defects owner project target number (alist-get 'defects data) run))
+    ('details (mayhem-run--details run now))
     ('tests (vui-component 'mayhem-run-tests-tab :owner owner :project project
                            :target target :number number :run run))
     ('events (mayhem-run--events (alist-get 'events data)))
@@ -359,12 +546,18 @@ called with the key of another one, to show it."
     (vui-fragment
      (mayhem-field "Status" (concat (mayhem-run-status run)
                                     (when-let* ((d (alist-get 'description run)))
-                                      (propertize (concat "  " d) 'face 'mayhem-label))))
+                                      (propertize (concat "  " d) 'face 'mayhem-label))
+                                    (when (alist-get 'has_critical_errors run)
+                                      (propertize "  critical errors" 'face 'error))))
      (mayhem-field "Started" (concat (or (mayhem--format-age (alist-get 'started_at run) now)
                                          "not yet")
                                      (when-let* ((by (alist-get 'started_by run)))
-                                       (propertize (concat "  by " by) 'face 'mayhem-label))))
-     (mayhem-field "Duration" (mayhem--format-duration (alist-get 'duration run)))
+                                       (propertize (concat "  by " by
+                                                           (and (alist-get 'is_mayhem_bot run)
+                                                                " (Mayhem bot)"))
+                                                   'face 'mayhem-label))))
+     (mayhem-field "Duration" (mayhem-run--duration run))
+     (mayhem-run--mayhemfile-field owner project target number run)
      (mayhem-scm-fields run)
      (when image
        (mayhem-field "Image" (let ((url (mayhem--image-url image))
@@ -387,7 +580,7 @@ called with the key of another one, to show it."
                                      (unless (eq key shown)
                                        (lambda () (funcall on-tab key)))))
                              tabs))
-     (mayhem-run--tab owner project target number run data shown))))
+     (mayhem-run--tab owner project target number run data shown now))))
 
 (defun mayhem-run--skeleton ()
   "Return grey bars shaped like a run's page, shown until its data lands."

@@ -397,11 +397,12 @@ links to its page on its host."
          (ci-type (alist-get 'ci_type scm)))
     (vui-fragment
      (mayhem-repo-field (alist-get 'scm_remote_origin scm))
-     (mayhem-field "Branch" (and branch (mayhem-repo-link repo branch 'branch branch))
-                   (when (and base (not (equal base branch)))
-                     (propertize "  base " 'face 'mayhem-label))
-                   (when (and base (not (equal base branch)))
-                     (mayhem-repo-link repo base 'branch base)))
+     (when branch
+       (mayhem-field "Branch" (mayhem-repo-link repo branch 'branch branch)
+                     (when (and base (not (equal base branch)))
+                       (propertize "  base " 'face 'mayhem-label))
+                     (when (and base (not (equal base branch)))
+                       (mayhem-repo-link repo base 'branch base))))
      (when revision
        (mayhem-field "Commit"
                      (mayhem-repo-link repo (substring revision 0 (min 7 (length revision)))
@@ -409,7 +410,8 @@ links to its page on its host."
                      (when-let* ((subject (alist-get 'scm_commit_subject scm)))
                        (concat "  " subject))
                      (when-let* ((author (alist-get 'scm_commit_author scm)))
-                       (propertize (concat "  by " author) 'face 'mayhem-label))))
+                       (propertize (concat "  by " author) 'face 'mayhem-label
+                                   'help-echo (alist-get 'scm_commit_author_email scm)))))
      (when (or ci-url ci-type)
        (mayhem-field "CI" (if ci-url
                               (mayhem-link (mayhem--ci-label ci-type ci-url) ci-url)

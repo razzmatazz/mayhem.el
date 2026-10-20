@@ -173,6 +173,28 @@ RAW is as for `mayhem--api-response'."
   (should (equal (mayhem--pick '((a . 1) (b . 2) (c . 3)) '(c a z))
                  '((c . 3) (a . 1) (z)))))
 
+(ert-deftest mayhem-core-test-run-summary ()
+  (let ((run (mayhem--run-summary
+              '((api_run (target . 1)) (duration . 300) (secret . "x")
+                (run_attributes (n_lines_total . 10))
+                (phases ((phase_name . "dynamic_analysis") (status . "completed")
+                         (msg . "false")))
+                (run_files ((path . "Mayhemfile") (sha256 . "ab") (extract)))))))
+    (should (eq (alist-get 'api_run run) t))
+    (should (equal (alist-get 'duration run) 300))
+    (should (equal (alist-get 'n_lines_total run) 10))
+    (should-not (assq 'secret run))
+    (should (equal (alist-get 'status (car (alist-get 'phases run))) "completed"))
+    (should-not (assq 'msg (car (alist-get 'phases run))))
+    (should (equal (alist-get 'run_files run) '(((path . "Mayhemfile") (sha256 . "ab")))))))
+
+(ert-deftest mayhem-core-test-format-value ()
+  (should (equal (mayhem--format-value "img:1") "img:1"))
+  (should (equal (mayhem--format-value 2) "2"))
+  (should (equal (mayhem--format-value '("a" "b")) "a, b"))
+  (should (equal (mayhem--format-value '((url . "tcp://x") (timeout . 2)))
+                 "{\"url\":\"tcp://x\",\"timeout\":2}")))
+
 (ert-deftest mayhem-core-test-decode-base64 ()
   (should (equal (mayhem--decode-base64 (base64-encode-string "GET / HTTP/1.1")) "GET / HTTP/1.1"))
   (should-not (mayhem--decode-base64 nil))
