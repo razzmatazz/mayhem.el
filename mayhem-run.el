@@ -13,7 +13,7 @@
 ;; and image; for a code run, a chart of its progress, as the web app's
 ;; run page has.  Below, in tabs: its defects; for a code run its tests
 ;; (counts and failing test cases) and coverage, for an API run its
-;; endpoints; and its event log.  RET on a defect or test case opens
+;; endpoints; and its event log, shown first for a failed run.  RET on a defect or test case opens
 ;; its page.  While the run is going, the page refetches every
 ;; `mayhem-run-refresh-interval' seconds.
 
@@ -317,14 +317,17 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER, from DATA."
 
 (defun mayhem-run--render (owner project target number data tab on-tab)
   "Return the vnodes of run NUMBER of TARGET of PROJECT of OWNER, showing DATA.
-TAB is the key of the tab shown, the first when nil or not the run's;
-ON-TAB is called with the key of another one, to show it."
+TAB is the key of the tab shown; when nil or not the run's, the
+log for a failed run, which says why, else the first.  ON-TAB is
+called with the key of another one, to show it."
   (let* ((run (alist-get 'run data))
          (image (alist-get 'docker_pullable run))
          (factors (alist-get 'n_exploitability_factors_total run))
          (code (not (alist-get 'api_run run)))
          (tabs (mayhem-run--tabs run data))
-         (shown (car (or (assq tab tabs) (car tabs))))
+         (shown (car (or (assq tab tabs)
+                         (and (alist-get 'failed run) (assq 'events tabs))
+                         (car tabs))))
          (now (current-time)))
     (vui-fragment
      (mayhem-field "Status" (concat (mayhem-run-status run)
