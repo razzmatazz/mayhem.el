@@ -283,8 +283,14 @@ LINE is a propertized string ending in newline, or the parts of a
 HELP-ECHO reads \"RET: <imperative>\", such as \"RET: open project\"."
   (let ((map (make-sparse-keymap))
         (decorate (lambda (s)
-                    (mayhem--default-help-echo (propertize s 'mouse-face 'highlight)
-                                               help-echo))))
+                    (let ((s (propertize s 'mouse-face 'highlight)) (pos 0))
+                      ;; Off the newline, else Emacs sees the rows as one
+                      ;; stretch of `highlight' and lights them all on hover.
+                      (while (string-match "\n" s pos)
+                        (remove-text-properties (match-beginning 0) (match-end 0)
+                                                '(mouse-face nil) s)
+                        (setq pos (match-end 0)))
+                      (mayhem--default-help-echo s help-echo)))))
     (define-key map (kbd "RET") (lambda () (interactive) (funcall on-visit)))
     (define-key map [mouse-1] (lambda () (interactive) (funcall on-visit)))
     (vui-region :keymap map

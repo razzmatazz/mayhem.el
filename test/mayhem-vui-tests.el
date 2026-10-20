@@ -72,5 +72,15 @@
   (should (equal (mayhem-cut-middle "stretch-20171101-adv-3" 11) "stret…adv-3"))
   (should (= (string-width (mayhem-cut-middle "stretch-20171101-adv-3" 11)) 11)))
 
+(ert-deftest mayhem-vui-test-rows-highlight-apart ()
+  ;; Hovering one row must not light up its neighbours too.
+  (with-temp-buffer
+    (vui-render (vui-fragment (mayhem-row "one\n" #'ignore "RET: x")
+                              (mayhem-row (list "two") #'ignore "RET: x")))
+    (should (eq (get-text-property 1 'mouse-face) 'highlight))
+    (should-not (get-text-property 4 'mouse-face))
+    (should (eq (get-text-property 5 'mouse-face) 'highlight))
+    (should-not (get-text-property 8 'mouse-face))))
+
 (provide 'mayhem-vui-tests)
 ;;; mayhem-vui-tests.el ends here
