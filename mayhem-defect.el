@@ -35,8 +35,9 @@
 (define-derived-mode mayhem-defect-mode mayhem-page-mode "Mayhem Defect"
   "Major mode for a Mayhem defect's page.")
 
-(defun mayhem-defect--evidence-fields (source evidence)
-  "Return the fields of EVIDENCE of a defect from SOURCE, \"api\" or \"code\"."
+(defun mayhem-defect--evidence-fields (owner project target source evidence)
+  "Return the fields of EVIDENCE of a defect from SOURCE, \"api\" or \"code\".
+The defect is of TARGET of PROJECT of OWNER."
   (pcase source
     ("api"
      (when (alist-get 'path evidence)
@@ -53,8 +54,14 @@
                              ", "))
       (when-let* ((run (alist-get 'run_number evidence))
                   (sha (alist-get 'sha256 evidence)))
-        (mayhem-field "Example" (format "run %s, test case %s" run
-                                        (substring sha 0 (min 8 (length sha))))))))))
+        (mayhem-field "Example" (mayhem-run-link owner project target run
+                                                 (format "run #%s" run))
+                      ", test case "
+                      (mayhem-page-link (substring sha 0 (min 8 (length sha)))
+                                        "RET: open test case"
+                                        (lambda ()
+                                          (mayhem-testcase-open owner project target run
+                                                                sha)))))))))
 
 (defun mayhem-defect--testcases (owner project target evidence)
   "Return the vnodes listing the test cases in EVIDENCE of a code defect.
@@ -123,10 +130,11 @@ SOURCE is \"api\" or \"code\"."
      (mayhem-field "First seen" (mayhem--format-age (alist-get 'first_seen defect) now))
      (mayhem-field "Last seen" (mayhem--format-age (alist-get 'last_seen defect) now))
      (when-let* ((run (alist-get 'run data)))
-       (mayhem-field "Run" (format "#%s" run)))
+       (mayhem-field "Run" (mayhem-run-link owner project target run)))
      (when-let* ((scm (alist-get 'scm data)))
        (mayhem-scm-fields scm))
-     (mayhem-defect--evidence-fields (alist-get 'source defect) (alist-get 'evidence data))
+     (mayhem-defect--evidence-fields owner project target
+                                     (alist-get 'source defect) (alist-get 'evidence data))
      (mayhem-block "Description"
                            (string-fill (or (alist-get 'description defect) "")
                                         mayhem-defect--fill-width))
@@ -156,10 +164,7 @@ SOURCE is \"api\" or \"code\"."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'defect owner project target number run))))
     (vui-fragment
-     (mayhem-heading (concat (propertize (concat owner "/" project) 'face 'mayhem-project)
-                             "/"
-                             (propertize target 'face 'mayhem-target)
-                             (format " defect #%s" number)))
+     (mayhem-page-heading owner project target (format " defect #%s" number))
      (vui-newline)
      (mayhem-snapshot-view snapshot "defect" (mayhem-defect--skeleton)
                            (lambda (data)

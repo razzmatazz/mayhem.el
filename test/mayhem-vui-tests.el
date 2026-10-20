@@ -30,5 +30,20 @@
     (should (equal bar "   "))
     (should (eq (get-text-property 0 'face bar) 'mayhem-skeleton))))
 
+(defun mayhem-vui-tests--parts (vnode)
+  "Return VNODE's text as a list: a link's as (LINK TEXT), else a string."
+  (cond ((vui-vnode-fragment-p vnode)
+         (mapcan #'mayhem-vui-tests--parts (vui-vnode-fragment-children vnode)))
+        ((vui-vnode-button-p vnode) (list (list 'link (vui-vnode-button-label vnode))))
+        ((vui-vnode-text-p vnode) (list (vui-vnode-text-content vnode)))))
+
+(ert-deftest mayhem-vui-test-page-heading-links-enclosing-pages ()
+  (should (equal (mayhem-vui-tests--parts (mayhem-page-heading nil nil nil))
+                 '("Mayhem" "\n")))
+  (should (equal (mayhem-vui-tests--parts (mayhem-page-heading "o" "p" "t"))
+                 '((link "Mayhem") "/" (link "o") "/" (link "p") "/" "t" "\n")))
+  (should (equal (mayhem-vui-tests--parts (mayhem-page-heading "o" "p" "t" " #3"))
+                 '((link "Mayhem") "/" (link "o") "/" (link "p") "/" (link "t") " #3" "\n"))))
+
 (provide 'mayhem-vui-tests)
 ;;; mayhem-vui-tests.el ends here

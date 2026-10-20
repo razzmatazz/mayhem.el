@@ -74,7 +74,7 @@ HOST is the Mayhem server's, shown with the user logged in."
   (let* ((snapshot (mayhem-sync-use-resource '(projects)))
          (workspaces (mayhem--workspaces (plist-get snapshot :data))))
     (vui-fragment
-     (mayhem-heading "Mayhem")
+     (mayhem-page-heading nil nil nil)
      (mayhem-snapshot-view (mayhem-sync-use-resource '(me)) "user"
                            (mayhem-skeleton '(("User        " 30)))
                            (lambda (me) (mayhem-field "User" (mayhem--user-label me))))

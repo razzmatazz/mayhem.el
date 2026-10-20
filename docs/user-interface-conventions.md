@@ -14,7 +14,12 @@ users expect.
 | Parts of a page shown one at a time | `mayhem-tab-row`: the current tab a heading, the others buttons, kept in the page's state |
 
 - Brackets mean an action (`[Stop]`, `[Load more]`); plain text is content.
-  A page's identity (`project/target`) is never a button.
+  A page's own name is never a button.
+- **Walk without a jump.**  A page's heading is a breadcrumb: each part
+  naming an enclosing page (`Mayhem` for the dashboard, then owner,
+  project, target, run) links to it; build it with `mayhem-page-heading`.
+  A field naming another page (`Run  #7`) links to it, with
+  `mayhem-page-link` or `mayhem-run-link`.
 - `help-echo` reads `"RET: <imperative>"`, e.g. `"RET: open target"`.
 - Build interactive parts from vui components, not hand-made text
   properties: only vui's elements are TAB stops.

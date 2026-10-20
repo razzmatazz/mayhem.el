@@ -135,7 +135,12 @@ A browser even when `mayhem-open-urls' would bring the link back here."
   (browse-url-with-browser-kind
    'external (mayhem--page-url (alist-get 'url (mayhem--read-config)) mayhem-page)))
 
+(declare-function mayhem "mayhem" ())
 (declare-function mayhem-jump "mayhem" ())
+(declare-function mayhem-workspace-open "mayhem-workspace" (owner))
+(declare-function mayhem-project-open "mayhem-project" (owner project))
+(declare-function mayhem-target-open "mayhem-target" (owner project target))
+(declare-function mayhem-run-open "mayhem-run" (owner project target number))
 
 (defvar-keymap mayhem-page-mode-map
   :parent vui-mode-map
@@ -202,11 +207,52 @@ Each of VALUES is a string, a vnode such as a `mayhem-link', or nil."
                          (delq nil values))
                  (list (vui-text "\n")))))
 
+(defun mayhem-page-link (text help-echo on-visit &optional face)
+  "Return a vnode showing TEXT, in FACE or `link', that RET follows.
+Following it calls ON-VISIT, of no arguments.  HELP-ECHO reads
+\"RET: <imperative>\", such as \"RET: open run\"."
+  (vui-button text :no-decoration t :face (or face 'link)
+              :help-echo help-echo :on-click on-visit))
+
 (defun mayhem-link (text url)
   "Return a vnode showing TEXT that RET opens URL with, through `browse-url'."
-  (vui-button text :no-decoration t :face 'link
-              :help-echo (concat "RET: open " url)
-              :on-click (lambda () (browse-url url))))
+  (mayhem-page-link text (concat "RET: open " url) (lambda () (browse-url url))))
+
+(defun mayhem-run-link (owner project target number &optional text face)
+  "Return TEXT, or #NUMBER, linking to run NUMBER of TARGET of PROJECT of OWNER.
+FACE is as for `mayhem-page-link'."
+  (mayhem-page-link (or text (format "#%s" number)) "RET: open run"
+                    (lambda () (mayhem-run-open owner project target number))
+                    face))
+
+(defun mayhem-page-heading (owner project target &rest self)
+  "Return a page's heading: Mayhem/OWNER/PROJECT/TARGET, then SELF.
+OWNER, PROJECT and TARGET may be nil, from the end.  Each part links
+to its page, the dashboard first, so one can walk up, except the last
+when SELF is empty: that is the page itself.  SELF are strings or
+vnodes, such as a `mayhem-run-link'."
+  (let* ((face 'mayhem-section-heading)
+         (parts (seq-filter
+                 #'car
+                 (list (list "Mayhem" "RET: open dashboard" #'mayhem)
+                       (list owner "RET: open workspace"
+                             (lambda () (mayhem-workspace-open owner)))
+                       (list project "RET: open project"
+                             (lambda () (mayhem-project-open owner project)))
+                       (list target "RET: open target"
+                             (lambda () (mayhem-target-open owner project target))))))
+         (last (car (last parts))))
+    (apply #'vui-fragment
+           (append
+            (cdr (mapcan (pcase-lambda (`(,name ,help ,open))
+                           (list (vui-text "/" :face face)
+                                 (if (and (eq name (car last)) (null self))
+                                     (vui-text name :face face)
+                                   (mayhem-page-link name help open (list 'link face)))))
+                         parts))
+            (mapcar (lambda (part) (if (stringp part) (vui-text part :face face) part))
+                    self)
+            (list (vui-text "\n"))))))
 
 (defun mayhem-repo-link (repo text &optional kind ref)
   "Return TEXT linking to REPO or its KIND REF, as `mayhem--repo-url' does.

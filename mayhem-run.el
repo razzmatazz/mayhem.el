@@ -382,10 +382,7 @@ ON-TAB is called with the key of another one, to show it."
                                           (cancel-timer timer)))))
           (lambda () (cancel-timer timer)))))
     (vui-fragment
-     (mayhem-heading (concat (propertize (concat owner "/" project) 'face 'mayhem-project)
-                             "/"
-                             (propertize target 'face 'mayhem-target)
-                             (format " #%s" number)))
+     (mayhem-page-heading owner project target (format " #%s" number))
      (vui-newline)
      (mayhem-snapshot-view snapshot "run" (mayhem-run--skeleton)
                            (lambda (data)

@@ -100,8 +100,10 @@ nil; ON-TAB is called with the other's key, to show it."
         (mayhem-field "Defects" (concat (format "%d" (or (alist-get 'n_defects latest) 0))
                                         (when-let* ((counts (mayhem-severity-counts latest)))
                                           (concat "  " counts))
-                                        (propertize (format "  in run #%s" (alist-get 'run_number latest))
-                                                    'face 'mayhem-label)))
+                                        (propertize "  in " 'face 'mayhem-label))
+                      (let ((number (alist-get 'run_number latest)))
+                        (mayhem-run-link owner project target number
+                                         (format "run #%s" number))))
         (mayhem-field "Crashes" (format "%d" (or (alist-get 'n_crash_reports latest) 0)))
         (when-let* ((suite (alist-get 'n_optimized_set_testcases latest)))
           (mayhem-field "Test suite" (format "%d test case%s" suite (if (= suite 1) "" "s"))))))
@@ -164,9 +166,7 @@ nil; ON-TAB is called with the other's key, to show it."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'target owner project target))))
     (vui-fragment
-     (mayhem-heading (concat (propertize (concat owner "/" project) 'face 'mayhem-project)
-                             "/"
-                             (propertize target 'face 'mayhem-target)))
+     (mayhem-page-heading owner project target)
      (vui-newline)
      (mayhem-snapshot-view snapshot "target" (mayhem-target--skeleton)
                            (lambda (data)

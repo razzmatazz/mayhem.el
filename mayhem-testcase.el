@@ -66,7 +66,7 @@ RUN is a run of TARGET of PROJECT of OWNER."
                                 (propertize "failing" 'face 'error)
                               (propertize "passing" 'face 'success)))
      (mayhem-field "Type" (if (alist-get 'is_regression test) "regression" "new"))
-     (mayhem-field "Run" (format "#%s" run))
+     (mayhem-field "Run" (mayhem-run-link owner project target run))
      (when (and at start)
        (mayhem-field "Seen" (concat (mayhem--format-elapsed (mayhem--elapsed at start))
                                     (propertize " into the run" 'face 'mayhem-label))))
@@ -109,11 +109,10 @@ RUN is a run of TARGET of PROJECT of OWNER."
   (let ((snapshot (mayhem-sync-use-resource
                    (list 'testcase owner project target run sha256))))
     (vui-fragment
-     (mayhem-heading (concat (propertize (concat owner "/" project) 'face 'mayhem-project)
-                             "/"
-                             (propertize target 'face 'mayhem-target)
-                             (format " #%s test case %s" run
-                                     (substring sha256 0 (min 8 (length sha256))))))
+     (mayhem-page-heading owner project target " "
+                          (mayhem-run-link owner project target run nil
+                                           '(link mayhem-section-heading))
+                          (format " test case %s" (substring sha256 0 (min 8 (length sha256)))))
      (vui-newline)
      (mayhem-snapshot-view snapshot "test case" (mayhem-testcase--skeleton)
                            (lambda (data)

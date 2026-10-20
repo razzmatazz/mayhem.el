@@ -150,7 +150,7 @@ nil; ON-TAB is called with the other's key, to show it."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'project owner project))))
     (vui-fragment
-     (mayhem-heading (propertize (concat owner "/" project) 'face 'mayhem-project))
+     (mayhem-page-heading owner project nil)
      (vui-newline)
      (mayhem-snapshot-view snapshot "project" (mayhem-project--skeleton)
                            (lambda (data)

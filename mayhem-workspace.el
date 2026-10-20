@@ -75,7 +75,7 @@
                    (mayhem-sync-use-resource '(projects))
                    (mayhem-sync-use-resource (list 'workspace-targets owner)))))
     (vui-fragment
-     (mayhem-heading (propertize owner 'face 'mayhem-project))
+     (mayhem-page-heading owner nil nil)
      (vui-newline)
      (mayhem-snapshot-view snapshot "workspace" (mayhem-workspace--skeleton)
                            (lambda (data)
