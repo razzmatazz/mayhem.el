@@ -556,11 +556,10 @@ Its defects are counted by severity, as `high', `medium' and `low'."
 
 (defun mayhem--fetch-run (owner project target number callback)
   "Fetch run NUMBER of TARGET of PROJECT of OWNER, with its defects and events.
-An API run's endpoints come too; a code run's progress and failing
-tests.  Call CALLBACK with (OK DATA): DATA is an alist with `run',
-`defects', `events', `endpoints', `progress' and `tests' (nil when the
-run has none), each trimmed to the fields its page shows, or an error
-message."
+An API run's endpoints come too; a code run's progress.  Call CALLBACK
+with (OK DATA): DATA is an alist with `run', `defects', `events',
+`endpoints' and `progress' (nil when the run has none), each trimmed
+to the fields its page shows, or an error message."
   (let ((path (mayhem--path "/api/v2/owner/%s/project/%s/target/%s/run/%s"
                             owner project target (format "%s" number))))
     (mayhem--api-get
@@ -626,18 +625,7 @@ message."
                                                                           data)))))))
                                         '((testcases . "/testcase_over_time")
                                           (defects . "/defect_over_time")))
-                                cb))))
-              ;; Only the failing ones: the rest are many and their
-              ;; reports are large.
-              (tests . ,(lambda (cb)
-                          (if api
-                              (funcall cb t nil)
-                            (mayhem--api-get-all
-                             (concat path "/testcase-result") 'testcase_reports
-                             (lambda (ok data)
-                               (funcall cb ok (if ok (mapcar #'mayhem--testcase-summary data)
-                                                data)))
-                             '((crashes_only "true")))))))
+                                cb)))))
             callback)))))))
 
 (defconst mayhem--defect-fields
@@ -1065,9 +1053,10 @@ error message."
 
 (defun mayhem--fetch-run-testcases (owner project target run callback)
   "Fetch how RUN of TARGET of PROJECT of OWNER saw each of its test cases.
-Call CALLBACK with (OK DATA): DATA is a list of alists of each one's
-`sha256', `source' (such as \"libfuzzer\"), `created_at', `n_defects'
-and `is_regression', or an error message."
+Call CALLBACK with (OK DATA): DATA is a list of each one's
+`mayhem--testcase-summary' with its `source' (such as \"libfuzzer\"),
+or an error message.  The API can filter only for crashes, which miss
+defects such as a memory error the target survives, so all come."
   (mayhem--api-get-all
    (mayhem--path "/api/v2/owner/%s/project/%s/target/%s/run/%s/testcase-result"
                  owner project target (format "%s" run))
@@ -1076,9 +1065,8 @@ and `is_regression', or an error message."
      (funcall callback ok
               (if ok
                   (mapcar (lambda (tc)
-                            `((sha256 . ,(alist-get 'sha256 tc))
-                              (source . ,(alist-get 'testcase_source tc))
-                              ,@(mayhem--pick tc '(created_at n_defects is_regression))))
+                            (cons (cons 'source (alist-get 'testcase_source tc))
+                                  (mayhem--testcase-summary tc)))
                           data)
                 data)))))
 

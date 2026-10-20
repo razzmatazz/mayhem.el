@@ -33,6 +33,15 @@
   :type 'number
   :group 'mayhem)
 
+(defconst mayhem-run--testcases-max-age 600
+  "Seconds a run's test case results are reused.
+The API sends each one's full report, so they are not refetched as
+often as other data.")
+
+(mayhem-sync-define-resource run-testcases (owner project target run)
+  :fetch (lambda (done) (mayhem--fetch-run-testcases owner project target run done))
+  :max-age mayhem-run--testcases-max-age)
+
 (defconst mayhem-run--chart-width 60
   "Columns of a run's progress chart, at most.")
 
@@ -213,7 +222,6 @@ and counts are its `help-echo'.  Nothing before the run starts."
 RUN is run NUMBER of TARGET of PROJECT of OWNER."
   (let ((start (alist-get 'started_at run)))
     (vui-fragment
-     (vui-newline)
      (mayhem-heading (format "Failing tests (%d)" (length failing)))
      (if (null failing)
          (mayhem-notice "No failing tests")
@@ -244,6 +252,26 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
                            (lambda () (mayhem-testcase-open owner project target number sha))
                            "RET: open test case")))
                       failing))))))
+
+(vui-defcomponent mayhem-run-tests-tab (owner project target number run)
+  "The Tests tab of RUN, run NUMBER of TARGET of PROJECT of OWNER.
+A test case fails when it shows a defect, crash or not; it is its own
+component so a run's test case results are fetched only once it shows."
+  :render
+  (let ((snapshot (mayhem-sync-use-resource
+                   (list 'run-testcases owner project target number))))
+    (vui-fragment
+     (mayhem-run--test-counts owner project target number run)
+     (vui-newline)
+     (mayhem-snapshot-view
+      snapshot "test cases"
+      (vui-fragment
+       (mayhem-heading "Failing tests")
+       (mayhem-skeleton '((8 "  " 10 "  " 10 "  " 7 "  " 12) (8 "  " 10 "  " 10 "  " 7 "  " 12))))
+      (lambda (tests)
+        (mayhem-run--tests owner project target number run
+                           (seq-filter (lambda (test) (> (or (alist-get 'n_defects test) 0) 0))
+                                       tests)))))))
 
 (defun mayhem-run--phase (phase)
   "Return the name the web app gives to PHASE, an event's."
@@ -308,9 +336,8 @@ RUN is the alist from DATA's `run'."
 RUN is run NUMBER of TARGET of PROJECT of OWNER, from DATA."
   (pcase tab
     ('defects (mayhem-run--defects owner project target number (alist-get 'defects data)))
-    ('tests (vui-fragment
-             (mayhem-run--test-counts owner project target number run)
-             (mayhem-run--tests owner project target number run (alist-get 'tests data))))
+    ('tests (vui-component 'mayhem-run-tests-tab :owner owner :project project
+                           :target target :number number :run run))
     ('events (mayhem-run--events (alist-get 'events data)))
     ('coverage (mayhem-run--coverage run))
     ('endpoints (mayhem-run--endpoints (alist-get 'endpoints data)))))

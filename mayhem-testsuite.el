@@ -29,6 +29,7 @@
 (require 'mayhem-core)
 (require 'mayhem-sync)
 (require 'mayhem-vui)
+(require 'mayhem-run)
 (require 'mayhem-testcase)
 
 (defconst mayhem-testsuite--live-max-age 600
@@ -56,11 +57,6 @@ often as other data.")
                     (error (funcall done nil (error-message-string err)))))))))
   :max-age (lambda (data)
              (if (alist-get 'live data) mayhem-testsuite--live-max-age t)))
-
-(mayhem-sync-define-resource run-testcases (owner project target run)
-  :fetch (lambda (done) (mayhem--fetch-run-testcases owner project target run done))
-  ;; Each report is large, so as rarely as the suite.
-  :max-age mayhem-testsuite--live-max-age)
 
 (defvar-keymap mayhem-testsuite-mode-map
   :parent mayhem-page-mode-map
