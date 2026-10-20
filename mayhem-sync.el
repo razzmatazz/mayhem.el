@@ -17,7 +17,9 @@
 ;;
 ;; The design follows octocat.el's plans/github-sync-mechanism.md.
 ;; Only its basics are here: one row per resource.  Entities shared by
-;; resources, mutations and prefetch come when pages need them.
+;; resources, mutations and prefetch come when pages need them.  See
+;; docs/mayhem-sync.md for the design, the schema and how to add a
+;; resource.
 
 ;;; Code:
 

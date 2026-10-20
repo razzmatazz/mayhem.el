@@ -28,7 +28,8 @@ Gotchas of vui.el as mayhem.el uses it.
 ## Reading the sync store
 
 Pages read their data from the sync layer (`mayhem-sync.el`), so they
-paint at once from a local SQLite store and refetch behind.  Define a
+paint at once from a local SQLite store and refetch behind.  Its design
+and schema are in [mayhem-sync.md](mayhem-sync.md).  Define a
 resource beside its page, and read it during render:
 
 ```elisp
