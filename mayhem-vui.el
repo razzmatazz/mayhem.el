@@ -191,11 +191,13 @@ A page with two sets it in its mode, and renders the other while
   "S-<return>" #'mayhem-visit-other-window)
 
 ;; Evil reads a map's `[STATE-state]' key as that state's bindings; set
-;; here so we need not depend on Evil.  In normal state `O' would
+;; here so we need not depend on Evil.  As in treemacs-evil and
+;; octocat.el, `o' is RET and `O' S-RET; in normal state they would
 ;; otherwise open a line.
 (dolist (state '("Normal" "Motion"))
   (let ((aux (make-sparse-keymap
               (format "Auxiliary keymap for %s state" state))))
+    (keymap-set aux "o" #'mayhem-visit)
     (keymap-set aux "O" #'mayhem-visit-other-window)
     (define-key mayhem-page-mode-map
                 (vector (intern (format "%s-state" (downcase state))))

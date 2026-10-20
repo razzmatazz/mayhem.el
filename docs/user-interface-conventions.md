@@ -97,7 +97,7 @@ users expect.
   point with the page shown in another window, so new rows need nothing
   extra.
 - Every page's mode derives from `mayhem-page-mode`, which binds `g`, `q`,
-  `S-RET` (and `O` under Evil) and `C-c C-v`.
+  `S-RET` (and `o` and `O` under Evil) and `C-c C-v`.
 - **One page, two views.**  `C-c C-v` (`mayhem-toggle-view`) switches
   a page between two ways of showing the same data, such as a test
   case's bytes as a hex dump or as plain text.  It is one key on every

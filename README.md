@@ -29,7 +29,7 @@ say because your token expired, the error shows in the header line.
 
 | Key | Command |
 |---|---|
-| `RET` | open what is at point, or switch to the tab at point |
+| `RET` | open what is at point, or switch to the tab at point (also `o` under Evil) |
 | `S-RET` | open it in another window (also `O` under Evil) |
 | `g` | refresh the page (`gr` under Evil) |
 | `C-c C-j` | jump to a workspace, project or target by name |
