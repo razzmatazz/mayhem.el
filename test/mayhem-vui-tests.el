@@ -41,17 +41,17 @@
 (ert-deftest mayhem-vui-test-page-heading-links-enclosing-pages ()
   (cl-letf (((symbol-function 'mayhem--host) (lambda () "h.example")))
     (should (equal (mayhem-vui-tests--parts (mayhem-page-heading "dashboard" nil nil nil))
-                   '("h.example" " (dashboard)" "\n")))
+                   '("h.example" " dashboard" "\n")))
     (should (equal (mayhem-vui-tests--parts (mayhem-page-heading "target" "o" "p" "t"))
-                   '((link "h.example") "/" (link "o") "/" (link "p") "/" "t" " (target)"
+                   '((link "h.example") "/" (link "o") "/" (link "p") "/" "t" " target"
                      "\n")))
     (should (equal (mayhem-vui-tests--parts (mayhem-page-heading "run" "o" "p" "t" "#3"))
                    '((link "h.example") "/" (link "o") "/" (link "p") "/" (link "t") "/" "#3"
-                     " (run)" "\n")))
+                     " run" "\n")))
     (should (equal (mayhem-vui-tests--parts
                     (mayhem-page-heading "target" "o" "p" "stretch-20171101-6-75k-unknown-adv-3"))
                    '((link "h.example") "/" (link "o") "/" (link "p") "/"
-                     "stretch-2017…known-adv-3" " (target)" "\n")))))
+                     "stretch-2017…known-adv-3" " target" "\n")))))
 
 (defun mayhem-vui-tests--line (max-width parts)
   "Return the text of the `mayhem-line' of PARTS, on a page MAX-WIDTH wide."

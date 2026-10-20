@@ -341,14 +341,14 @@ NUMBER is a run of TARGET of PROJECT of OWNER.  FACE is as for
   "Most columns a name takes in a page's heading; longer ones are cut.")
 
 (defun mayhem-page-heading (kind owner project target &rest more)
-  "Return a page's heading: HOST/OWNER/PROJECT/TARGET/MORE (KIND).
+  "Return a page's heading: HOST/OWNER/PROJECT/TARGET/MORE KIND.
 HOST is the Mayhem server's, `mayhem--host', naming the dashboard.
 OWNER, PROJECT and TARGET may be nil, from the end.  Each part links
 to its page, the dashboard first, so one can walk up, except the last:
 that is the page itself.  MORE are parts below TARGET, strings or
-vnodes such as a `mayhem-run-link'.  KIND, such as \"target\", says
-what the page shows, as the last part is often a bare name or number.
-A name longer than `mayhem-heading-part-width' is cut in the middle,
+vnodes such as a `mayhem-run-link'.  KIND, such as \"target\", says in
+`shadow' what the page shows, as the last part is often a bare name or
+number.  A name longer than `mayhem-heading-part-width' is cut in the middle,
 whole on hover."
   (let* ((face 'mayhem-section-heading)
          (parts (seq-filter
@@ -377,7 +377,7 @@ whole on hover."
                       (list (vui-text "/" :face face)
                             (if (stringp part) (vui-text part :face face) part)))
                     more)
-            (list (vui-text (format " (%s)" kind) :face (list 'shadow face))
+            (list (vui-text (concat " " kind) :face (list 'shadow face))
                   (vui-text "\n"))))))
 
 (defun mayhem-repo-link (repo text &optional kind ref)

@@ -28,8 +28,8 @@ users expect.
   naming an enclosing page (the server's host for the dashboard, then
   owner, project, target, run) links to it; build it with
   `mayhem-page-heading`.  Its last part is the page itself, followed by
-  the page's kind in parentheses (`host/o/p/t/#7 (run)`,
-  `host/o (workspace)`), since that part is often a bare name or
+  the page's kind in grey (`host/o/p/t/#7 run`,
+  `host/o workspace`), since that part is often a bare name or
   number.  A long name in it is cut in the middle
   (`mayhem-cut-middle`), whole on hover.
   A field naming another page (`Run  run #7`) links to it, with
@@ -41,8 +41,8 @@ users expect.
   label beside it says the same (`Run  run #7`): the link reads right
   on its own, and is the same text wherever it appears.
   `mayhem-run-link` writes `run #N` for you.  A page heading, where
-  each part is short, drops the kind word (`o/p/t/#7/abcd1234 (test
-  case)`, `o/p/t/!12 (defect)`), and so does a table column of numbers
+  each part is short, drops the kind word before a number
+  (`o/p/t/#7/abcd1234 test case`), and so does a table column of numbers
   under a heading that already names them, such as a target's run
   list (`#7`).
 - `help-echo` reads `"RET: <imperative>"`, e.g. `"RET: open target"`.
