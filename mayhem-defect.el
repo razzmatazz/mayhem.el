@@ -78,7 +78,7 @@ The defect is of TARGET of PROJECT of OWNER."
                               (run (alist-get 'run_number test)))
                           (mayhem-row
                            (concat (substring sha 0 (min 8 (length sha)))
-                                   (format "  run %-4s" run)
+                                   (format "  run #%-4s" run)
                                    (propertize
                                     (format "%5dms" (round (* 1000 (or (alist-get 'execution_time test)
                                                                        0))))
@@ -167,7 +167,7 @@ SOURCE is \"api\" or \"code\"."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'defect owner project target number run))))
     (vui-fragment
-     (mayhem-page-heading owner project target (format " defect #%s" number))
+     (mayhem-page-heading "defect" owner project target (format "!%s" number))
      (vui-newline)
      (mayhem-snapshot-view snapshot "defect" (mayhem-defect--skeleton)
                            (lambda (data)

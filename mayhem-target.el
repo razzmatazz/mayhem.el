@@ -67,11 +67,11 @@
           (mayhem-fit title (string-width title))
           (propertize (concat (when-let* ((cwe (alist-get 'cwe_number defect)))
                                 (format "  CWE-%s" cwe))
-                              (format "  defect #%s" (alist-get 'defect_number defect))
+                              (format "  defect !%s" (alist-get 'defect_number defect))
                               (unless (equal (alist-get 'state defect) "open")
                                 (format "  %s" (alist-get 'state defect)))
                               (when-let* ((run (alist-get 'last_seen_run_number defect)))
-                                (format "  run %s" run))
+                                (format "  run #%s" run))
                               "  ")
                       'face 'mayhem-label)
           (propertize (or (mayhem--format-age (alist-get 'last_seen defect) now) "")
@@ -180,7 +180,7 @@ nil; ON-TAB is called with the other's key, to show it."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'target owner project target))))
     (vui-fragment
-     (mayhem-page-heading owner project target)
+     (mayhem-page-heading "target" owner project target)
      (vui-newline)
      (mayhem-snapshot-view snapshot "target" (mayhem-target--skeleton)
                            (lambda (data)

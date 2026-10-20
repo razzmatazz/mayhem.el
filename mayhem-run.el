@@ -87,7 +87,7 @@ COUNTS, the run's alist, gives how many are active and fixed by severity."
                                " "
                                (mayhem-fit (or (alist-get 'title defect) "")
                                            (string-width (or (alist-get 'title defect) "")))
-                               (propertize (format "  defect #%s" number) 'face 'mayhem-label))
+                               (propertize (format "  defect !%s" number) 'face 'mayhem-label))
                          (lambda () (mayhem-defect-open owner project target number run))
                          "RET: open defect")))
                     defects)))))
@@ -653,7 +653,7 @@ are for the header's folds, as in `mayhem-run--started-with'."
                                           (cancel-timer timer)))))
           (lambda () (cancel-timer timer)))))
     (vui-fragment
-     (mayhem-page-heading owner project target (format " run #%s" number))
+     (mayhem-page-heading "run" owner project target (format "#%s" number))
      (vui-newline)
      (mayhem-snapshot-view snapshot "run" (mayhem-run--skeleton)
                            (lambda (data)

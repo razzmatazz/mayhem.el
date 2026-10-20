@@ -340,14 +340,16 @@ NUMBER is a run of TARGET of PROJECT of OWNER.  FACE is as for
 (defconst mayhem-heading-part-width 24
   "Most columns a name takes in a page's heading; longer ones are cut.")
 
-(defun mayhem-page-heading (owner project target &rest self)
-  "Return a page's heading: HOST/OWNER/PROJECT/TARGET, then SELF.
+(defun mayhem-page-heading (kind owner project target &rest more)
+  "Return a page's heading: HOST/OWNER/PROJECT/TARGET/MORE (KIND).
 HOST is the Mayhem server's, `mayhem--host', naming the dashboard.
 OWNER, PROJECT and TARGET may be nil, from the end.  Each part links
-to its page, the dashboard first, so one can walk up, except the last
-when SELF is empty: that is the page itself.  A name longer than
-`mayhem-heading-part-width' is cut in the middle, whole on hover.  SELF
-are strings or vnodes, such as a `mayhem-run-link'."
+to its page, the dashboard first, so one can walk up, except the last:
+that is the page itself.  MORE are parts below TARGET, strings or
+vnodes such as a `mayhem-run-link'.  KIND, such as \"target\", says
+what the page shows, as the last part is often a bare name or number.
+A name longer than `mayhem-heading-part-width' is cut in the middle,
+whole on hover."
   (let* ((face 'mayhem-section-heading)
          (parts (seq-filter
                  #'car
@@ -365,15 +367,18 @@ are strings or vnodes, such as a `mayhem-run-link'."
                            (let* ((shown (mayhem-cut-middle name mayhem-heading-part-width))
                                   (cut (not (eq shown name))))
                              (list (vui-text "/" :face face)
-                                   (if (and (eq name (car last)) (null self))
+                                   (if (and (eq name (car last)) (null more))
                                        (vui-text (if cut (propertize shown 'help-echo name) shown)
                                                  :face face)
                                      (mayhem-page-link shown (if cut (concat help " " name) help)
                                                        open (list 'link face))))))
                          parts))
-            (mapcar (lambda (part) (if (stringp part) (vui-text part :face face) part))
-                    self)
-            (list (vui-text "\n"))))))
+            (mapcan (lambda (part)
+                      (list (vui-text "/" :face face)
+                            (if (stringp part) (vui-text part :face face) part)))
+                    more)
+            (list (vui-text (format " (%s)" kind) :face (list 'shadow face))
+                  (vui-text "\n"))))))
 
 (defun mayhem-repo-link (repo text &optional kind ref)
   "Return TEXT linking to REPO or its KIND REF, as `mayhem--repo-url' does.
