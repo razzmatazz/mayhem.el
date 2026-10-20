@@ -190,6 +190,17 @@ A page with two sets it in its mode, and renders the other while
   "q" #'mayhem-quit-window
   "S-<return>" #'mayhem-visit-other-window)
 
+;; Evil reads a map's `[STATE-state]' key as that state's bindings; set
+;; here so we need not depend on Evil.  In normal state `O' would
+;; otherwise open a line.
+(dolist (state '("Normal" "Motion"))
+  (let ((aux (make-sparse-keymap
+              (format "Auxiliary keymap for %s state" state))))
+    (keymap-set aux "O" #'mayhem-visit-other-window)
+    (define-key mayhem-page-mode-map
+                (vector (intern (format "%s-state" (downcase state))))
+                aux)))
+
 (define-derived-mode mayhem-page-mode vui-mode "Mayhem"
   "Base mode of every mayhem.el page."
   ;; So `revert-buffer', and `gr' under Evil, refresh as `g' does.
