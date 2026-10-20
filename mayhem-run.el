@@ -42,7 +42,12 @@
   "Columns the tab bar of a run's page is underlined across.")
 
 (mayhem-sync-define-resource run (owner project target number)
-  :fetch (lambda (done) (mayhem--fetch-run owner project target number done)))
+  :fetch (lambda (done) (mayhem--fetch-run owner project target number done))
+  ;; A finished run no longer changes.
+  :max-age (lambda (data)
+             (if (mayhem-run--live-p (alist-get 'run data))
+                 mayhem-sync-fresh-for
+               mayhem-sync-settled-for)))
 
 (define-derived-mode mayhem-run-mode mayhem-page-mode "Mayhem Run"
   "Major mode for a Mayhem run's page.")

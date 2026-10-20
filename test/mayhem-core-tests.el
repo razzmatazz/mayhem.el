@@ -142,6 +142,12 @@
   (should (equal (mayhem--bar-rows '(0 1 4 8) 1) '(" ▁▄█")))
   (should (equal (mayhem--bar-rows '(0 1 8) 2) '("  █" " ▂█"))))
 
+(ert-deftest mayhem-core-test-stack-rows ()
+  ;; A cell takes the colour of the layer at its lowest eighth.
+  (should (equal (mayhem--stack-rows '((1 1) (0 2) (0 0)) 1)
+                 '(((?█ . 0) (?█ . 1) (?\s)))))
+  (should (equal (mayhem--stack-rows '((1 1)) 2) '(((?█ . 1)) ((?█ . 0))))))
+
 (ert-deftest mayhem-core-test-testcase-summary ()
   (should (equal (mayhem--testcase-summary
                   '((sha256 . "ab") (n_defects . 3) (is_regression) (maps . "big")

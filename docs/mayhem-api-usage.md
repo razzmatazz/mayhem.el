@@ -38,9 +38,12 @@ fallback only for what the API cannot do (none so far).
 | `GET /api/v2/user/{slug}/project` | every project visible to the user: dashboard (workspaces) and workspace pages |
 | `GET /api/v2/owner/{owner}/target` | a workspace page's targets |
 | `GET /api/v2/owner/{owner}/project/{project}` | project page |
-| `GET /api/v2/owner/{owner}/project/{project}/target` | project page's targets |
+| `GET /api/v2/owner/{owner}/project/{project}/target?include_archived=true` | project page's targets, archived ones too |
+| `GET /api/v2/owner/{owner}/project/{project}/project-total` | project page's run count and targets passing their tests |
 | `GET /api/v2/owner/{owner}/project/{project}/target/{target}` | target page |
 | `GET .../target/{target}/run?per_page=20` | target page's latest runs |
+| `GET /api/v2/owner/{owner}/project/{project}/defect?target_slug={target}&sorted_by=-severity` | target page's defects, most severe first |
+| `GET /api/v2/owner/{owner}/defect-trend?project=&target=&window_start_timestamp_seconds=&window_end_timestamp_seconds=&window_step_seconds=` | target page's defect trend |
 | `GET .../target/{target}/run/{number}` | run page |
 | `GET /api/v2/owner/{owner}/project/{project}/defect?run={run_id}` | run page's defects |
 | `GET .../run/{number}/endpoints` | an API run page's endpoints |
@@ -54,6 +57,12 @@ fallback only for what the API cannot do (none so far).
 
 - The defect list's `run` filter takes the run's `run_id`, not its
   number; with a number it silently returns nothing.
+- The project defect list filters on `target_slug`; a `target`
+  parameter is ignored.  `defect-trend`, though, takes `target`, and
+  without one gives the whole project's.
+- `defect-trend` answers only members of the workspace, as the owner's
+  project list does: a 404 shows as a notice, not an error.
+- A target's `latest_active_run` is its latest run, whole.
 - A run's coverage counts (`n_lines_covered` and the like) are under its
   `run_attributes`.
 - `testcase-result` reports are large (the target's memory maps, ~4 KB

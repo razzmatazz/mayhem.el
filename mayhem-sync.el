@@ -32,7 +32,15 @@
   :group 'mayhem)
 
 (defcustom mayhem-sync-fresh-for 30
-  "Seconds after a fetch during which opening a page doesn't refetch it."
+  "Seconds after a fetch during which opening a page doesn't refetch it.
+A resource may keep its data longer, by its :max-age."
+  :type 'number
+  :group 'mayhem)
+
+(defcustom mayhem-sync-settled-for 86400
+  "Seconds data that should no longer change is reused, such as a finished run's.
+Resources whose data has settled give this as their :max-age; `g'
+refetches them all the same."
   :type 'number
   :group 'mayhem)
 
@@ -43,7 +51,7 @@
   "Functions called with a resource's key and whether it is now loading.
 Loading changes no data, so pages show it in the mode line only.")
 
-(defconst mayhem-sync--schema 3
+(defconst mayhem-sync--schema 5
   "Version of the store's tables, kept in SQLite's `user_version'.
 Bump it also when a resource's data changes shape: the store is then
 recreated rather than read in the old shape.")
@@ -137,7 +145,9 @@ The resource keeps its data.  Return non-nil if the error is new."
 PROPS are evaluated with ARGS bound.  :fetch is a function of DONE that
 fetches the resource and calls DONE with (OK DATA), as
 `mayhem--api-get' calls back.  DATA must be plain Lisp data that prints
-readably: it is stored printed."
+readably: it is stored printed.  :max-age, seconds or a function of the
+stored DATA returning them, is how long a fetch is reused; by default
+`mayhem-sync-fresh-for'."
   (declare (indent 2))
   `(puthash ',name (lambda ,args (list ,@props)) mayhem-sync--resources))
 
@@ -163,13 +173,16 @@ the first fetch succeeds; :error is the last fetch's failure, if any."
       (list :data data :fetched-at fetched-at :error error
             :loading (gethash key mayhem-sync--loading)))))
 
-(defun mayhem-sync--fresh-p (key now)
-  "Return non-nil if resource KEY was fetched just before NOW.
-That is, within `mayhem-sync-fresh-for' seconds."
-  (when-let* ((fetched (caar (sqlite-select (mayhem-sync--db)
-                                            "SELECT fetched_at FROM resource WHERE key = ?"
-                                            (list key)))))
-    (< (- now fetched) mayhem-sync-fresh-for)))
+(defun mayhem-sync--fresh-p (spec now)
+  "Return non-nil if resource SPEC was fetched recently enough before NOW.
+That is, within its :max-age, else `mayhem-sync-fresh-for' seconds."
+  (pcase-let ((`(,data ,fetched) (mayhem-sync--read (mayhem-sync--db)
+                                                    (mayhem-sync-spec-key spec))))
+    (when fetched
+      (let ((max-age (plist-get (mayhem-sync--props spec) :max-age)))
+        (< (- now fetched) (cond ((functionp max-age) (funcall max-age data))
+                                 (max-age)
+                                 (t mayhem-sync-fresh-for)))))))
 
 (defun mayhem-sync--set-loading (key loading)
   "Record whether resource KEY is LOADING, and report it."
@@ -184,7 +197,7 @@ FORCE fetches even data fetched just now.  Return at once; the store
 reports the result through `mayhem-sync-change-functions'."
   (let ((key (mayhem-sync-spec-key spec)))
     (unless (or (gethash key mayhem-sync--loading)
-                (and (not force) (mayhem-sync--fresh-p key (float-time))))
+                (and (not force) (mayhem-sync--fresh-p spec (float-time))))
       (mayhem-sync--set-loading key t)
       (let ((answered nil))
         (condition-case err

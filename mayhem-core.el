@@ -322,36 +322,154 @@ or the first error message."
                                                   fetches)))))))))))
 
 (defun mayhem--fetch-project (owner project callback)
-  "Fetch PROJECT of OWNER with its targets.
-Call CALLBACK with (OK DATA): DATA is an alist with `project' and
-`targets', or an error message."
-  (mayhem--fetch-each
-   `((project . ,(lambda (cb)
-                   (mayhem--api-get (mayhem--path "/api/v2/owner/%s/project/%s"
-                                                  owner project)
-                                    nil cb)))
-     (targets . ,(lambda (cb)
-                   (mayhem--api-get-all (mayhem--path "/api/v2/owner/%s/project/%s/target"
-                                                      owner project)
-                                        'targets cb))))
-   callback))
+  "Fetch PROJECT of OWNER with its totals and targets, archived ones too.
+Call CALLBACK with (OK DATA): DATA is an alist with `project', `totals'
+and `targets', each trimmed to what its page shows, each target with
+its `latest' run, or an error message."
+  (let ((path (mayhem--path "/api/v2/owner/%s/project/%s" owner project))
+        (pick (lambda (fields cb)
+                (lambda (ok data) (funcall cb ok (if ok (mayhem--pick data fields) data))))))
+    (mayhem--fetch-each
+     `((project . ,(lambda (cb)
+                     (mayhem--api-get path nil
+                                      (funcall pick '(default_branch repository_url updated_at
+                                                                     n_defects_active_high
+                                                                     n_defects_active_medium
+                                                                     n_defects_active_low
+                                                                     n_defects_fixed_high
+                                                                     n_defects_fixed_medium
+                                                                     n_defects_fixed_low)
+                                               cb))))
+       (totals . ,(lambda (cb)
+                    (mayhem--api-get (concat path "/project-total") nil
+                                     (funcall pick '(runs targets latest_targets_passing_tests)
+                                              cb))))
+       (targets . ,(lambda (cb)
+                     (mayhem--api-get-all
+                      (concat path "/target") 'targets
+                      (lambda (ok data)
+                        (funcall cb ok
+                                 (if (not ok)
+                                     data
+                                   (mapcar (lambda (target)
+                                             (cons (cons 'latest
+                                                         (when-let* ((run (alist-get 'latest_active_run
+                                                                                     target)))
+                                                           (mayhem--target-run run)))
+                                                   (mayhem--pick target '(slug target_name type
+                                                                               is_archived n_runs))))
+                                           data))))
+                      '((include_archived "true"))))))
+     callback)))
 
 (defconst mayhem--runs-shown 20
   "How many of a target's latest runs its page shows.")
 
+(defconst mayhem--target-defects-shown 100
+  "How many of a target's defects, most severe first, its page shows.")
+
+(defconst mayhem--target-run-fields
+  '(run_number pending started stopped ended failed n_defects branch_name
+               created_at started_by n_testcase_reports n_crash_reports
+               n_optimized_set_testcases n_exploitability_factors_passing
+               n_exploitability_factors_total
+               ;; From its `run_attributes'.
+               n_lines_covered n_lines_total n_defects_active_high
+               n_defects_active_medium n_defects_active_low)
+  "Fields of a run kept for its target's page.")
+
+(defun mayhem--target-run (run)
+  "Return RUN, as the API gives it, with only `mayhem--target-run-fields'."
+  (mayhem--pick (append run (alist-get 'run_attributes run)) mayhem--target-run-fields))
+
 (defun mayhem--fetch-target (owner project target callback)
-  "Fetch TARGET of PROJECT of OWNER, with its latest run list.
-Call CALLBACK with (OK DATA): DATA is an alist with `target' and `runs',
-the latter as the API lists them (`count' and `runs'), or an error
-message."
+  "Fetch TARGET of PROJECT of OWNER, with its defects and latest run list.
+Call CALLBACK with (OK DATA): DATA is an alist with `target', its
+`latest' run, and `runs' and `defects', each a list as the API gives it
+\(`count' and the items), or an error message.  All are trimmed to what
+the page shows; the defects are the most severe ones."
   (let ((path (mayhem--path "/api/v2/owner/%s/project/%s/target/%s"
-                            owner project target)))
+                            owner project target))
+        (trim (lambda (key fn)
+                (lambda (cb)
+                  (lambda (ok data)
+                    (funcall cb ok (if ok `((count . ,(alist-get 'count data))
+                                            (,key . ,(mapcar fn (alist-get key data))))
+                                     data)))))))
     (mayhem--fetch-each
-     `((target . ,(lambda (cb) (mayhem--api-get path nil cb)))
+     `((target . ,(lambda (cb)
+                    (mayhem--api-get
+                     path nil
+                     (lambda (ok data)
+                       (funcall cb ok (if ok
+                                          (cons (cons 'latest
+                                                      (when-let* ((run (alist-get 'latest_active_run
+                                                                                  data)))
+                                                        (mayhem--target-run run)))
+                                                (mayhem--pick data '(type url updated_at)))
+                                        data))))))
        (runs . ,(lambda (cb)
                   (mayhem--api-get (concat path "/run")
-                                   `((per_page ,mayhem--runs-shown)) cb))))
-     callback)))
+                                   `((per_page ,mayhem--runs-shown))
+                                   (funcall (funcall trim 'runs #'mayhem--target-run) cb))))
+       (defects . ,(lambda (cb)
+                     (mayhem--api-get
+                      (mayhem--path "/api/v2/owner/%s/project/%s/defect" owner project)
+                      `((target_slug ,target) (sorted_by "-severity")
+                        (per_page ,mayhem--target-defects-shown))
+                      (funcall (funcall trim 'defects
+                                        (lambda (d)
+                                          (mayhem--pick d '(defect_number title severity
+                                                                          severity_level state
+                                                                          cwe_number last_seen
+                                                                          last_seen_run_number))))
+                               cb)))))
+     (lambda (ok data)
+       (funcall callback ok
+                (if (not ok)
+                    data
+                  ;; The latest run rides with the target, as the API gives it.
+                  (let ((target (alist-get 'target data)))
+                    `((target . ,(cdr target))
+                      (latest . ,(alist-get 'latest target))
+                      (runs . ,(alist-get 'runs data))
+                      (defects . ,(alist-get 'defects data))))))))))
+
+(defconst mayhem--trend-windows
+  '((year "12 months" 31536000 604800 "%d %b")
+    (quarter "3 months" 7776000 172800 "%d %b")
+    (month "30 days" 2592000 86400 "%d %b")
+    (week "7 days" 604800 14400 "%a %H:%M")
+    (day "24 hours" 86400 3600 "%H:%M"))
+  "Windows of a defect trend, as the web app offers them.
+Each is (KEY LABEL SPAN STEP TIME-FORMAT): SPAN and STEP in seconds,
+TIME-FORMAT for a point's time.")
+
+(defun mayhem--fetch-defect-trend (owner project target window callback)
+  "Fetch the defect trend of TARGET of PROJECT of OWNER over WINDOW.
+Of the whole PROJECT when TARGET is nil.
+WINDOW is a key of `mayhem--trend-windows', ending now.  Call CALLBACK
+with (OK DATA): DATA is a list of points, each an alist of `timestamp'
+and active defects by severity, `active_high' and the like; or
+`members-only' when only members of OWNER may see it; or an error
+message."
+  (pcase-let* ((`(,_ ,_ ,span ,step ,_) (assq window mayhem--trend-windows))
+               (end (truncate (float-time))))
+    (mayhem--api-get
+     (mayhem--path "/api/v2/owner/%s/defect-trend" owner)
+     `((project ,project) ,@(and target `((target ,target)))
+       (window_start_timestamp_seconds ,(- end span))
+       (window_end_timestamp_seconds ,end)
+       (window_step_seconds ,step))
+     (lambda (ok data)
+       (cond (ok (funcall callback t (mapcar (lambda (p)
+                                               (mayhem--pick p '(timestamp active_high
+                                                                           active_medium
+                                                                           active_low fixed)))
+                                             (alist-get 'trend data))))
+             ;; Like the owner's project list, it answers only members.
+             ((string-prefix-p "HTTP 404" data) (funcall callback t 'members-only))
+             (t (funcall callback nil data)))))))
 
 (defconst mayhem--run-fields
   '(run_id run_number description pending started stopped ended failed
@@ -664,6 +782,32 @@ Bars scale to the largest value; any value above 0 shows."
                                (aref mayhem--bar-chars (min 8 (max 0 (- e (* 8 row))))))
                              eighths)))
             (number-sequence (1- height) 0 -1))))
+
+(defun mayhem--stack-rows (stacks height)
+  "Return STACKS as a stacked bar chart HEIGHT rows tall, top row first.
+Each stack is a list of values, its bottom layer first.  Each row is a
+list of (CHAR . LAYER) per column: LAYER is the index of the layer the
+cell shows, nil for an empty one.  Bars scale to the tallest stack."
+  (let* ((top (max 1 (apply #'max 0 (mapcar (lambda (s) (apply #'+ s)) stacks))))
+         (scale (lambda (v) (if (> v 0) (max 1 (round (* 8 height v) top)) 0))))
+    (mapcar
+     (lambda (row)
+       (mapcar
+        (lambda (stack)
+          (let* ((filled (funcall scale (apply #'+ stack)))
+                 (eighths (min 8 (max 0 (- filled (* 8 row)))))
+                 (layer nil) (sum 0))
+            ;; The layer at the cell's lowest eighth colours it.
+            (when (> eighths 0)
+              (seq-do-indexed (lambda (v i)
+                                (setq sum (+ sum v))
+                                (when (and (null layer)
+                                           (> (funcall scale sum) (* 8 row)))
+                                  (setq layer i)))
+                              stack))
+            (cons (aref mayhem--bar-chars eighths) layer)))
+        stacks))
+     (number-sequence (1- height) 0 -1))))
 
 (defun mayhem--format-duration (seconds)
   "Return SECONDS as \"1h 5m\", \"3m 20s\" or \"45s\"; nil gives nil."

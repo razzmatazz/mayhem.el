@@ -24,7 +24,8 @@
 (require 'mayhem-defect)
 
 (mayhem-sync-define-resource testcase (owner project target run sha256)
-  :fetch (lambda (done) (mayhem--fetch-testcase owner project target run sha256 done)))
+  :fetch (lambda (done) (mayhem--fetch-testcase owner project target run sha256 done))
+  :max-age mayhem-sync-settled-for)
 
 (define-derived-mode mayhem-testcase-mode mayhem-page-mode "Mayhem Test Case"
   "Major mode for a Mayhem test case's page.")

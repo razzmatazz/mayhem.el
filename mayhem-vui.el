@@ -279,6 +279,13 @@ is drawn as a heading, the others as buttons."
                                     :face 'underline))))
      (vui-newline))))
 
+(defun mayhem-defect-severity-face (level)
+  "Return the face for a defect of severity LEVEL, such as \"high\"."
+  (pcase level
+    ("high" 'error)
+    ("medium" 'warning)
+    (_ 'mayhem-label)))
+
 (defun mayhem-snapshot-view (snapshot what skeleton render)
   "Return the vnode of a page part showing SNAPSHOT, a sync snapshot.
 RENDER is called with the data once there is some.  Before that, it
@@ -289,6 +296,121 @@ failed: then it says fetching WHAT failed."
          (vui-text (concat (propertize (format "Fetching %s failed: " what) 'face 'error)
                            (plist-get snapshot :error) "\n")))
         (t skeleton)))
+
+;;;; Defect trend
+
+(mayhem-sync-define-resource defect-trend (owner project target window)
+  :fetch (lambda (done)
+           (mayhem--fetch-defect-trend owner project target window done)))
+
+(defconst mayhem-trend--width 60
+  "Columns of a defect trend chart, at most.")
+
+(defconst mayhem-trend--height 4
+  "Rows of a defect trend chart.")
+
+(defconst mayhem-severities '("high" "medium" "low")
+  "Severity levels, most severe first: the bottom layer of a trend chart.")
+
+(defun mayhem-severity-counts (counts &optional kind)
+  "Return active defects by severity, as \"3 high, 6 medium\", from COUNTS.
+COUNTS is an alist with `n_defects_active_high' and the like, as a run
+or project has.  KIND \"fixed\" counts fixed defects instead.  Levels
+with none are left out; nil when there are none."
+  (let ((parts (delq nil
+                     (mapcar (lambda (level)
+                               (let ((n (or (alist-get (intern (format "n_defects_%s_%s" (or kind "active") level))
+                                                       counts)
+                                            0)))
+                                 (when (> n 0)
+                                   (propertize (format "%d %s" n level)
+                                               'face (mayhem-defect-severity-face level)))))
+                             mayhem-severities))))
+    (and parts (string-join parts ", "))))
+
+(defun mayhem-trend--chart (points window)
+  "Return the vnodes charting POINTS of a defect trend over WINDOW.
+POINTS are as `mayhem--fetch-defect-trend' gives them; WINDOW is a key
+of `mayhem--trend-windows'.  Active defects are stacked by severity;
+each column's time and counts are its `help-echo'."
+  (cond
+   ((eq points 'members-only)
+    (mayhem-notice "Only members of the workspace see its defect trend"))
+   ((null points)
+    (mayhem-notice "No data"))
+   (t
+    (let* ((time-format (nth 4 (assq window mayhem--trend-windows)))
+           (colw (max 1 (/ mayhem-trend--width (length points))))
+           (count (lambda (p level) (or (alist-get (intern (concat "active_" level)) p) 0)))
+           (stacks (mapcar (lambda (p) (mapcar (lambda (l) (funcall count p l))
+                                               mayhem-severities))
+                           points))
+           (time (lambda (p) (format-time-string
+                              time-format (encode-time (iso8601-parse (alist-get 'timestamp p))))))
+           (tips (seq-mapn (lambda (p stack)
+                             (format "%s  %d active%s" (funcall time p) (apply #'+ stack)
+                                     (if (> (apply #'+ stack) 0)
+                                         (concat ": " (string-join
+                                                       (seq-mapn (lambda (n l) (format "%d %s" n l))
+                                                                 stack mayhem-severities)
+                                                       ", "))
+                                       "")))
+                           points stacks))
+           (top (apply #'max 0 (mapcar (lambda (s) (apply #'+ s)) stacks)))
+           (margin (max 4 (length (number-to-string top))))
+           (pad (make-string (+ 3 margin) ?\s))
+           (rows (mayhem--stack-rows stacks mayhem-trend--height))
+           (width (* colw (length points)))
+           (first (funcall time (car points)))
+           (last (funcall time (car (last points)))))
+      (vui-text
+       (concat
+        (mapconcat
+         (lambda (row)
+           (concat "  "
+                   (propertize (format (format "%%%ds " margin) (if (eq row (car rows)) top ""))
+                               'face 'mayhem-label)
+                   (apply #'concat
+                          (seq-mapn (pcase-lambda (`(,char . ,layer) tip)
+                                      (propertize (make-string colw char)
+                                                  'face (if layer
+                                                            (mayhem-defect-severity-face
+                                                             (nth layer mayhem-severities))
+                                                          'mayhem-label)
+                                                  'help-echo tip 'mayhem-ts tip))
+                                    row tips))
+                   "\n"))
+         rows "")
+        pad (propertize (concat first (make-string (max 1 (- width (length first) (length last)))
+                                                   ?\s)
+                                last)
+                        'face 'mayhem-label)
+        "\n"
+        pad (mapconcat (lambda (level)
+                         (concat (propertize "█" 'face (mayhem-defect-severity-face level))
+                                 (propertize (concat " " level) 'face 'mayhem-label)))
+                       mayhem-severities "  ")
+        "\n"))))))
+
+(vui-defcomponent mayhem-trend (owner project target)
+  "The defect trend of TARGET of PROJECT of OWNER, with its window selector.
+Of the whole PROJECT when TARGET is nil."
+  :state ((window 'month))
+  :render
+  (let ((snapshot (mayhem-sync-use-resource (list 'defect-trend owner project target window))))
+    (vui-fragment
+     (mayhem-heading "Defect trend")
+     (mayhem-tab-row (mapcar (pcase-lambda (`(,key ,label . ,_))
+                               (list label (format "RET: show the last %s" label)
+                                     (unless (eq key window)
+                                       (lambda () (vui-set-state :window key)))))
+                             mayhem--trend-windows)
+                     mayhem-trend--width)
+     (vui-newline)
+     (mayhem-snapshot-view snapshot "defect trend"
+                           (mayhem-skeleton (make-list mayhem-trend--height
+                                                       (list "       " mayhem-trend--width)))
+                           (lambda (points) (mayhem-trend--chart points window))))))
 
 (provide 'mayhem-vui)
 ;;; mayhem-vui.el ends here

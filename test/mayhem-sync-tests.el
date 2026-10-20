@@ -41,6 +41,25 @@
     (should (mayhem-sync--write mayhem-sync--db "k" '(1) 20.0))
     (should (equal (mayhem-sync--read mayhem-sync--db "k") '((1) 20.0 nil)))))
 
+(ert-deftest mayhem-sync-test-max-age ()
+  (mayhem-sync-tests--with-db
+    (mayhem-sync-define-resource thing (age)
+      :fetch #'ignore
+      :max-age age)
+    (mayhem-sync-define-resource settled ()
+      :fetch #'ignore
+      :max-age (lambda (data) (if (eq (car data) 'done) 1000 10)))
+    (dolist (spec '((thing nil) (thing 1000) (settled)))
+      (mayhem-sync--write mayhem-sync--db (mayhem-sync-spec-key spec) '(running) 100.0))
+    (let ((mayhem-sync-fresh-for 30))
+      (should (mayhem-sync--fresh-p '(thing nil) 120.0))
+      (should-not (mayhem-sync--fresh-p '(thing nil) 140.0))
+      (should (mayhem-sync--fresh-p '(thing 1000) 500.0))
+      (should-not (mayhem-sync--fresh-p '(settled) 120.0))
+      (mayhem-sync--write mayhem-sync--db (mayhem-sync-spec-key '(settled)) '(done) 100.0)
+      (should (mayhem-sync--fresh-p '(settled) 500.0))
+      (should-not (mayhem-sync--fresh-p '(missing) 100.0)))))
+
 (ert-deftest mayhem-sync-test-newer-schema-signals ()
   (let ((db (sqlite-open nil)))
     (sqlite-execute db (format "PRAGMA user_version = %d" (1+ mayhem-sync--schema)))

@@ -27,17 +27,11 @@
   "Column at which a defect's description is wrapped.")
 
 (mayhem-sync-define-resource defect (owner project target number run)
-  :fetch (lambda (done) (mayhem--fetch-defect owner project target number run done)))
+  :fetch (lambda (done) (mayhem--fetch-defect owner project target number run done))
+  :max-age mayhem-sync-settled-for)
 
 (define-derived-mode mayhem-defect-mode mayhem-page-mode "Mayhem Defect"
   "Major mode for a Mayhem defect's page.")
-
-(defun mayhem-defect-severity-face (level)
-  "Return the face for a defect of severity LEVEL, such as \"high\"."
-  (pcase level
-    ("high" 'error)
-    ("medium" 'warning)
-    (_ 'mayhem-label)))
 
 (defun mayhem-defect--evidence-fields (source evidence)
   "Return the fields of EVIDENCE of a defect from SOURCE, \"api\" or \"code\"."
