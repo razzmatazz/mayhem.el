@@ -417,6 +417,30 @@ links to its page on its host."
                               (mayhem-link (mayhem--ci-label ci-type ci-url) ci-url)
                             ci-type))))))
 
+(defun mayhem-image-field (run)
+  "Return the Image field of RUN, an alist, or nil when it has no image.
+It links to the image's page when it has one; its digest is the
+`help-echo'."
+  (when-let* ((image (alist-get 'docker_pullable run)))
+    (mayhem-field "Image"
+                  (let ((url (mayhem--image-url image))
+                        (digest (alist-get 'fetched_docker_image_digest run)))
+                    (if url
+                        (mayhem-page-link image
+                                          (concat "RET: open " url
+                                                  (and digest (concat "\n" digest)))
+                                          (lambda () (browse-url url)))
+                      (propertize image 'help-echo digest))))))
+
+(defun mayhem-hardening-field (run)
+  "Return the Hardening field of RUN, an alist, or nil without one."
+  (let ((factors (alist-get 'n_exploitability_factors_total run)))
+    (when (and factors (> factors 0))
+      (mayhem-field "Hardening"
+                    (format "%s of %s exploitability factors"
+                            (or (alist-get 'n_exploitability_factors_passing run) 0)
+                            factors)))))
+
 (defun mayhem-heading (text)
   "Return a vnode for the section heading TEXT and its newline."
   (vui-text (concat (propertize text 'face 'mayhem-section-heading) "\n")))

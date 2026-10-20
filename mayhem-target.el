@@ -9,9 +9,10 @@
 
 ;;; Commentary:
 
-;; A target's page, `*mayhem: owner/project/target*': its details, what
-;; its latest run found, and a chart of its active defects over time,
-;; as the web app's target page has.  Below, in tabs: its most severe
+;; A target's page, `*mayhem: owner/project/target*': its details; its
+;; latest run, with what it found, its coverage, hardening, repository
+;; and image; and a chart of its active defects over time, as the web
+;; app's target page has.  Below, in tabs: its most severe
 ;; defects and its latest runs.  RET on either opens its page.
 
 ;;; Code:
@@ -95,15 +96,27 @@ nil; ON-TAB is called with the other's key, to show it."
      (when (alist-get 'url info)
        (mayhem-field "URL" (alist-get 'url info)))
      (mayhem-field "Updated" (mayhem--format-age (alist-get 'updated_at info) now))
+     ;; The fields below come from the latest run; a target has none of
+     ;; its own, and each run may have its own image and repository.
      (when latest
        (vui-fragment
+        (mayhem-field "Latest" (mayhem-run-link owner project target
+                                                (alist-get 'run_number latest))
+                      (concat "  " (mayhem-run-status latest)
+                              (when-let* ((age (mayhem--format-age (alist-get 'created_at latest)
+                                                                   now)))
+                                (propertize (concat "  " age) 'face 'mayhem-label))))
         (mayhem-field "Defects" (concat (format "%d" (or (alist-get 'n_defects latest) 0))
                                         (when-let* ((counts (mayhem-severity-counts latest)))
-                                          (concat "  " counts))
-                                        (propertize "  in " 'face 'mayhem-label))
-                      (let ((number (alist-get 'run_number latest)))
-                        (mayhem-run-link owner project target number)))
+                                          (concat "  " counts))))
         (mayhem-field "Crashes" (format "%d" (or (alist-get 'n_crash_reports latest) 0)))
+        (let ((covered (alist-get 'n_lines_covered latest))
+              (total (alist-get 'n_lines_total latest)))
+          (when (and covered total (> total 0))
+            (mayhem-field "Coverage" (format "%.2f%% of lines" (/ (* 100.0 covered) total)))))
+        (mayhem-hardening-field latest)
+        (mayhem-repo-field (alist-get 'scm_remote_origin latest))
+        (mayhem-image-field latest)
         (when-let* ((suite (alist-get 'n_optimized_set_testcases latest)))
           (mayhem-field "Test suite"
                         (mayhem-page-link (format "%d test case%s" suite (if (= suite 1) "" "s"))
@@ -154,6 +167,7 @@ nil; ON-TAB is called with the other's key, to show it."
   (vui-fragment
    (mayhem-field "Type" (mayhem-skeleton-bar 4))
    (mayhem-field "Updated" (mayhem-skeleton-bar 12))
+   (mayhem-field "Latest" (mayhem-skeleton-bar 24))
    (mayhem-field "Defects" (mayhem-skeleton-bar 20))
    (mayhem-field "Crashes" (mayhem-skeleton-bar 3))
    (vui-newline)

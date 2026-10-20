@@ -53,11 +53,13 @@ often as other data.")
 
 (mayhem-sync-define-resource run (owner project target number)
   :fetch (lambda (done) (mayhem--fetch-run owner project target number done))
-  ;; A finished run no longer changes.
+  ;; A finished run no longer changes, once a later one says it is not
+  ;; the latest.
   :max-age (lambda (data)
-             (if (mayhem-run--live-p (alist-get 'run data))
-                 mayhem-sync-fresh-for
-               mayhem-sync-settled-for)))
+             (let ((run (alist-get 'run data)))
+               (if (or (mayhem-run--live-p run) (not (alist-get 'next_run_number run)))
+                   mayhem-sync-fresh-for
+                 mayhem-sync-settled-for))))
 
 (define-derived-mode mayhem-run-mode mayhem-page-mode "Mayhem Run"
   "Major mode for a Mayhem run's page.")
@@ -549,8 +551,6 @@ log for a failed run, which says why, else the first.  ON-TAB is
 called with the key of another one, to show it.  OPEN and ON-OPEN
 are for the header's folds, as in `mayhem-run--started-with'."
   (let* ((run (alist-get 'run data))
-         (image (alist-get 'docker_pullable run))
-         (factors (alist-get 'n_exploitability_factors_total run))
          (code (not (alist-get 'api_run run)))
          (repo (mayhem--repo (alist-get 'scm_remote_origin run)))
          (parent (alist-get 'parent_revision run))
@@ -572,7 +572,13 @@ are for the header's folds, as in `mayhem-run--started-with'."
                                       (propertize (format "  %d of %d workers"
                                                           (or (alist-get 'current_workers run) 0)
                                                           (or (alist-get 'desired_workers run) 0))
-                                                  'face 'mayhem-label))))
+                                                  'face 'mayhem-label))
+                                    (propertize (if (alist-get 'next_run_number run)
+                                                    "  next "
+                                                  "  latest run")
+                                                'face 'mayhem-label))
+                   (when-let* ((next (alist-get 'next_run_number run)))
+                     (mayhem-run-link owner project target next)))
      (mayhem-field "Started" (concat (or (mayhem--format-age start now)
                                          (concat "not yet"
                                                  (when-let* ((age (mayhem--format-age queued now)))
@@ -595,25 +601,14 @@ are for the header's folds, as in `mayhem-run--started-with'."
                                  'face 'mayhem-label)))
      (when (alist-get 'phases run)
        (mayhem-field "Tasks" (mayhem-run--tasks run)))
-     (when (and factors (> factors 0))
-       (mayhem-field "Hardening"
-                     (format "%s of %s exploitability factors" (or (alist-get 'n_exploitability_factors_passing run) 0)
-                             factors)))
+     (mayhem-hardening-field run)
      (mayhem-scm-fields run)
      (when parent
        (mayhem-field "Parent" (mayhem-repo-link repo (substring parent 0 (min 7 (length parent)))
                                                 'commit parent)))
      (when-let* ((build (alist-get 'build_id run)))
        (mayhem-field "Build" (format "%s" build)))
-     (when image
-       (mayhem-field "Image" (let ((url (mayhem--image-url image))
-                                   (digest (alist-get 'fetched_docker_image_digest run)))
-                               (if url
-                                   (mayhem-page-link image
-                                                     (concat "RET: open " url
-                                                             (and digest (concat "\n" digest)))
-                                                     (lambda () (browse-url url)))
-                                 (propertize image 'help-echo digest)))))
+     (mayhem-image-field run)
      (mayhem-run--mayhemfile-field owner project target number run)
      (mayhem-run--started-with run open on-open)
      (when-let* ((cli (alist-get 'cli_version run)))

@@ -49,8 +49,9 @@ say because your token expired, the error shows in the header line.
 - **Project**: its repository, remaining and fixed defects, how many
   targets pass their tests, a defect trend chart, and its targets
   (active and archived tabs), each with what its latest run found.
-- **Target**: what its latest run found, its defect trend, and tabs
-  for its defects (most severe first) and latest runs.
+- **Target**: its latest run, with what it found, its line coverage,
+  hardening, repository and image; its defect trend; and tabs for its
+  defects (most severe first) and latest runs.
 - **Run**: status, when it started and how long it waited in the
   queue, how long it ran against its time limit and its CPU time, its
   repository, branch, commit and parent commit, the CI build and build

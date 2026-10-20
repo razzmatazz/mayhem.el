@@ -381,7 +381,8 @@ its `latest' run, or an error message."
   '(run_number pending started stopped ended failed n_defects branch_name
                created_at started_by n_testcase_reports n_crash_reports
                n_optimized_set_testcases n_exploitability_factors_passing
-               n_exploitability_factors_total
+               n_exploitability_factors_total scm_remote_origin docker_pullable
+               fetched_docker_image_digest
                ;; From its `run_attributes'.
                n_lines_covered n_lines_total n_defects_active_high
                n_defects_active_medium n_defects_active_low)
@@ -558,7 +559,7 @@ such as a Mayhem server's own, which have no page."
            n_regression_defect_reports n_optimized_set_testcases
            elapsed_real_time cputime created_at updated_at build_id
            cli_version parent_revision is_mayhem_bot has_critical_errors
-           mayhemfile_flat overrides env_vars run_files phases
+           mayhemfile_flat overrides env_vars run_files phases next_run_number
            tests_run_mfuzz tests_run_libfuzz tests_run_honggfuzz
            tests_run_symexec current_workers desired_workers
            n_desired_cpu n_desired_memory n_crash_reports
