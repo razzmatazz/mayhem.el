@@ -45,22 +45,28 @@ say because your token expired, the error shows in the header line.
 ## Pages
 
 - **Workspace**: its projects and their targets.
-- **Project**: remaining and fixed defects, how many targets pass
-  their tests, a defect trend chart, and its targets (active and
-  archived tabs), each with what its latest run found.
+- **Project**: its repository, remaining and fixed defects, how many
+  targets pass their tests, a defect trend chart, and its targets
+  (active and archived tabs), each with what its latest run found.
 - **Target**: what its latest run found, its defect trend, and tabs
   for its defects (most severe first) and latest runs.
-- **Run**: status, image and commit.  A code run also has a chart of
-  test cases processed and defects found over time, as in the web
-  app.  Tabs: Defects, Tests (counts and failing test cases), Coverage
-  and Log; an API run has Defects, Endpoints and Log.  A run that is
-  still going refreshes itself every 10 seconds.
-- **Defect**: severity, CWE, description and evidence: for an API
-  defect the request, response and stack trace, for a crash the test
-  cases that hit it (RET opens one), and one's reproducer and
-  backtrace.
+- **Run**: status, image, its repository, branch and commit, and the
+  CI build that started it.  A code run also has a chart of test cases
+  processed and defects found over time, as in the web app.  Tabs:
+  Defects, Tests (counts and failing test cases), Coverage and Log; an
+  API run has Defects, Endpoints and Log.  A run that is still going
+  refreshes itself every 10 seconds.
+- **Defect**: severity, CWE, the commit of the run that saw it,
+  description and evidence: for an API defect the request, response
+  and stack trace, for a crash the test cases that hit it (RET opens
+  one), and one's reproducer and backtrace.
 - **Test case**: its defects, how to reproduce it, its bytes, the
   target's output and the backtrace.
+
+Repositories, branches, commits and CI builds are links, shown with
+the repository's host (`github.com/owner/name`); RET follows them with
+`browse-url`.  Branches and commits link on GitHub, GitLab and
+Bitbucket.
 
 Defect trends cover the last 12 months, 3 months, 30 days, 7 days or
 24 hours; pick one with RET.  Only members of a workspace can see its

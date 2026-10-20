@@ -124,6 +124,8 @@ SOURCE is \"api\" or \"code\"."
      (mayhem-field "Last seen" (mayhem--format-age (alist-get 'last_seen defect) now))
      (when-let* ((run (alist-get 'run data)))
        (mayhem-field "Run" (format "#%s" run)))
+     (when-let* ((scm (alist-get 'scm data)))
+       (mayhem-scm-fields scm))
      (mayhem-defect--evidence-fields (alist-get 'source defect) (alist-get 'evidence data))
      (mayhem-block "Description"
                            (string-fill (or (alist-get 'description defect) "")

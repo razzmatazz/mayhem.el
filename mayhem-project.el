@@ -96,9 +96,12 @@ nil; ON-TAB is called with the other's key, to show it."
          (shown (or (assq tab tabs) (car tabs)))
          (now (current-time)))
     (vui-fragment
-     (mayhem-field "Branch" (alist-get 'default_branch info))
-     (when (alist-get 'repository_url info)
-       (mayhem-field "Repo" (alist-get 'repository_url info)))
+     (mayhem-repo-field (alist-get 'repository_url info))
+     (let ((branch (alist-get 'default_branch info)))
+       (mayhem-field "Branch" (and branch
+                                   (mayhem-repo-link (mayhem--repo
+                                                      (alist-get 'repository_url info))
+                                                     branch 'branch branch))))
      (mayhem-field "Defects" (concat (mayhem-project--defects info "active")
                                      (propertize "  remaining" 'face 'mayhem-label)))
      (mayhem-field "Fixed" (mayhem-project--defects info "fixed"))

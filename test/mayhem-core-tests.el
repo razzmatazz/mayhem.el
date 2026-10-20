@@ -242,5 +242,43 @@
   (should (equal (mayhem--page-url "https://h/" '(defect "o" "p" "t" 34 1))
                  "https://h/o/p/t/1?defect=34")))
 
+(ert-deftest mayhem-core-test-clean-url ()
+  (should (equal (mayhem--clean-url "https://github.com:443/o/r//actions/runs/7")
+                 "https://github.com/o/r/actions/runs/7"))
+  (should (equal (mayhem--clean-url "http://ci.example:80") "http://ci.example"))
+  (should (equal (mayhem--clean-url "https://ci.example:8443/job/1")
+                 "https://ci.example:8443/job/1"))
+  (should-not (mayhem--clean-url nil)))
+
+(ert-deftest mayhem-core-test-repo ()
+  (dolist (url '("git@github.com:o/r.git" "https://github.com:443/o/r/"
+                 "https://github.com/o/r.git" "https://github.com/o/r"
+                 "ssh://git@github.com/o/r.git"))
+    (should (equal (mayhem--repo url) '("github.com" . "o/r"))))
+  (should (equal (mayhem--repo "git@gitlab.com:group/sub/r.git")
+                 '("gitlab.com" . "group/sub/r")))
+  (should-not (mayhem--repo "https://github.com/o"))
+  (should-not (mayhem--repo nil)))
+
+(ert-deftest mayhem-core-test-repo-url ()
+  (let ((github '("github.com" . "o/r")))
+    (should (equal (mayhem--repo-url github) "https://github.com/o/r"))
+    (should (equal (mayhem--repo-url github 'branch "feature/x")
+                   "https://github.com/o/r/tree/feature/x"))
+    (should (equal (mayhem--repo-url github 'commit "abc")
+                   "https://github.com/o/r/commit/abc")))
+  (should (equal (mayhem--repo-url '("gitlab.example" . "g/r") 'commit "abc")
+                 "https://gitlab.example/g/r/-/commit/abc"))
+  (should (equal (mayhem--repo-url '("bitbucket.org" . "o/r") 'branch "main")
+                 "https://bitbucket.org/o/r/src/main"))
+  (should (equal (mayhem--repo-url '("git.example" . "o/r")) "https://git.example/o/r"))
+  (should-not (mayhem--repo-url '("git.example" . "o/r") 'commit "abc")))
+
+(ert-deftest mayhem-core-test-ci-label ()
+  (should (equal (mayhem--ci-label "GitHubActions" "https://github.com/o/r/actions/runs/42")
+                 "GitHub Actions run 42"))
+  (should (equal (mayhem--ci-label "Jenkins" "https://ci/job/1") "Jenkins  https://ci/job/1"))
+  (should (equal (mayhem--ci-label nil "https://ci/job/1") "https://ci/job/1")))
+
 (provide 'mayhem-core-tests)
 ;;; mayhem-core-tests.el ends here

@@ -471,10 +471,55 @@ message."
              ((string-prefix-p "HTTP 404" data) (funcall callback t 'members-only))
              (t (funcall callback nil data)))))))
 
+(defconst mayhem--scm-fields
+  '(scm_remote_origin branch_name merge_base_branch_name revision
+                     scm_commit_subject scm_commit_author ci_type ci_url)
+  "Fields of a run naming its source and the CI build that started it.")
+
+(defun mayhem--clean-url (url)
+  "Return URL without a default port or doubled slashes in its path.
+The API gives links such as https://github.com:443/owner/name//actions."
+  (when url
+    (replace-regexp-in-string
+     "\\([^:/]\\)//+" "\\1/"
+     (replace-regexp-in-string "\\`\\(https?://[^/:]+\\):\\(?:443\\|80\\)\\(/\\|\\'\\)"
+                               "\\1\\2" url))))
+
+(defun mayhem--repo (url)
+  "Return the repository at URL as (HOST . PATH), or nil.
+URL is a remote or web link in any form the API gives, such as
+git@github.com:owner/name.git or https://github.com:443/owner/name/."
+  (when (and url
+             (string-match (concat "\\`\\(?:[a-z+]+://\\)?\\(?:[^@/]+@\\)?\\([^/:@]+\\)"
+                                   "\\(?::[0-9]*\\)?[:/]\\([^/]+/.+?\\)"
+                                   "\\(?:\\.git\\)?/*\\'")
+                           url))
+    (cons (match-string 1 url) (match-string 2 url))))
+
+(defun mayhem--repo-url (repo &optional kind ref)
+  "Return the web link to REPO, (HOST . PATH), or to its KIND REF.
+KIND is `branch' or `commit'.  Nil for a KIND on a host whose links
+are not known: GitHub's, GitLab's and Bitbucket's are."
+  (pcase-let* ((`(,host . ,path) repo)
+               (home (concat "https://" host "/" path))
+               (forge (cond ((equal host "github.com") '("tree" . "commit"))
+                            ((string-match-p "gitlab" host) '("-/tree" . "-/commit"))
+                            ((equal host "bitbucket.org") '("src" . "commits")))))
+    (pcase kind
+      ('nil home)
+      ('branch (and forge (concat home "/" (car forge) "/" ref)))
+      ('commit (and forge (concat home "/" (cdr forge) "/" ref))))))
+
+(defun mayhem--ci-label (type url)
+  "Return how a page names the CI build of TYPE at URL."
+  (if (string-match "/actions/runs/\\([0-9]+\\)" url)
+      (concat "GitHub Actions run " (match-string 1 url))
+    (string-join (delq nil (list type url)) "  ")))
+
 (defconst mayhem--run-fields
-  '(run_id run_number description pending started stopped ended failed
-           started_at ended_at duration started_by branch_name revision
-           scm_commit_subject n_defects tests_run tests_per_second edges_covered
+  `(run_id run_number description pending started stopped ended failed
+           started_at ended_at duration started_by ,@mayhem--scm-fields
+           n_defects tests_run tests_per_second edges_covered
            api_run docker_pullable fetched_docker_image_digest
            n_exploitability_factors_passing n_exploitability_factors_total
            n_testcase_reports n_regression_testcase_reports
@@ -665,11 +710,12 @@ first's crash and backtrace, parsed into `frames' when the API did."
 
 (defun mayhem--fetch-defect (owner project target number run callback)
   "Fetch defect NUMBER of TARGET of PROJECT of OWNER, with its evidence.
-Call CALLBACK with (OK DATA): DATA is an alist with `defect' and
-`evidence', each trimmed to what its page shows, or an error message.
-An API defect's evidence is the HTTP exchange of RUN, a run number, or
-else of the last run that saw it; a code defect's, its first page of
-test cases and the first one's crash."
+Call CALLBACK with (OK DATA): DATA is an alist with `defect', `run',
+`evidence' and `scm', each trimmed to what its page shows, or an error
+message.  `run' is RUN, a run number, or else the last run that saw
+it, and `scm' that run's commit and CI build.  An API defect's evidence
+is that run's HTTP exchange; a code defect's, its first page of test
+cases and the first one's crash."
   (let ((path (mayhem--path "/api/v2/owner/%s/project/%s/target/%s"
                             owner project target)))
     (mayhem--api-get
@@ -677,25 +723,40 @@ test cases and the first one's crash."
      (lambda (ok defect)
        (if (not ok)
            (funcall callback nil defect)
-         (let ((done (lambda (ok evidence)
-                       (funcall callback ok
-                                (if ok `((defect . ,(mayhem--pick defect mayhem--defect-fields))
-                                         (run . ,run)
-                                         (evidence . ,evidence))
-                                  evidence))))
-               ;; A defect gives its last run's id, but evidence needs a number.
-               (run (or run (alist-get 'last_seen_run_number defect))))
-           (cond
-            ((and (equal (alist-get 'source defect) "api") run)
-             (mayhem--api-get (concat path (format "/run/%s/api/rest/issue/%s" run number)) nil
-                              (lambda (ok issue)
-                                (funcall done ok (if ok (mayhem--api-evidence issue) issue)))))
-            ((equal (alist-get 'source defect) "code")
-             (mayhem--api-get (concat path (format "/defect/%s/testcase_report" number))
-                              `((per_page ,mayhem--page-size))
-                              (lambda (ok reports)
-                                (funcall done ok (if ok (mayhem--code-evidence reports) reports)))))
-            (t (funcall done t nil)))))))))
+         ;; A defect gives its last run's id, but evidence needs a number.
+         (let* ((run (or run (alist-get 'last_seen_run_number defect)))
+                (evidence
+                 (lambda (cb)
+                   (cond
+                    ((and (equal (alist-get 'source defect) "api") run)
+                     (mayhem--api-get (concat path (format "/run/%s/api/rest/issue/%s" run number))
+                                      nil
+                                      (lambda (ok issue)
+                                        (funcall cb ok (if ok (mayhem--api-evidence issue) issue)))))
+                    ((equal (alist-get 'source defect) "code")
+                     (mayhem--api-get (concat path (format "/defect/%s/testcase_report" number))
+                                      `((per_page ,mayhem--page-size))
+                                      (lambda (ok reports)
+                                        (funcall cb ok (if ok (mayhem--code-evidence reports)
+                                                         reports)))))
+                    (t (funcall cb t nil)))))
+                ;; The run's commit is a nicety: the page shows without it.
+                (scm (lambda (cb)
+                       (if (not run)
+                           (funcall cb t nil)
+                         (mayhem--api-get (concat path (format "/run/%s" run)) nil
+                                          (lambda (ok data)
+                                            (funcall cb t (and ok (mayhem--pick
+                                                                   data
+                                                                   mayhem--scm-fields)))))))))
+           (mayhem--fetch-each
+            `((evidence . ,evidence) (scm . ,scm))
+            (lambda (ok data)
+              (funcall callback ok
+                       (if ok `((defect . ,(mayhem--pick defect mayhem--defect-fields))
+                                (run . ,run)
+                                ,@data)
+                         data))))))))))
 
 (defconst mayhem--testcase-fields
   '(sha256 is_regression crashed crash_type signal_number faulting_address

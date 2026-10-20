@@ -316,7 +316,6 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER, from DATA."
 TAB is the key of the tab shown, the first when nil or not the run's;
 ON-TAB is called with the key of another one, to show it."
   (let* ((run (alist-get 'run data))
-         (revision (alist-get 'revision run))
          (image (alist-get 'docker_pullable run))
          (factors (alist-get 'n_exploitability_factors_total run))
          (code (not (alist-get 'api_run run)))
@@ -332,11 +331,7 @@ ON-TAB is called with the key of another one, to show it."
                                      (when-let* ((by (alist-get 'started_by run)))
                                        (propertize (concat "  by " by) 'face 'mayhem-label))))
      (mayhem-field "Duration" (mayhem--format-duration (alist-get 'duration run)))
-     (mayhem-field "Branch" (alist-get 'branch_name run))
-     (when revision
-       (mayhem-field "Commit" (concat (substring revision 0 (min 7 (length revision)))
-                                      (when-let* ((s (alist-get 'scm_commit_subject run)))
-                                        (concat "  " s)))))
+     (mayhem-scm-fields run)
      (when image
        (mayhem-field "Image" (if-let* ((digest (alist-get 'fetched_docker_image_digest run)))
                                  (propertize image 'help-echo digest)

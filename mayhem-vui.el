@@ -193,10 +193,66 @@ So a timestamp in a row keeps its exact time on hover."
         (setq pos next)))
     s))
 
-(defun mayhem-field (label value)
-  "Return a vnode for a LABEL: VALUE line of a page's header."
-  (vui-text (concat (propertize (format "%-12s" label) 'face 'mayhem-label)
-                    (or value "") "\n")))
+(defun mayhem-field (label &rest values)
+  "Return a vnode for a LABEL: VALUES line of a page's header.
+Each of VALUES is a string, a vnode such as a `mayhem-link', or nil."
+  (apply #'vui-fragment
+         (vui-text (propertize (format "%-12s" label) 'face 'mayhem-label))
+         (append (mapcar (lambda (v) (if (stringp v) (vui-text v) v))
+                         (delq nil values))
+                 (list (vui-text "\n")))))
+
+(defun mayhem-link (text url)
+  "Return a vnode showing TEXT that RET opens URL with, through `browse-url'."
+  (vui-button text :no-decoration t :face 'link
+              :help-echo (concat "RET: open " url)
+              :on-click (lambda () (browse-url url))))
+
+(defun mayhem-repo-link (repo text &optional kind ref)
+  "Return TEXT linking to REPO or its KIND REF, as `mayhem--repo-url' does.
+Just TEXT when REPO is nil, or its host's KIND links are not known."
+  (if-let* ((url (and repo (mayhem--repo-url repo kind ref))))
+      (mayhem-link text url)
+    text))
+
+(defun mayhem-repo-field (url)
+  "Return the Repo field for the repository at URL, nil when URL is.
+It shows the host, so it is plain where its links lead."
+  (when url
+    (let ((repo (mayhem--repo url)))
+      (mayhem-field "Repo" (if repo
+                               (mayhem-repo-link repo (concat (car repo) "/" (cdr repo)))
+                             url)))))
+
+(defun mayhem-scm-fields (scm)
+  "Return the Repo, Branch, Commit and CI fields of SCM.
+SCM is a run's alist with `mayhem--scm-fields'.  On GitHub, each
+links to its page on its host."
+  (let* ((repo (mayhem--repo (alist-get 'scm_remote_origin scm)))
+         (branch (alist-get 'branch_name scm))
+         (base (alist-get 'merge_base_branch_name scm))
+         (revision (alist-get 'revision scm))
+         (ci-url (mayhem--clean-url (alist-get 'ci_url scm)))
+         (ci-type (alist-get 'ci_type scm)))
+    (vui-fragment
+     (mayhem-repo-field (alist-get 'scm_remote_origin scm))
+     (mayhem-field "Branch" (and branch (mayhem-repo-link repo branch 'branch branch))
+                   (when (and base (not (equal base branch)))
+                     (propertize "  base " 'face 'mayhem-label))
+                   (when (and base (not (equal base branch)))
+                     (mayhem-repo-link repo base 'branch base)))
+     (when revision
+       (mayhem-field "Commit"
+                     (mayhem-repo-link repo (substring revision 0 (min 7 (length revision)))
+                                       'commit revision)
+                     (when-let* ((subject (alist-get 'scm_commit_subject scm)))
+                       (concat "  " subject))
+                     (when-let* ((author (alist-get 'scm_commit_author scm)))
+                       (propertize (concat "  by " author) 'face 'mayhem-label))))
+     (when (or ci-url ci-type)
+       (mayhem-field "CI" (if ci-url
+                              (mayhem-link (mayhem--ci-label ci-type ci-url) ci-url)
+                            ci-type))))))
 
 (defun mayhem-heading (text)
   "Return a vnode for the section heading TEXT and its newline."
