@@ -377,7 +377,7 @@ whole on hover."
                       (list (vui-text "/" :face face)
                             (if (stringp part) (vui-text part :face face) part)))
                     more)
-            (list (vui-text (concat " " kind) :face (list 'shadow face))
+            (list (vui-text (concat "  " kind) :face (list 'shadow face))
                   (vui-text "\n"))))))
 
 (defun mayhem-repo-link (repo text &optional kind ref)
