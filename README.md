@@ -51,20 +51,21 @@ say because your token expired, the error shows in the header line.
   (active and archived tabs), each with what its latest run found.
 - **Target**: what its latest run found, its defect trend, and tabs
   for its defects (most severe first) and latest runs.
-- **Run**: status, how long it ran against its time limit, image, its
-  repository, branch and commit, and the CI build that started it.
-  RET on `Mayhemfile` shows the Mayhemfile it was started with,
-  read-only, in your YAML mode; the field names what the CLI overrode.
-  A code run also has a chart of test cases processed and defects found
-  over time, as in the web app.  Tabs: Defects (with active and fixed
-  counts), Tests (counts, crashes, Valgrind errors, the corpus and the
-  failing test cases), Coverage (with tests run by each engine),
-  Details and Log; an API run has Defects, Endpoints, Details and Log.
-  Details has when it was queued, its build ID, parent commit, CLI
-  version and CPU time, each task (regression, exploitability,
-  behavior, coverage) with its status and timing, what the CLI
-  overrode, the environment it added and the files sent.  A run that
-  is still going refreshes itself every 10 seconds.
+- **Run**: status, when it started and how long it waited in the
+  queue, how long it ran against its time limit and its CPU time, its
+  repository, branch, commit and parent commit, the CI build and build
+  ID that started it, its image, and each task (regression,
+  exploitability, behavior, coverage), coloured by how it went with
+  how long it took.  RET on `Mayhemfile` shows the Mayhemfile it was
+  started with, read-only, in your YAML mode.  What the CLI overrode,
+  the environment it added and the files sent are each a line, folded
+  when too wide for one.  A code run also has a chart of test cases
+  processed and defects found over time, as in the web app.  Tabs:
+  Defects (with active and fixed counts), Tests (counts, crashes,
+  Valgrind errors, the corpus and the failing test cases), Coverage
+  (with tests run by each engine) and Log; an API run has Defects,
+  Endpoints and Log.  A run that is still going refreshes itself every
+  10 seconds.
 - **Defect**: severity, CWE, the commit of the run that saw it,
   description and evidence: for an API defect the request, response
   and stack trace, for a crash the test cases that hit it (RET opens
