@@ -51,6 +51,8 @@ fallback only for what the API cannot do (none so far).
 | `GET .../run/{number}/testcase_over_time`, `.../defect_over_time` | code run page's progress chart |
 | `GET .../run/{number}/testcase-result?crashes_only=true` | code run page's failing tests |
 | `GET .../run/{number}/testcase_report/{sha256}` | test case page |
+| `GET .../target/{target}/testsuite.tar?run_number={number}&optimized_only=true` | test suite page: the run's suite, a tarball of the files, each named by its sha256 |
+| `GET .../target/{target}/testcase` | test suite page: each test case's `source` and `created_at` |
 | `GET .../target/{target}/defect/{number}` | defect page |
 | `GET .../target/{target}/run/{run}/api/rest/issue/{defect}` | API defect's stack trace, request and response (base64) |
 | `GET .../target/{target}/defect/{number}/testcase_report?per_page=100` | code defect's test cases (run, time), and the first's crash, backtrace and reproducer, as the web app's "Example Backtrace" |
@@ -67,6 +69,11 @@ fallback only for what the API cannot do (none so far).
   `run_attributes`.
 - `testcase-result` reports are large (the target's memory maps, ~4 KB
   each), so the run page fetches only the failing ones.
+- No JSON endpoint lists a test suite: `optimized_only` works only on
+  `testsuite.tar` (the CLI's `mayhem download` and the web app's
+  "Download Test Suite" use it), and other lists ignore it.  The
+  target's `testcase` list is every test case of every run.  The
+  tarball pads names with spaces, not NULs.
 
 - `GET /api/v2/owner/{owner}/project` answers only members of the
   workspace (404 "No resource found ... has access to"), so workspace
@@ -95,6 +102,9 @@ fallback only for what the API cannot do (none so far).
 
 ## Gotchas
 
+- `url-http-end-of-headers` is before the blank line ending the
+  headers, so a body starts one newline after it: it matters for
+  bytes (`mayhem--api-get` with RAW), not for JSON.
 - `user/{slug}/project` includes projects you can see but don't own
   (90 for this account), unlike `mayhem list` (none).
 - Errors are JSON `{"message": ...}`; 404 for unknown paths and owners.

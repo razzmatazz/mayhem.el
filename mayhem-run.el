@@ -26,6 +26,7 @@
 (require 'mayhem-defect)
 
 (declare-function mayhem-testcase-open "mayhem-testcase" (owner project target run sha256))
+(declare-function mayhem-testsuite-open "mayhem-testsuite" (owner project target run))
 
 (defcustom mayhem-run-refresh-interval 10
   "Seconds between refetches of a run's page while the run is going."
@@ -127,8 +128,9 @@ The exact time is its `help-echo' and `mayhem-ts', as for an age."
                                     (propertize (format "  %s per second" rate)
                                                 'face 'mayhem-label))))))
 
-(defun mayhem-run--test-counts (run)
-  "Return the vnodes of how many test cases RUN, a code run, has, by kind."
+(defun mayhem-run--test-counts (owner project target number run)
+  "Return the vnodes of how many test cases RUN, a code run, has, by kind.
+RUN is run NUMBER of TARGET of PROJECT of OWNER."
   (let* ((all (or (alist-get 'n_testcase_reports run) 0))
          (regression (or (alist-get 'n_regression_testcase_reports run) 0))
          (failing (or (alist-get 'n_regression_defect_reports run) 0))
@@ -138,8 +140,13 @@ The exact time is its `help-echo' and `mayhem-ts', as for an age."
      (mayhem-field "Regression" (format "%d of %d passing" (- regression failing) regression))
      (mayhem-field "New" (format "%d discovered" (- all regression)))
      (when optimized
-       (mayhem-field "Optimized" (format "%d test case%s in the suite"
-                                         optimized (if (= optimized 1) "" "s")))))))
+       (mayhem-field "Optimized"
+                     (mayhem-page-link (format "%d test case%s" optimized
+                                               (if (= optimized 1) "" "s"))
+                                       "RET: open test suite"
+                                       (lambda ()
+                                         (mayhem-testsuite-open owner project target number)))
+                     " in the suite")))))
 
 (defun mayhem-run--chart (run progress now)
   "Return the vnodes charting PROGRESS of RUN, a code run, as of NOW.
@@ -302,7 +309,7 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER, from DATA."
   (pcase tab
     ('defects (mayhem-run--defects owner project target number (alist-get 'defects data)))
     ('tests (vui-fragment
-             (mayhem-run--test-counts run)
+             (mayhem-run--test-counts owner project target number run)
              (mayhem-run--tests owner project target number run (alist-get 'tests data))))
     ('events (mayhem-run--events (alist-get 'events data)))
     ('coverage (mayhem-run--coverage run))

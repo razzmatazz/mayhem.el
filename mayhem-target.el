@@ -28,6 +28,7 @@
   "Major mode for a Mayhem target's page.")
 
 (declare-function mayhem-run-open "mayhem-run" (owner project target number))
+(declare-function mayhem-testsuite-open "mayhem-testsuite" (owner project target run))
 (declare-function mayhem-defect-open "mayhem-defect" (owner project target number &optional run))
 
 (defun mayhem-target--run-line (run now)
@@ -104,7 +105,13 @@ nil; ON-TAB is called with the other's key, to show it."
                                          (format "run #%s" number))))
         (mayhem-field "Crashes" (format "%d" (or (alist-get 'n_crash_reports latest) 0)))
         (when-let* ((suite (alist-get 'n_optimized_set_testcases latest)))
-          (mayhem-field "Test suite" (format "%d test case%s" suite (if (= suite 1) "" "s"))))))
+          (mayhem-field "Test suite"
+                        (mayhem-page-link (format "%d test case%s" suite (if (= suite 1) "" "s"))
+                                          "RET: open test suite"
+                                          (lambda ()
+                                            (mayhem-testsuite-open owner project target
+                                                                   (alist-get 'run_number
+                                                                              latest))))))))
      (vui-newline)
      (mayhem-trend-view owner project target)
      (mayhem-tab-row (mapcar (pcase-lambda (`(,key ,label))

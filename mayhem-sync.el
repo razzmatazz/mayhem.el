@@ -16,14 +16,16 @@
 ;; changed.  A failed refresh keeps the data.
 ;;
 ;; The design follows octocat.el's plans/github-sync-mechanism.md.
-;; Only its basics are here: one row per resource.  Entities shared by
-;; resources, mutations and prefetch come when pages need them.  See
+;; Only its basics are here: one row per resource, and files kept by
+;; their sha256.  Entities shared by resources, mutations and prefetch
+;; come when pages need them.  See
 ;; docs/mayhem-sync.md for the design, the schema and how to add a
 ;; resource.
 
 ;;; Code:
 
 (require 'seq)
+(require 'sqlite)
 (require 'subr-x)
 (require 'vui)
 (require 'mayhem-core)
@@ -53,7 +55,7 @@ refetches them all the same."
   "Functions called with a resource's key and whether it is now loading.
 Loading changes no data, so pages show it in the mode line only.")
 
-(defconst mayhem-sync--schema 7
+(defconst mayhem-sync--schema 8
   "Version of the store's tables, kept in SQLite's `user_version'.
 Bump it also when a resource's data changes shape: the store is then
 recreated rather than read in the old shape.")
@@ -74,8 +76,11 @@ Signal a `user-error' when DB was made by a newer mayhem.el."
      ((< version mayhem-sync--schema)
       ;; A cache, so there are no migrations.
       (sqlite-execute db "DROP TABLE IF EXISTS resource")
+      (sqlite-execute db "DROP TABLE IF EXISTS file")
       (sqlite-execute db "CREATE TABLE resource (
   key TEXT PRIMARY KEY, body TEXT, hash TEXT, fetched_at REAL, error TEXT)")
+      ;; Files by the sha256 of their bytes, so never stale and shared.
+      (sqlite-execute db "CREATE TABLE file (sha256 TEXT PRIMARY KEY, bytes BLOB NOT NULL)")
       (sqlite-execute db (format "PRAGMA user_version = %d" mayhem-sync--schema))))
     db))
 
@@ -137,6 +142,25 @@ The resource keeps its data.  Return non-nil if the error is new."
           (nth 2 row))))
 
 
+;;;; Files
+
+(defun mayhem-sync-put-files (files)
+  "Store FILES, each (SHA256 . BYTES), BYTES a unibyte string.
+A file is named by the sha256 of its bytes, so one already stored is
+kept as it is."
+  (let ((db (mayhem-sync--db)))
+    (with-sqlite-transaction db
+      (pcase-dolist (`(,sha . ,bytes) files)
+        ;; Bound as a BLOB, not text, by its coding system.
+        (sqlite-execute db "INSERT OR IGNORE INTO file (sha256, bytes) VALUES (?, ?)"
+                        (list sha (propertize bytes 'coding-system 'binary)))))))
+
+(defun mayhem-sync-file (sha256)
+  "Return the bytes of the file SHA256 as a unibyte string, nil if not stored."
+  (caar (sqlite-select (mayhem-sync--db) "SELECT bytes FROM file WHERE sha256 = ?"
+                       (list sha256))))
+
+
 ;;;; Resources
 
 (defvar mayhem-sync--resources (make-hash-table :test #'eq)
@@ -149,7 +173,8 @@ fetches the resource and calls DONE with (OK DATA), as
 `mayhem--api-get' calls back.  DATA must be plain Lisp data that prints
 readably: it is stored printed.  :max-age, seconds or a function of the
 stored DATA returning them, is how long a fetch is reused; by default
-`mayhem-sync-fresh-for'."
+`mayhem-sync-fresh-for'.  t means for good: data that can no longer
+change is not refetched, even by `g'."
   (declare (indent 2))
   `(puthash ',name (lambda ,args (list ,@props)) mayhem-sync--resources))
 
@@ -175,16 +200,19 @@ the first fetch succeeds; :error is the last fetch's failure, if any."
       (list :data data :fetched-at fetched-at :error error
             :loading (gethash key mayhem-sync--loading)))))
 
-(defun mayhem-sync--fresh-p (spec now)
+(defun mayhem-sync--fresh-p (spec now &optional force)
   "Return non-nil if resource SPEC was fetched recently enough before NOW.
-That is, within its :max-age, else `mayhem-sync-fresh-for' seconds."
+That is, within its :max-age, else `mayhem-sync-fresh-for' seconds.
+With FORCE, only if its :max-age is t: its data is fixed for good."
   (pcase-let ((`(,data ,fetched) (mayhem-sync--read (mayhem-sync--db)
                                                     (mayhem-sync-spec-key spec))))
     (when fetched
-      (let ((max-age (plist-get (mayhem-sync--props spec) :max-age)))
-        (< (- now fetched) (cond ((functionp max-age) (funcall max-age data))
-                                 (max-age)
-                                 (t mayhem-sync-fresh-for)))))))
+      (let* ((max-age (plist-get (mayhem-sync--props spec) :max-age))
+             (max-age (cond ((functionp max-age) (funcall max-age data))
+                            (max-age)
+                            (t mayhem-sync-fresh-for))))
+        (or (eq max-age t)
+            (and (not force) (< (- now fetched) max-age)))))))
 
 (defun mayhem-sync--set-loading (key loading)
   "Record whether resource KEY is LOADING, and report it."
@@ -195,11 +223,12 @@ That is, within its :max-age, else `mayhem-sync-fresh-for' seconds."
 
 (defun mayhem-sync-request (spec &optional force)
   "Fetch SPEC in the background, unless running or fetched just now.
-FORCE fetches even data fetched just now.  Return at once; the store
-reports the result through `mayhem-sync-change-functions'."
+FORCE fetches even data fetched just now, but not data fixed for good
+\(:max-age t).  Return at once; the store reports the result through
+`mayhem-sync-change-functions'."
   (let ((key (mayhem-sync-spec-key spec)))
     (unless (or (gethash key mayhem-sync--loading)
-                (and (not force) (mayhem-sync--fresh-p spec (float-time))))
+                (mayhem-sync--fresh-p spec (float-time) force))
       (mayhem-sync--set-loading key t)
       (let ((answered nil))
         (condition-case err

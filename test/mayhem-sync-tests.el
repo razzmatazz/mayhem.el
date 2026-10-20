@@ -60,6 +60,30 @@
       (should (mayhem-sync--fresh-p '(settled) 500.0))
       (should-not (mayhem-sync--fresh-p '(missing) 100.0)))))
 
+(ert-deftest mayhem-sync-test-max-age-t-is-for-good ()
+  (mayhem-sync-tests--with-db
+    (mayhem-sync-define-resource suite ()
+      :fetch #'ignore
+      :max-age (lambda (data) (if (eq (car data) 'done) t 10)))
+    (mayhem-sync--write mayhem-sync--db (mayhem-sync-spec-key '(suite)) '(running) 100.0)
+    (should-not (mayhem-sync--fresh-p '(suite) 200.0))
+    (should-not (mayhem-sync--fresh-p '(suite) 105.0 t))
+    (mayhem-sync--write mayhem-sync--db (mayhem-sync-spec-key '(suite)) '(done) 100.0)
+    (should (mayhem-sync--fresh-p '(suite) 1e9))
+    ;; Not even `g' refetches it.
+    (should (mayhem-sync--fresh-p '(suite) 1e9 t))))
+
+(ert-deftest mayhem-sync-test-files-round-trip ()
+  (mayhem-sync-tests--with-db
+    (let ((bytes (unibyte-string 0 255 10 ?A 0)))
+      (mayhem-sync-put-files (list (cons "s1" bytes)))
+      (should (equal (mayhem-sync-file "s1") bytes))
+      (should-not (multibyte-string-p (mayhem-sync-file "s1")))
+      ;; Named by their bytes: one stored is kept.
+      (mayhem-sync-put-files (list (cons "s1" "other")))
+      (should (equal (mayhem-sync-file "s1") bytes))
+      (should-not (mayhem-sync-file "s2")))))
+
 (ert-deftest mayhem-sync-test-newer-schema-signals ()
   (let ((db (sqlite-open nil)))
     (sqlite-execute db (format "PRAGMA user_version = %d" (1+ mayhem-sync--schema)))

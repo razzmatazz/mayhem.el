@@ -71,34 +71,40 @@ PARAMS is a list of (NAME VALUE) as for `url-build-query-string'."
   (concat (string-trim-right base "/") path
           (and params (concat "?" (url-build-query-string params)))))
 
-(defun mayhem--api-response (status)
+(defun mayhem--api-response (status &optional raw)
   "Return (OK DATA) for the HTTP response in the current buffer.
 STATUS is the plist `url-retrieve' passes its callback.  DATA is the
-parsed JSON body on success, else an error message."
+parsed JSON body on success, else an error message.  With RAW, DATA on
+success is the body's bytes, as a unibyte string."
   (if (not (and (boundp 'url-http-end-of-headers) url-http-end-of-headers))
       (list nil (if-let* ((err (plist-get status :error)))
                     ;; url.el signals e.g. (error connection-failed "..." :host ...).
                     (mapconcat (lambda (x) (string-trim (format "%s" x)))
                                (take 2 (cdr err)) " ")
                   "No response"))
-    (let* ((body (decode-coding-string
-                  (buffer-substring-no-properties url-http-end-of-headers
-                                                  (point-max))
-                  'utf-8))
-           (json (ignore-errors
-                   (json-parse-string body :object-type 'alist
-                                      :array-type 'list
-                                      :null-object nil :false-object nil))))
+    (let* ((start (if (eq (char-after url-http-end-of-headers) ?\n)
+                      ;; The newline of the blank line ending the headers.
+                      (1+ url-http-end-of-headers)
+                    url-http-end-of-headers))
+           (bytes (buffer-substring-no-properties start (point-max)))
+           (bytes (if (multibyte-string-p bytes) (string-to-unibyte bytes) bytes))
+           (body (decode-coding-string bytes 'utf-8))
+           (json (and (not (and raw (<= 200 url-http-response-status 299)))
+                      (ignore-errors
+                        (json-parse-string body :object-type 'alist
+                                           :array-type 'list
+                                           :null-object nil :false-object nil)))))
       (if (<= 200 url-http-response-status 299)
-          (list t json)
+          (list t (if raw bytes json))
         (list nil (format "HTTP %d: %s" url-http-response-status
                           (or (and (consp json) (alist-get 'message json))
                               (string-trim body))))))))
 
-(defun mayhem--api-get (path params callback)
+(defun mayhem--api-get (path params callback &optional raw)
   "GET PATH with query PARAMS from the Mayhem API in the background.
 Call CALLBACK with (OK DATA): OK is non-nil on success, DATA is the
-parsed JSON (objects as alists, arrays as lists) or an error message."
+parsed JSON (objects as alists, arrays as lists) or an error message.
+With RAW, DATA on success is the body's bytes, as a unibyte string."
   (condition-case err
       (let* ((config (mayhem--read-config))
              (url-request-extra-headers
@@ -107,7 +113,7 @@ parsed JSON (objects as alists, arrays as lists) or an error message."
         (url-retrieve (mayhem--api-url (alist-get 'url config) path params)
                       (lambda (status)
                         (let ((result (condition-case err
-                                          (mayhem--api-response status)
+                                          (mayhem--api-response status raw)
                                         (error (list nil (error-message-string err))))))
                           (kill-buffer (current-buffer))
                           (apply callback result)))
@@ -200,9 +206,10 @@ order.  Targets of other projects are dropped."
 ;; A page is named by a list (KIND ARGS...): (dashboard), (workspace
 ;; OWNER), (project OWNER PROJECT), (target OWNER PROJECT TARGET), (run
 ;; OWNER PROJECT TARGET NUMBER), (defect OWNER PROJECT TARGET NUMBER
-;; RUN) or (testcase OWNER PROJECT TARGET RUN SHA256).  Links to the web
-;; app map to pages and back.  Its routes come from its JS bundle; "-"
-;; starts a segment that is not a slug.
+;; RUN), (testcase OWNER PROJECT TARGET RUN SHA256) or (testsuite OWNER
+;; PROJECT TARGET RUN), which the web app shows with the run's tests.
+;; Links to the web app map to pages and back.  Its routes come from
+;; its JS bundle; "-" starts a segment that is not a slug.
 
 (defun mayhem--url-number (string)
   "Return STRING as a number if it is all digits, else nil."
@@ -247,6 +254,8 @@ Nil also when URL is on another host, or shows something no page does."
       (if run
           (format "%s?defect=%s" (mayhem--path "/%s/%s/%s/%s" o p tg (format "%s" run)) n)
         (mayhem--path "/%s/%s/%s/-/defects/%s" o p tg (format "%s" n))))
+     (`(testsuite ,o ,p ,tg ,run)
+      (mayhem--path "/%s/%s/%s/%s/tests" o p tg (format "%s" run)))
      (`(testcase ,o ,p ,tg ,run ,sha)
       (format "%s?testcase=%s" (mayhem--path "/%s/%s/%s/%s/tests" o p tg (format "%s" run))
               (url-hexify-string sha)))
@@ -929,6 +938,116 @@ when `global-eldoc-mode' is on (the default)."
   (add-hook 'eldoc-documentation-functions #'mayhem--ts-eldoc nil t)
   ;; vui motions, so ElDoc reacts to them like to `next-line'.
   (eldoc-add-command-completions "vui-forward" "vui-backward"))
+
+;;;; Test suites
+
+;; A target's test suite is the optimized set of its test cases at the
+;; end of a run.  The API gives it only as a tarball of the files, each
+;; named by the sha256 of its bytes, as the CLI's `mayhem download'
+;; fetches it.
+
+(defconst mayhem--preview-length 24
+  "Bytes of a test case shown as its preview.")
+
+(defun mayhem--gunzip (bytes)
+  "Return BYTES, a unibyte string, decompressed if it is gzipped."
+  (if (not (and (> (length bytes) 1) (= (aref bytes 0) #x1f) (= (aref bytes 1) #x8b)))
+      bytes
+    (unless (and (fboundp 'zlib-available-p) (zlib-available-p))
+      (error "Mayhem: Needs an Emacs built with zlib to unpack the test suite"))
+    (with-temp-buffer
+      (set-buffer-multibyte nil)
+      (insert bytes)
+      (unless (zlib-decompress-region (point-min) (point-max))
+        (error "Mayhem: The test suite is not valid gzip"))
+      (buffer-string))))
+
+(defun mayhem--tar-files (bytes)
+  "Return the regular files in BYTES, a tar archive, as (NAME . CONTENTS).
+NAME is the file's path in the archive, CONTENTS a unibyte string, in
+the archive's order."
+  (let ((pos 0) (len (length bytes)) files)
+    ;; A zero block ends the archive.
+    (while (and (<= (+ pos 512) len) (/= (aref bytes pos) 0))
+      (let* ((field (lambda (start size)
+                      ;; Some archivers pad with spaces, not NULs.
+                      (string-trim-right
+                       (car (split-string (substring bytes (+ pos start) (+ pos start size))
+                                          "\0")))))
+             (name (funcall field 0 100))
+             (prefix (if (string-prefix-p "ustar" (funcall field 257 6))
+                         (funcall field 345 155)
+                       ""))
+             (size (string-to-number (string-trim (funcall field 124 12)) 8))
+             (start (+ pos 512)))
+        (when (and (memq (aref bytes (+ pos 156)) '(?0 0)) (<= (+ start size) len))
+          (push (cons (if (string-empty-p prefix) name (concat prefix "/" name))
+                      (substring bytes start (+ start size)))
+                files))
+        (setq pos (+ start (* 512 (/ (+ size 511) 512))))))
+    (nreverse files)))
+
+(defun mayhem--testsuite-files (bytes)
+  "Return the test cases in BYTES, a test suite tarball, as (SHA256 . CONTENTS).
+Only the files named by the sha256 of their contents: others are not
+test cases, or were damaged on the way.  Signal an error when there
+are files but none is, as a suite that seems empty is kept for good."
+  (let* ((all (mayhem--tar-files (mayhem--gunzip bytes)))
+         (files (delq nil (mapcar (pcase-lambda (`(,name . ,contents))
+                                    (let ((sha (file-name-nondirectory name)))
+                                      (and (equal sha (secure-hash 'sha256 contents))
+                                           (cons sha contents))))
+                                  all))))
+    (when (and all (null files))
+      (error "Mayhem: None of the %d files of the test suite is a test case" (length all)))
+    files))
+
+(defun mayhem--bytes-preview (bytes)
+  "Return the first bytes of BYTES as text: printable ASCII as is, others as `.'."
+  (apply #'string (mapcar (lambda (b) (if (<= 32 b 126) b ?.))
+                          (substring bytes 0 (min (length bytes) mayhem--preview-length)))))
+
+(defun mayhem--fetch-testsuite (owner project target run callback)
+  "Fetch the test suite of run RUN of TARGET of PROJECT of OWNER.
+That is the optimized set of test cases at the end of the run.  Call
+CALLBACK with (OK DATA): DATA is an alist with `live', non-nil while the
+run is going, and `files', each test case as (SHA256 . CONTENTS); or an
+error message."
+  (let ((path (mayhem--path "/api/v2/owner/%s/project/%s/target/%s" owner project target)))
+    (mayhem--fetch-each
+     `((live . ,(lambda (cb)
+                  (mayhem--api-get
+                   (concat path (mayhem--path "/run/%s" (format "%s" run))) nil
+                   (lambda (ok data)
+                     (funcall cb ok (if ok
+                                        (not (or (alist-get 'ended data) (alist-get 'failed data)
+                                                 (alist-get 'stopped data)))
+                                      data))))))
+       (files . ,(lambda (cb)
+                   (mayhem--api-get
+                    (concat path "/testsuite.tar") `((run_number ,run) (optimized_only "true"))
+                    (lambda (ok data)
+                      (if (not ok)
+                          (funcall cb nil data)
+                        (condition-case err
+                            (funcall cb t (mayhem--testsuite-files data))
+                          (error (funcall cb nil (error-message-string err))))))
+                    t))))
+     callback)))
+
+(defun mayhem--fetch-target-testcases (owner project target callback)
+  "Fetch every test case of TARGET of PROJECT of OWNER, from any run.
+Call CALLBACK with (OK DATA): DATA is a list of alists of each one's
+`sha256', `source' (such as \"libfuzzer\") and `created_at', or an
+error message."
+  (mayhem--api-get-all
+   (mayhem--path "/api/v2/owner/%s/project/%s/target/%s/testcase" owner project target)
+   'testcases
+   (lambda (ok data)
+     (funcall callback ok (if ok
+                              (mapcar (lambda (tc) (mayhem--pick tc '(sha256 source created_at)))
+                                      data)
+                            data)))))
 
 (provide 'mayhem-core)
 ;;; mayhem-core.el ends here

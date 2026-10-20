@@ -22,9 +22,12 @@ must pass before you send changes.
 - **Mayhem through its REST API.**  Request with `mayhem--api-get` (or
   `mayhem--api-get-all` for paged lists); shape responses in pure, tested
   functions in `mayhem-core.el`.  See
-  [docs/mayhem-api-usage.md](docs/mayhem-api-usage.md) for how, and
-  `docs/mayhem-openapi.json` for part of the API.  Fall back to the
-  `mayhem` CLI only for what the API cannot do.
+  [docs/mayhem-api-usage.md](docs/mayhem-api-usage.md) for how.  Look up
+  endpoints and fields in the API's OpenAPI spec,
+  [docs/mayhem-openapi.json](docs/mayhem-openapi.json), first.  It
+  lacks many (`testsuite.tar`, `testcase-result`): find those in the
+  web app's JS bundle or the CLI, as mayhem-api-usage.md says.  Fall
+  back to the `mayhem` CLI only for what the API cannot do.
 - **Entry points live in `mayhem.el`.**  Every `;;;###autoload` command is
   defined there, and `mayhem.el` `require`s every other file, so any
   command a user runs has everything loaded.  Put a new view's mode and

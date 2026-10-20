@@ -6,8 +6,9 @@ at once, and the store refetches behind them.  This page covers how it
 works, the store's schema, and how to add a resource.
 
 The design follows octocat.el's `plans/github-sync-mechanism.md`, but
-only its basics are here: one row per resource.  Entities shared
-between resources, mutations and prefetch come when pages need them.
+only its basics are here: one row per resource, and files kept by
+their hash.  Entities shared between resources, mutations and prefetch
+come when pages need them.
 
 ## The idea
 
@@ -49,7 +50,10 @@ A resource is defined beside the page that shows it:
   pages never use.
 - `:max-age` is how long a fetch is reused before opening the page
   refetches it: seconds, or a function of the stored data returning
-  them.  The default is `mayhem-sync-fresh-for` (30 s).
+  them.  The default is `mayhem-sync-fresh-for` (30 s).  `t` means for
+  good: data that can no longer change is not refetched, not even by
+  `g`.  Keep it for data that is costly to fetch, and make sure a bad
+  fetch fails rather than storing something wrong: nothing replaces it.
 
 ### Freshness
 
@@ -59,9 +63,35 @@ A resource is defined beside the page that shows it:
 | A finished run (ended, failed or stopped) | `mayhem-sync-settled-for` (a day) | it no longer changes |
 | A running run | 30 s, and the page refetches every `mayhem-run-refresh-interval` (10 s) | it is changing |
 | A defect, a test case | a day | they change rarely, if ever |
+| A finished run's test suite | `t`: for good | it cannot change, and each fetch downloads every file |
+| A going run's test suite | 10 minutes | it changes, but each fetch downloads every file |
+
+### Test suites: fetched once, kept by hash
+
+A test suite comes only as a tarball of every file in it, so it is the
+costliest thing a page fetches, and the policy is built around not
+fetching it again:
+
+- The `testsuite` resource is keyed by run.  A finished run's suite
+  can no longer change, so its `:max-age` is `t`: it is downloaded
+  once, and neither reopening the page nor `g` downloads it again.  A
+  newer run is another key, so its suite is fetched when its page
+  first opens.
+- While the run is still going, the suite changes as Mayhem optimizes
+  it, so it is refetched at most every 10 minutes.
+- The tarball is unpacked as it lands.  Each test case goes to the
+  `file` table under the sha256 of its bytes (checked against its
+  name), and the resource keeps only each one's sha256, size and
+  first bytes: a page of 232 test cases reads a few KB, not the files.
+  Saving a test case (`w`) reads that one file.
+- A fetch that unpacks nothing from a non-empty tarball fails rather
+  than storing an empty suite, as one stored for good is never
+  replaced.  To fetch suites afresh anyway, delete the store.
+- The target's `target-testcases`, small JSON giving each test case's
+  source and age, is fetched like any other data.
 
 `g` (`mayhem-sync-refresh`) refetches every resource on the page,
-however fresh.  Opening a page that is already open refetches only
+however fresh, except data kept for good.  Opening a page that is already open refetches only
 what is stale.
 
 ### The resources
@@ -77,6 +107,8 @@ what is stale.
 | `run` | owner project target number | run |
 | `defect` | owner project target number run | defect |
 | `testcase` | owner project target run sha256 | test case |
+| `testsuite` | owner project target run | test suite; its files go to the `file` table |
+| `target-testcases` | owner project target | test suite (each test case's source and age) |
 
 `mayhem-jump` reads `projects` and `workspace-targets` straight from
 the store (`mayhem-sync-read`) and requests them behind its prompt.
@@ -110,8 +142,9 @@ the run, its defects, events, progress and failing tests.
 ## Requests
 
 `mayhem-sync-request SPEC &optional FORCE` starts a fetch unless one is
-already running for SPEC (requests join it) or, without FORCE, the
-stored data is fresh.  It returns at once.  When the fetch calls back:
+already running for SPEC (requests join it), the stored data is kept
+for good (`:max-age` `t`), or, without FORCE, it is fresh.  It returns
+at once.  When the fetch calls back:
 
 - success: the data is printed, hashed and written with the time;
   any earlier error is cleared;
@@ -141,19 +174,33 @@ CREATE TABLE resource (
   fetched_at REAL,              -- float-time of the last successful fetch
   error      TEXT               -- the last fetch's error, NULL after a success
 );
+
+CREATE TABLE file (
+  sha256 TEXT PRIMARY KEY,      -- the sha256 of bytes
+  bytes  BLOB NOT NULL          -- a test case's file
+);
 ```
 
 - A row with an `error` but no `body` is a resource whose every fetch
   failed.
 - Rows are never deleted: a resource no page reads any more just stays.
-  Deleting the file is the way to clear it.
+  Deleting the store's SQLite file is the way to clear it.
+- `file` holds files by the sha256 of their bytes, so a row never
+  goes stale, and runs and targets share it.  A resource that brings
+  files stores them there (`mayhem-sync-put-files`) and keeps only
+  their names in its data, so a page reads one file
+  (`mayhem-sync-file`) without loading them all.  The `testsuite`
+  resource unpacks the suite's tarball as it lands; the tarball
+  itself is not kept.
+- Emacs binds a string as a BLOB only when it has the `coding-system`
+  property `binary`; else it is stored as text, and bytes are lost.
 
 ### Versions
 
 The schema version is SQLite's `user_version`, compared with
 `mayhem-sync--schema` on opening:
 
-- **Older**: the table is dropped and created afresh.  The store is a
+- **Older**: the tables are dropped and created afresh.  The store is a
   cache, so there are no migrations.
 - **Newer**: a `user-error`, since an older mayhem.el must not read data
   shaped for a newer one; restart Emacs.
@@ -172,5 +219,8 @@ refetched.
    settles.
 3. Read it with `mayhem-sync-use-resource` in the page's component.
 4. Bump `mayhem-sync--schema` if you changed the shape of an existing
-   resource.
-5. List any new endpoint in [mayhem-api-usage.md](mayhem-api-usage.md).
+   resource.  A running Emacs applies a bump only when it next opens
+   the store.
+5. If it brings files, put them in the `file` table and keep their
+   sha256s in its data, as `testsuite` does.
+6. List any new endpoint in [mayhem-api-usage.md](mayhem-api-usage.md).

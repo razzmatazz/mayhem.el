@@ -26,18 +26,25 @@
                                   '((per_page 100) (offset 0)))
                  "https://example.com/api/v2/x?per_page=100&offset=0")))
 
-(defun mayhem-core-tests--response (status body)
-  "Run `mayhem--api-response' on an HTTP STATUS response with BODY."
+(defun mayhem-core-tests--response (status body &optional raw)
+  "Run `mayhem--api-response' on an HTTP STATUS response with BODY.
+RAW is as for `mayhem--api-response'."
   (with-temp-buffer
-    (insert "HTTP/1.1 " (number-to-string status) "\n\n")
+    (set-buffer-multibyte nil)
+    (insert "HTTP/1.1 " (number-to-string status) "\n")
+    ;; As url.el leaves it: before the blank line ending the headers.
     (setq-local url-http-end-of-headers (point))
     (setq-local url-http-response-status status)
-    (insert body)
-    (mayhem--api-response nil)))
+    (insert "\n" body)
+    (mayhem--api-response nil raw)))
 
 (ert-deftest mayhem-core-test-api-response-parses-json ()
   (should (equal (mayhem-core-tests--response 200 "{\"slug\":\"me\",\"x\":[1,null]}")
                  '(t ((slug . "me") (x 1 nil))))))
+
+(ert-deftest mayhem-core-test-api-response-raw-keeps-bytes ()
+  (let ((bytes (unibyte-string 10 0 255 ?x)))
+    (should (equal (mayhem-core-tests--response 200 bytes t) (list t bytes)))))
 
 (ert-deftest mayhem-core-test-api-response-reports-message ()
   (should (equal (mayhem-core-tests--response 401 "{\"message\":\"Unauthorized\"}")
@@ -279,6 +286,51 @@
                  "GitHub Actions run 42"))
   (should (equal (mayhem--ci-label "Jenkins" "https://ci/job/1") "Jenkins  https://ci/job/1"))
   (should (equal (mayhem--ci-label nil "https://ci/job/1") "https://ci/job/1")))
+
+(defun mayhem-core-tests--tar (files)
+  "Return FILES, each (NAME . CONTENTS), as a ustar archive."
+  (let ((field (lambda (s size) (concat s (make-string (- size (length s)) 0)))))
+    (concat
+     (mapconcat
+      (pcase-lambda (`(,name . ,contents))
+        (concat (funcall field name 100) (funcall field "0000644" 8)
+                (funcall field "0000000" 8) (funcall field "0000000" 8)
+                (funcall field (format "%011o" (length contents)) 12)
+                (funcall field "00000000000" 12) (make-string 8 ?\s) "0"
+                (funcall field "" 100) (funcall field "ustar" 6) "00"
+                (make-string 247 0)
+                contents (make-string (% (- 512 (% (length contents) 512)) 512) 0)))
+      files "")
+     (make-string 1024 0))))
+
+(ert-deftest mayhem-core-test-tar-files ()
+  (let ((tar (mayhem-core-tests--tar '(("testsuite/a" . "hello") ("b" . "")))))
+    (should (= (% (length tar) 512) 0))
+    (should (equal (mayhem--tar-files tar) '(("testsuite/a" . "hello") ("b" . ""))))
+    (should (equal (mayhem--tar-files "") nil))
+    ;; Names padded with spaces, as the Mayhem server writes them.
+    (should (equal (mayhem--tar-files (concat "x" (make-string 99 ?\s) (substring tar 100)))
+                   '(("x" . "hello") ("b" . ""))))))
+
+(ert-deftest mayhem-core-test-testsuite-files-keeps-test-cases ()
+  ;; Only files named by the sha256 of their contents are test cases.
+  (let* ((bytes (unibyte-string 0 1 255 ?A))
+         (sha (secure-hash 'sha256 bytes))
+         (tar (mayhem-core-tests--tar (list (cons (concat "testsuite/" sha) bytes)
+                                            (cons "testsuite/meta.json" "{}")
+                                            (cons (concat "testsuite/" (make-string 64 ?0))
+                                                  "damaged")))))
+    (should (equal (mayhem--testsuite-files tar) (list (cons sha bytes)))))
+  (should-error (mayhem--testsuite-files (mayhem-core-tests--tar '(("testsuite/x" . "y")))))
+  (should-not (mayhem--testsuite-files (make-string 1024 0))))
+
+(ert-deftest mayhem-core-test-bytes-preview ()
+  (should (equal (mayhem--bytes-preview (unibyte-string ?G ?E ?T 0 10 255 ?/)) "GET.../"))
+  (should (equal (length (mayhem--bytes-preview (make-string 100 ?x)))
+                 mayhem--preview-length)))
+
+(ert-deftest mayhem-core-test-testsuite-page-url ()
+  (should (equal (mayhem--page-url "https://h/" '(testsuite "o" "p" "t" 7)) "https://h/o/p/t/7/tests")))
 
 (provide 'mayhem-core-tests)
 ;;; mayhem-core-tests.el ends here

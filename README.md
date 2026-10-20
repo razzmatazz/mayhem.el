@@ -60,6 +60,11 @@ say because your token expired, the error shows in the header line.
   description and evidence: for an API defect the request, response
   and stack trace, for a crash the test cases that hit it (RET opens
   one), and one's reproducer and backtrace.
+- **Test suite**: the optimized set of a target's test cases at the end
+  of a run, newest first, each with its size, source, age and first
+  bytes; RET on `Test suite` on the target page, or on `Optimized` on
+  the run's Tests tab, opens it.  `w` saves the test case at point to a
+  file.  A finished run's suite is downloaded once and kept.
 - **Test case**: its defects, how to reproduce it, its bytes, the
   target's output and the backtrace.
 
@@ -107,3 +112,9 @@ Links mayhem.el has no page for still go to the browser.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).  `make
 ci` compiles, lints and tests in a container.
+
+The API's own spec is in
+[docs/mayhem-openapi.json](docs/mayhem-openapi.json); check it first for
+endpoints and fields.  It lacks many that the web app and the CLI use:
+[docs/mayhem-api-usage.md](docs/mayhem-api-usage.md) lists the ones
+mayhem.el uses, and how to find others.
