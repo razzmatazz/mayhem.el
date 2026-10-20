@@ -267,6 +267,16 @@ RAW is as for `mayhem--api-response'."
   (should-not (mayhem--repo "https://github.com/o"))
   (should-not (mayhem--repo nil)))
 
+(ert-deftest mayhem-core-test-image-url ()
+  (should (equal (mayhem--image-url "ethan42/exim4:stretch-20171101-6")
+                 "https://hub.docker.com/r/ethan42/exim4/tags?name=stretch-20171101-6"))
+  (should (equal (mayhem--image-url "debian") "https://hub.docker.com/_/debian"))
+  (should (equal (mayhem--image-url "docker.io/library/debian:stretch@sha256:ab")
+                 "https://hub.docker.com/_/debian/tags?name=stretch"))
+  (should (equal (mayhem--image-url "ghcr.io/o/r:1") "https://ghcr.io/o/r"))
+  (should-not (mayhem--image-url "registry.example.com:5000/o/r:1"))
+  (should-not (mayhem--image-url "localhost/o/r")))
+
 (ert-deftest mayhem-core-test-repo-url ()
   (let ((github '("github.com" . "o/r")))
     (should (equal (mayhem--repo-url github) "https://github.com/o/r"))

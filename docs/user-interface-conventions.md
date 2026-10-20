@@ -13,6 +13,15 @@ users expect.
 | A foldable block | `vui-collapsible` |
 | Parts of a page shown one at a time | `mayhem-tab-row`: the current tab a heading, the others buttons, kept in the page's state |
 
+- **Anything outside Mayhem links to its own page.**  A repository,
+  branch, commit, CI build, Docker image or CWE entry is shown as a
+  link (`mayhem-link`) to where it lives on the web, so one RET takes
+  the user there instead of a copy-paste and a search.  Build the URL
+  from what the API gives (`mayhem--repo-url`, `mayhem--image-url`);
+  when there is no page to point to (an image in a private registry, a
+  repository on an unknown host), show plain text rather than a link
+  that leads nowhere.  Rows that open a page on RET carry no links
+  inside them, so RET has one meaning on the line.
 - Brackets mean an action (`[Stop]`, `[Load more]`); plain text is content.
   A page's own name is never a button.
 - **Walk without a jump.**  A page's heading is a breadcrumb: each part

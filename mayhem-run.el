@@ -367,9 +367,14 @@ called with the key of another one, to show it."
      (mayhem-field "Duration" (mayhem--format-duration (alist-get 'duration run)))
      (mayhem-scm-fields run)
      (when image
-       (mayhem-field "Image" (if-let* ((digest (alist-get 'fetched_docker_image_digest run)))
-                                 (propertize image 'help-echo digest)
-                               image)))
+       (mayhem-field "Image" (let ((url (mayhem--image-url image))
+                                   (digest (alist-get 'fetched_docker_image_digest run)))
+                               (if url
+                                   (mayhem-page-link image
+                                                     (concat "RET: open " url
+                                                             (and digest (concat "\n" digest)))
+                                                     (lambda () (browse-url url)))
+                                 (propertize image 'help-echo digest)))))
      (when (and factors (> factors 0))
        (mayhem-field "Hardening"
                      (format "%s of %s exploitability factors" (or (alist-get 'n_exploitability_factors_passing run) 0)

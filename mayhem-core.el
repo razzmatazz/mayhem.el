@@ -519,6 +519,28 @@ are not known: GitHub's, GitLab's and Bitbucket's are."
       ('branch (and forge (concat home "/" (car forge) "/" ref)))
       ('commit (and forge (concat home "/" (cdr forge) "/" ref))))))
 
+(defun mayhem--image-url (image)
+  "Return the web page of the Docker IMAGE, such as \"debian:stretch\".
+Its tag's page on Docker Hub, GitHub or Quay; nil for other registries,
+such as a Mayhem server's own, which have no page."
+  (let* ((ref (car (split-string image "@")))
+         (slash (string-search "/" ref))
+         (first (and slash (substring ref 0 slash)))
+         (host (and first (string-match-p "[.:]\\|\\`localhost\\'" first) first))
+         (path (if host (substring ref (1+ slash)) ref))
+         (tag (and (string-match ":\\([^:/]+\\)\\'" path) (match-string 1 path)))
+         (name (string-remove-prefix
+                "library/" (if tag (substring path 0 (match-beginning 0)) path))))
+    (pcase host
+      ((or 'nil "docker.io" "index.docker.io" "registry-1.docker.io")
+       (concat "https://hub.docker.com/"
+               (if (string-search "/" name)
+                   (concat "r/" name)
+                 (concat "_/" name))
+               (when tag (concat "/tags?name=" (url-hexify-string tag)))))
+      ("ghcr.io" (concat "https://ghcr.io/" name))
+      ("quay.io" (concat "https://quay.io/repository/" name "?tab=tags")))))
+
 (defun mayhem--ci-label (type url)
   "Return how a page names the CI build of TYPE at URL."
   (if (string-match "/actions/runs/\\([0-9]+\\)" url)
