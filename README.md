@@ -34,6 +34,7 @@ say because your token expired, the error shows in the header line.
 | `g` | refresh the page (`gr` under Evil) |
 | `C-c C-j` | jump to a workspace, project or target by name |
 | `C-c C-o` | open this page in the web app, in a browser |
+| `C-c C-v` | switch the page's view, say a test case's bytes between hex and text |
 | `q` | go back to the previous page |
 
 `mayhem-jump` (`C-c C-j`) works anywhere, so you may want it global:

@@ -20,8 +20,17 @@ users expect.
   owner, project, target, run) links to it; build it with
   `mayhem-page-heading`.  A long name in it is cut in the middle
   (`mayhem-cut-middle`), whole on hover.
-  A field naming another page (`Run  #7`) links to it, with
+  A field naming another page (`Run  run #7`) links to it, with
   `mayhem-page-link` or `mayhem-run-link`.
+- **Say what a number is.**  A run, defect or other numbered thing is
+  written with its kind in front: `run #7`, `defect #12`, never a bare
+  `#7`.  Runs and defects are both numbered from 1 within a target, so a
+  lone `#7` could be either.  This holds even where the label beside it
+  says the same (`Run  run #7`): the link reads right on its own, and
+  is the same text wherever it appears.  `mayhem-run-link` writes
+  `run #N` for you.  The one exception is a table column of numbers
+  under a heading that already names them, such as a target's run
+  list.
 - `help-echo` reads `"RET: <imperative>"`, e.g. `"RET: open target"`.
 - Build interactive parts from vui components, not hand-made text
   properties: only vui's elements are TAB stops.
@@ -67,8 +76,16 @@ users expect.
   place.  `S-RET` (`mayhem-visit-other-window`) runs whatever RET does at
   point with the page shown in another window, so new rows need nothing
   extra.
-- Every page's mode derives from `mayhem-page-mode`, which binds `g`, `q`
-  and `S-RET`.
+- Every page's mode derives from `mayhem-page-mode`, which binds `g`, `q`,
+  `S-RET` and `C-c C-v`.
+- **One page, two views.**  `C-c C-v` (`mayhem-toggle-view`) switches
+  a page between two ways of showing the same data, such as a test
+  case's bytes as a hex dump or as plain text.  It is one key on every
+  page, so users learn it once; on a page with a single view it says
+  so.  To give a page a second view, set `mayhem-views` in its mode to
+  the two views' names (they show in the echo area on each switch), and
+  render the second while `mayhem-other-view` is non-nil.  The choice
+  is the buffer's, so it survives `g`.
 - `q` (`mayhem-quit-window`) quits the window, back to the previous
   page, deleting a window made for mayhem.el once it has no mayhem page
   left.  `g` refreshes; `mayhem-page-mode` sets `revert-buffer-function`,

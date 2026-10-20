@@ -65,7 +65,7 @@
           (mayhem-fit title (string-width title))
           (propertize (concat (when-let* ((cwe (alist-get 'cwe_number defect)))
                                 (format "  CWE-%s" cwe))
-                              (format "  #%s" (alist-get 'defect_number defect))
+                              (format "  defect #%s" (alist-get 'defect_number defect))
                               (unless (equal (alist-get 'state defect) "open")
                                 (format "  %s" (alist-get 'state defect)))
                               (when-let* ((run (alist-get 'last_seen_run_number defect)))
@@ -101,8 +101,7 @@ nil; ON-TAB is called with the other's key, to show it."
                                           (concat "  " counts))
                                         (propertize "  in " 'face 'mayhem-label))
                       (let ((number (alist-get 'run_number latest)))
-                        (mayhem-run-link owner project target number
-                                         (format "run #%s" number))))
+                        (mayhem-run-link owner project target number)))
         (mayhem-field "Crashes" (format "%d" (or (alist-get 'n_crash_reports latest) 0)))
         (when-let* ((suite (alist-get 'n_optimized_set_testcases latest)))
           (mayhem-field "Test suite"

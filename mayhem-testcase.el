@@ -12,7 +12,8 @@
 ;; A test case's page, `*mayhem: owner/project/target/N/testcase-SHA*',
 ;; as a run saw it: whether it failed, the defects it shows, how to
 ;; reproduce it, its bytes, the target's output and its backtrace.
-;; RET on a defect opens its page.
+;; RET on a defect opens its page; C-c C-v shows the bytes as text
+;; rather than in hex.
 
 ;;; Code:
 
@@ -28,7 +29,9 @@
   :max-age mayhem-sync-settled-for)
 
 (define-derived-mode mayhem-testcase-mode mayhem-page-mode "Mayhem Test Case"
-  "Major mode for a Mayhem test case's page.")
+  "Major mode for a Mayhem test case's page.
+\\[mayhem-toggle-view] shows its bytes as text rather than in hex."
+  (setq-local mayhem-views '("bytes in hex" "bytes as text")))
 
 (defun mayhem-testcase--defects (owner project target run defects)
   "Return the vnodes listing DEFECTS of a test case of RUN.
@@ -48,7 +51,7 @@ RUN is a run of TARGET of PROJECT of OWNER."
                                " "
                                (mayhem-fit (or (alist-get 'title defect) "")
                                            (string-width (or (alist-get 'title defect) "")))
-                               (propertize (format "  #%s" number) 'face 'mayhem-label))
+                               (propertize (format "  defect #%s" number) 'face 'mayhem-label))
                          (lambda () (mayhem-defect-open owner project target number run))
                          "RET: open defect")))
                     defects)))))
@@ -83,7 +86,10 @@ RUN is a run of TARGET of PROJECT of OWNER."
      (mayhem-testcase--defects owner project target run (alist-get 'defects test))
      (mayhem-block "Reproduce" (when-let* ((cmd (alist-get 'repro_cmdline test)))
                                  (mayhem--split-command cmd)))
-     (mayhem-block "Test case" (alist-get 'hexdump test))
+     (mayhem-block "Test case" (if mayhem-other-view
+                                   (mayhem--bytes-text
+                                    (mayhem--hexdump-bytes (alist-get 'hexdump test)))
+                                 (alist-get 'hexdump test)))
      (mayhem-block "Output" (alist-get 'output test))
      (mayhem-block "Backtrace" (if-let* ((frames (alist-get 'frames test)))
                                    (mayhem-backtrace frames)
@@ -109,7 +115,7 @@ RUN is a run of TARGET of PROJECT of OWNER."
                    (list 'testcase owner project target run sha256))))
     (vui-fragment
      (mayhem-page-heading owner project target " "
-                          (mayhem-run-link owner project target run (format "run #%s" run)
+                          (mayhem-run-link owner project target run nil
                                            '(link mayhem-section-heading))
                           (format " test case %s" (substring sha256 0 (min 8 (length sha256)))))
      (vui-newline)

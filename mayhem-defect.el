@@ -54,8 +54,7 @@ The defect is of TARGET of PROJECT of OWNER."
                              ", "))
       (when-let* ((run (alist-get 'run_number evidence))
                   (sha (alist-get 'sha256 evidence)))
-        (mayhem-field "Example" (mayhem-run-link owner project target run
-                                                 (format "run #%s" run))
+        (mayhem-field "Example" (mayhem-run-link owner project target run)
                       ", test case "
                       (mayhem-page-link (substring sha 0 (min 8 (length sha)))
                                         "RET: open test case"

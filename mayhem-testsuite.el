@@ -150,7 +150,7 @@ as `target-testcases' has them, or nil before they land."
         (testcases (mayhem-sync-use-resource (list 'target-testcases owner project target))))
     (vui-fragment
      (mayhem-page-heading owner project target " "
-                          (mayhem-run-link owner project target run (format "run #%s" run)
+                          (mayhem-run-link owner project target run nil
                                            '(link mayhem-section-heading))
                           " test suite")
      (vui-newline)

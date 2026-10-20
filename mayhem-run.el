@@ -65,7 +65,7 @@
                                " "
                                (mayhem-fit (or (alist-get 'title defect) "")
                                            (string-width (or (alist-get 'title defect) "")))
-                               (propertize (format "  #%s" number) 'face 'mayhem-label))
+                               (propertize (format "  defect #%s" number) 'face 'mayhem-label))
                          (lambda () (mayhem-defect-open owner project target number run))
                          "RET: open defect")))
                     defects)))))

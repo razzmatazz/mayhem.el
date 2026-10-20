@@ -1007,6 +1007,34 @@ are files but none is, as a suite that seems empty is kept for good."
   (apply #'string (mapcar (lambda (b) (if (<= 32 b 126) b ?.))
                           (substring bytes 0 (min (length bytes) mayhem--preview-length)))))
 
+;; A test case's `hexdump' is xxd's: per line an offset, up to 16 bytes
+;; in hex, then those bytes as text; a short last line may be unpadded.
+(defun mayhem--hexdump-bytes (hexdump)
+  "Return the bytes in HEXDUMP, as a unibyte string."
+  (apply #'unibyte-string
+         (mapcan
+          (lambda (line)
+            (when (string-match "\\`[[:xdigit:]]+: ?" line)
+              (let ((rest (substring line (match-end 0))))
+                ;; The text column is as long as the line has bytes.
+                (catch 'bytes
+                  (dolist (n (number-sequence (min 16 (length rest)) 1 -1))
+                    (let ((hex (string-replace " " "" (substring rest 0 (- (length rest) n)))))
+                      (when (and (= (length hex) (* 2 n))
+                                 (string-match-p "\\`[[:xdigit:]]*\\'" hex))
+                        (throw 'bytes
+                               (mapcar (lambda (i) (string-to-number (substring hex i (+ i 2)) 16))
+                                       (number-sequence 0 (- (length hex) 2) 2))))))))))
+          (split-string (or hexdump "") "\n" t))))
+
+(defun mayhem--bytes-text (bytes)
+  "Return BYTES as text: printable ASCII, tabs and newlines as is, others as \\xNN."
+  (mapconcat (lambda (b)
+               (if (or (<= 32 b 126) (memq b '(?\t ?\n)))
+                   (string b)
+                 (propertize (format "\\x%02x" b) 'face 'shadow)))
+             bytes ""))
+
 (defun mayhem--fetch-testsuite (owner project target run callback)
   "Fetch the test suite of run RUN of TARGET of PROJECT of OWNER.
 That is the optimized set of test cases at the end of the run.  Call

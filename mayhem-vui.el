@@ -156,6 +156,24 @@ A browser even when `mayhem-open-urls' would bring the link back here."
   (browse-url-with-browser-kind
    'external (mayhem--page-url (alist-get 'url (mayhem--read-config)) mayhem-page)))
 
+(defvar-local mayhem-views nil
+  "The names of the page's two views, as (DEFAULT OTHER); nil if it has one.
+A page with two sets it in its mode, and renders the other while
+`mayhem-other-view' is non-nil.")
+
+(defvar-local mayhem-other-view nil
+  "Non-nil while the page shows the second of `mayhem-views'.")
+
+(defun mayhem-toggle-view ()
+  "Switch the page between its two views, as a test case's bytes in hex or as text."
+  (interactive)
+  (unless mayhem-views
+    (user-error "Mayhem: This page has one view"))
+  (setq mayhem-other-view (not mayhem-other-view))
+  (when-let* ((root (vui-get-instance (current-buffer))))
+    (vui-rerender root))
+  (message "Mayhem: Showing %s" (nth (if mayhem-other-view 1 0) mayhem-views)))
+
 (declare-function mayhem "mayhem" ())
 (declare-function mayhem-jump "mayhem" ())
 (declare-function mayhem-workspace-open "mayhem-workspace" (owner))
@@ -167,6 +185,7 @@ A browser even when `mayhem-open-urls' would bring the link back here."
   :parent vui-mode-map
   "C-c C-j" #'mayhem-jump
   "C-c C-o" #'mayhem-browse
+  "C-c C-v" #'mayhem-toggle-view
   "g" #'mayhem-refresh
   "q" #'mayhem-quit-window
   "S-<return>" #'mayhem-visit-other-window)
@@ -292,9 +311,10 @@ Following it calls ON-VISIT, of no arguments.  HELP-ECHO reads
   (mayhem-page-link text (concat "RET: open " url) (lambda () (browse-url url))))
 
 (defun mayhem-run-link (owner project target number &optional text face)
-  "Return TEXT, or #NUMBER, linking to run NUMBER of TARGET of PROJECT of OWNER.
-FACE is as for `mayhem-page-link'."
-  (mayhem-page-link (or text (format "#%s" number)) "RET: open run"
+  "Return TEXT, or \"run #NUMBER\", linking to run NUMBER.
+NUMBER is a run of TARGET of PROJECT of OWNER.  FACE is as for
+`mayhem-page-link'."
+  (mayhem-page-link (or text (format "run #%s" number)) "RET: open run"
                     (lambda () (mayhem-run-open owner project target number))
                     face))
 

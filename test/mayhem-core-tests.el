@@ -324,6 +324,16 @@ RAW is as for `mayhem--api-response'."
   (should-error (mayhem--testsuite-files (mayhem-core-tests--tar '(("testsuite/x" . "y")))))
   (should-not (mayhem--testsuite-files (make-string 1024 0))))
 
+(ert-deftest mayhem-core-test-hexdump-bytes ()
+  (should (equal (mayhem--hexdump-bytes
+                  (concat "0000000: 4548 4c4f 2041 4141 4141 4141 4141 0a00 EHLO AAAAAAAAA..\n"
+                          "0000010: 4141 41 AAA"))
+                 "EHLO AAAAAAAAA\n\0AAA"))
+  ;; Padded as xxd pads, with a text column that looks like hex.
+  (should (equal (mayhem--hexdump-bytes "0000000: 4142                                     AB")
+                 "AB"))
+  (should (equal (mayhem--bytes-text (unibyte-string ?A 10 0 255)) "A\n\\x00\\xff")))
+
 (ert-deftest mayhem-core-test-bytes-preview ()
   (should (equal (mayhem--bytes-preview (unibyte-string ?G ?E ?T 0 10 255 ?/)) "GET.../"))
   (should (equal (length (mayhem--bytes-preview (make-string 100 ?x)))
