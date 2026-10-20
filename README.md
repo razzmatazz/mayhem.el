@@ -56,8 +56,9 @@ say because your token expired, the error shows in the header line.
   and Log; an API run has Defects, Endpoints and Log.  A run that is
   still going refreshes itself every 10 seconds.
 - **Defect**: severity, CWE, description and evidence: for an API
-  defect the request, response and stack trace, for a crash its
-  reproducer and backtrace.
+  defect the request, response and stack trace, for a crash the test
+  cases that hit it (RET opens one), and one's reproducer and
+  backtrace.
 - **Test case**: its defects, how to reproduce it, its bytes, the
   target's output and the backtrace.
 

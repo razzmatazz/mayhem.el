@@ -53,7 +53,7 @@ fallback only for what the API cannot do (none so far).
 | `GET .../run/{number}/testcase_report/{sha256}` | test case page |
 | `GET .../target/{target}/defect/{number}` | defect page |
 | `GET .../target/{target}/run/{run}/api/rest/issue/{defect}` | API defect's stack trace, request and response (base64) |
-| `GET .../target/{target}/defect/{number}/testcase_report?per_page=1` | code defect's crash, backtrace and reproducer |
+| `GET .../target/{target}/defect/{number}/testcase_report?per_page=100` | code defect's test cases (run, time), and the first's crash, backtrace and reproducer, as the web app's "Example Backtrace" |
 
 - The defect list's `run` filter takes the run's `run_id`, not its
   number; with a number it silently returns nothing.

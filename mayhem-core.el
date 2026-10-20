@@ -648,23 +648,28 @@ than one when calls were inlined into it.  SOURCE is nil when unknown."
 
 (defun mayhem--code-evidence (reports)
   "Return the evidence of a code defect from its test case REPORTS.
-That is how many there are, and the first's crash and backtrace, parsed
-into `frames' when the API did."
-  (let ((first (car (alist-get 'testcase_reports reports))))
+That is how many there are, each listed one's run and timing, and the
+first's crash and backtrace, parsed into `frames' when the API did."
+  (let* ((all (alist-get 'testcase_reports reports))
+         (first (car all)))
     (append (list (cons 'count (alist-get 'count reports)))
-            (mayhem--pick first '(crash_type signal_number repro_cmdline))
+            (mayhem--pick first '(sha256 run_number crash_type signal_number repro_cmdline))
             (list (cons 'frames (mayhem--backtrace-frames (alist-get 'parsed_backtrace first)))
                   (cons 'backtrace
                         (when-let* ((bt (alist-get 'backtrace first)))
-                          (truncate-string-to-width bt mayhem--evidence-max nil nil "…")))))))
+                          (truncate-string-to-width bt mayhem--evidence-max nil nil "…")))
+                  (cons 'testcases
+                        (mapcar (lambda (r)
+                                  (mayhem--pick r '(sha256 run_number execution_time)))
+                                all))))))
 
 (defun mayhem--fetch-defect (owner project target number run callback)
   "Fetch defect NUMBER of TARGET of PROJECT of OWNER, with its evidence.
 Call CALLBACK with (OK DATA): DATA is an alist with `defect' and
 `evidence', each trimmed to what its page shows, or an error message.
 An API defect's evidence is the HTTP exchange of RUN, a run number, or
-else of the last run that saw it; a code defect's, its first test
-case's crash."
+else of the last run that saw it; a code defect's, its first page of
+test cases and the first one's crash."
   (let ((path (mayhem--path "/api/v2/owner/%s/project/%s/target/%s"
                             owner project target)))
     (mayhem--api-get
@@ -687,7 +692,7 @@ case's crash."
                                 (funcall done ok (if ok (mayhem--api-evidence issue) issue)))))
             ((equal (alist-get 'source defect) "code")
              (mayhem--api-get (concat path (format "/defect/%s/testcase_report" number))
-                              '((per_page 1))
+                              `((per_page ,mayhem--page-size))
                               (lambda (ok reports)
                                 (funcall done ok (if ok (mayhem--code-evidence reports) reports)))))
             (t (funcall done t nil)))))))))

@@ -13,7 +13,7 @@
 ;; severity, CWE and description, and its evidence.  For an API defect
 ;; that is the server's stack trace and the request and response that
 ;; showed it; for a code defect, the crash, its backtrace and how to
-;; reproduce it.
+;; reproduce it, and the test cases that hit it.
 
 ;;; Code:
 
@@ -22,6 +22,8 @@
 (require 'mayhem-core)
 (require 'mayhem-sync)
 (require 'mayhem-vui)
+
+(declare-function mayhem-testcase-open "mayhem-testcase" (owner project target run sha256))
 
 (defconst mayhem-defect--fill-width 72
   "Column at which a defect's description is wrapped.")
@@ -49,7 +51,38 @@
                                              (when-let* ((n (alist-get 'signal_number evidence)))
                                                (format "signal %s" n))))
                              ", "))
-      (mayhem-field "Test cases" (format "%s" (or (alist-get 'count evidence) 0)))))))
+      (when-let* ((run (alist-get 'run_number evidence))
+                  (sha (alist-get 'sha256 evidence)))
+        (mayhem-field "Example" (format "run %s, test case %s" run
+                                        (substring sha 0 (min 8 (length sha))))))))))
+
+(defun mayhem-defect--testcases (owner project target evidence)
+  "Return the vnodes listing the test cases in EVIDENCE of a code defect.
+The defect is of TARGET of PROJECT of OWNER."
+  (let ((testcases (alist-get 'testcases evidence))
+        (count (or (alist-get 'count evidence) 0)))
+    (vui-fragment
+     (vui-newline)
+     (mayhem-heading (format "Test cases (%s)" count))
+     (if (null testcases)
+         (mayhem-notice "No test cases")
+       (apply #'vui-fragment
+              (mapcar (lambda (test)
+                        (let ((sha (alist-get 'sha256 test))
+                              (run (alist-get 'run_number test)))
+                          (mayhem-row
+                           (concat "  " (substring sha 0 (min 8 (length sha)))
+                                   (format "  run %-4s" run)
+                                   (propertize
+                                    (format "%5dms" (round (* 1000 (or (alist-get 'execution_time test)
+                                                                       0))))
+                                    'face 'mayhem-label)
+                                   "\n")
+                           (lambda () (mayhem-testcase-open owner project target run sha))
+                           "RET: open test case")))
+                      testcases)))
+     (when (> count (length testcases))
+       (mayhem-notice (format "%d more in the web app" (- count (length testcases))))))))
 
 (defun mayhem-defect--evidence-blocks (source evidence)
   "Return the sections of EVIDENCE of a defect from SOURCE, trace last.
@@ -70,8 +103,8 @@ SOURCE is \"api\" or \"code\"."
                                 (mayhem-backtrace frames)
                               (alist-get 'backtrace evidence)))))))
 
-(defun mayhem-defect--render (data)
-  "Return the vnodes of a defect's page, showing DATA."
+(defun mayhem-defect--render (owner project target data)
+  "Return the vnodes of a defect of TARGET of PROJECT of OWNER, showing DATA."
   (let* ((defect (alist-get 'defect data))
          (level (alist-get 'severity_level defect))
          (now (current-time)))
@@ -95,6 +128,8 @@ SOURCE is \"api\" or \"code\"."
      (mayhem-block "Description"
                            (string-fill (or (alist-get 'description defect) "")
                                         mayhem-defect--fill-width))
+     (when (equal (alist-get 'source defect) "code")
+       (mayhem-defect--testcases owner project target (alist-get 'evidence data)))
      (mayhem-defect--evidence-blocks (alist-get 'source defect) (alist-get 'evidence data)))))
 
 (defun mayhem-defect--skeleton ()
@@ -109,7 +144,10 @@ SOURCE is \"api\" or \"code\"."
    (mayhem-field "First seen" (mayhem-skeleton-bar 12))
    (mayhem-field "Last seen" (mayhem-skeleton-bar 22))
    (vui-newline)
-   (mayhem-skeleton '((60) (52) (64) (40)))))
+   (mayhem-skeleton '((60) (52) (64) (40)))
+   (vui-newline)
+   (mayhem-heading "Test cases")
+   (mayhem-skeleton '(("  " 24) ("  " 24) ("  " 24)))))
 
 (vui-defcomponent mayhem-defect-page (owner project target number run)
   "The page of defect NUMBER of TARGET of PROJECT of OWNER, as RUN saw it."
@@ -122,7 +160,8 @@ SOURCE is \"api\" or \"code\"."
                              (format " defect #%s" number)))
      (vui-newline)
      (mayhem-snapshot-view snapshot "defect" (mayhem-defect--skeleton)
-                           #'mayhem-defect--render))))
+                           (lambda (data)
+                             (mayhem-defect--render owner project target data))))))
 
 (defun mayhem-defect-open (owner project target number &optional run)
   "Open the page of defect NUMBER of TARGET of PROJECT of OWNER.
