@@ -33,13 +33,10 @@
   :group 'mayhem)
 
 (defconst mayhem-run--chart-width 60
-  "Columns of a run's progress chart.")
+  "Columns of a run's progress chart, at most.")
 
 (defconst mayhem-run--chart-height 4
   "Rows of a run's progress chart.")
-
-(defconst mayhem-run--tab-width 70
-  "Columns the tab bar of a run's page is underlined across.")
 
 (mayhem-sync-define-resource run (owner project target number)
   :fetch (lambda (done) (mayhem--fetch-run owner project target number done))
@@ -62,13 +59,12 @@
                       (let ((level (or (alist-get 'severity_level defect) ""))
                             (number (alist-get 'defect_number defect)))
                         (mayhem-row
-                         (concat "  "
-                                 (propertize (format "%-7s" level)
-                                             'face (mayhem-defect-severity-face level))
-                                 " "
-                                 (or (alist-get 'title defect) "")
-                                 (propertize (format "  #%s" number) 'face 'mayhem-label)
-                                 "\n")
+                         (list (propertize (format "%-7s" level)
+                                           'face (mayhem-defect-severity-face level))
+                               " "
+                               (mayhem-fit (or (alist-get 'title defect) "")
+                                           (string-width (or (alist-get 'title defect) "")))
+                               (propertize (format "  #%s" number) 'face 'mayhem-label))
                          (lambda () (mayhem-defect-open owner project target number run))
                          "RET: open defect")))
                     defects)))))
@@ -77,22 +73,23 @@
   "Return the vnodes listing ENDPOINTS of an API run."
   (if (null endpoints)
       (mayhem-notice "No endpoints")
-   (apply #'vui-fragment
-          (mapcar (lambda (endpoint)
-                    (let ((passing (alist-get 'passing endpoint))
-                          (n (or (alist-get 'defects_total endpoint) 0)))
-                      (vui-text
-                       (concat "  "
-                               (format "%-7s" (or (alist-get 'method endpoint) ""))
-                               (format "%-40s" (or (alist-get 'path endpoint) ""))
-                               (propertize (if passing "passing" "failing")
-                                           'face (if passing 'success 'error))
-                               (propertize (format "  %d defect%s" n (if (= n 1) "" "s"))
-                                           'face 'mayhem-label)
-                               (if (alist-get 'covered endpoint) ""
-                                 (propertize "  not covered" 'face 'mayhem-label))
-                               "\n"))))
-                  endpoints))))
+    (let ((path-width (apply #'max 1 (mapcar (lambda (endpoint)
+                                                (string-width (or (alist-get 'path endpoint) "")))
+                                              endpoints))))
+      (apply #'vui-fragment
+             (mapcar (lambda (endpoint)
+                       (let ((passing (alist-get 'passing endpoint))
+                             (n (or (alist-get 'defects_total endpoint) 0)))
+                         (mayhem-line
+                          (list (format "%-7s" (or (alist-get 'method endpoint) ""))
+                                (mayhem-fit (or (alist-get 'path endpoint) "") path-width t)
+                                (propertize (if passing "  passing" "  failing")
+                                            'face (if passing 'success 'error))
+                                (propertize (format "  %d defect%s" n (if (= n 1) "" "s"))
+                                            'face 'mayhem-label)
+                                (if (alist-get 'covered endpoint) ""
+                                  (propertize "  not covered" 'face 'mayhem-label))))))
+                     endpoints)))))
 
 (defun mayhem-run--live-p (run)
   "Return non-nil if RUN, an alist, is still pending or running."
@@ -151,7 +148,10 @@ run started, a dot where more defects were found.  Each column's time
 and counts are its `help-echo'.  Nothing before the run starts."
   (when-let* ((start (alist-get 'started_at run))
               ((alist-get 'testcases progress)))
-    (let* ((width mayhem-run--chart-width)
+    (let* ((most (apply #'max 0 (mapcar #'cdr (alist-get 'testcases progress))))
+           (margin (max 4 (length (number-to-string most))))
+           (pad (make-string (1+ margin) ?\s))
+           (width (max 10 (min mayhem-run--chart-width (- (mayhem-page-width) (1+ margin)))))
            (span (if-let* ((end (alist-get 'ended_at run)))
                      (mayhem--elapsed end start)
                    (float-time (time-subtract now (encode-time (iso8601-parse start))))))
@@ -175,8 +175,6 @@ and counts are its `help-echo'.  Nothing before the run starts."
                                     tips)
                     s)))
            (top (apply #'max 0 tests))
-           (margin (max 4 (length (number-to-string top))))
-           (pad (make-string (+ 3 margin) ?\s))
            (rows (mayhem--bar-rows tests mayhem-run--chart-height))
            (dots (apply #'string (seq-mapn (lambda (d prev) (if (> d prev) ?● ?\s))
                                            defects (cons 0 defects))))
@@ -192,8 +190,7 @@ and counts are its `help-echo'.  Nothing before the run starts."
                          'face 'mayhem-label)
          "\n"
          (mapconcat (lambda (row)
-                      (concat "  "
-                              (propertize (format (format "%%%ds " margin)
+                      (concat (propertize (format (format "%%%ds " margin)
                                                   (if (eq row (car rows)) top ""))
                                           'face 'mayhem-label)
                               (propertize (funcall tip row) 'face 'mayhem-target)
@@ -218,8 +215,7 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
                         (let ((sha (alist-get 'sha256 test))
                               (n (or (alist-get 'n_defects test) 0)))
                           (mayhem-row
-                           (concat "  "
-                                   (substring sha 0 (min 8 (length sha)))
+                           (concat (substring sha 0 (min 8 (length sha)))
                                    (propertize (if (alist-get 'is_regression test)
                                                    "  regression" "  new       ")
                                                'face 'mayhem-label)
@@ -252,11 +248,11 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
     ((or 'nil "") "")
     (_ (replace-regexp-in-string "_" " " phase))))
 
-(defconst mayhem-run--event-indent 28
+(defconst mayhem-run--event-indent 26
   "Column at which an event's description starts.")
 
 (defconst mayhem-run--event-width 70
-  "Column at which an event's description is wrapped, from its start.")
+  "Column at which an event's description is wrapped, from its start, at most.")
 
 (defun mayhem-run--events (events)
   "Return the vnodes of the event log EVENTS of a run, newest first."
@@ -271,8 +267,7 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
                 (level (or (alist-get 'event_level event) 1))
                 (face (cond ((>= level 3) 'error) ((= level 2) 'warning)
                             ((= level 0) 'mayhem-label))))
-           (concat "  "
-                   (propertize (format-time-string "%H:%M:%S" at)
+           (concat (propertize (format-time-string "%H:%M:%S" at)
                                'face 'mayhem-label 'help-echo exact 'mayhem-ts exact)
                    (propertize (format "  %-16s" (mayhem-run--phase (alist-get 'event_phase event)))
                                'face 'mayhem-label)
@@ -280,7 +275,9 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
                    (let ((desc (replace-regexp-in-string
                                 "\n" (concat "\n" (make-string mayhem-run--event-indent ?\s))
                                 (string-fill (string-trim (or (alist-get 'event_desc event) ""))
-                                             mayhem-run--event-width))))
+                                             (max 20 (min mayhem-run--event-width
+                                                          (- (mayhem-page-width)
+                                                             mayhem-run--event-indent)))))))
                      (if face (propertize desc 'face face) desc))
                    "\n")))
        events "")))))
@@ -347,9 +344,7 @@ ON-TAB is called with the key of another one, to show it."
                                (list label (format "RET: show %s" (downcase label))
                                      (unless (eq key shown)
                                        (lambda () (funcall on-tab key)))))
-                             tabs)
-                     mayhem-run--tab-width)
-     (vui-newline)
+                             tabs))
      (mayhem-run--tab owner project target number run data shown))))
 
 (defun mayhem-run--skeleton ()
@@ -362,7 +357,7 @@ ON-TAB is called with the key of another one, to show it."
    (mayhem-field "Commit" (mayhem-skeleton-bar 30))
    (vui-newline)
    (mayhem-heading "Defects")
-   (mayhem-skeleton '(("  " 6 " " 28) ("  " 6 " " 36) ("  " 6 " " 22) ("  " 6 " " 30)))))
+   (mayhem-skeleton '((6 " " 28) (6 " " 36) (6 " " 22) (6 " " 30)))))
 
 (vui-defcomponent mayhem-run-page (owner project target number)
   "The page of run NUMBER of TARGET of PROJECT of OWNER."
@@ -382,7 +377,7 @@ ON-TAB is called with the key of another one, to show it."
                                           (cancel-timer timer)))))
           (lambda () (cancel-timer timer)))))
     (vui-fragment
-     (mayhem-page-heading owner project target (format " #%s" number))
+     (mayhem-page-heading owner project target (format " run #%s" number))
      (vui-newline)
      (mayhem-snapshot-view snapshot "run" (mayhem-run--skeleton)
                            (lambda (data)

@@ -26,7 +26,7 @@
 (declare-function mayhem-testcase-open "mayhem-testcase" (owner project target run sha256))
 
 (defconst mayhem-defect--fill-width 72
-  "Column at which a defect's description is wrapped.")
+  "Column at which a defect's description is wrapped, at most.")
 
 (mayhem-sync-define-resource defect (owner project target number run)
   :fetch (lambda (done) (mayhem--fetch-defect owner project target number run done))
@@ -78,7 +78,7 @@ The defect is of TARGET of PROJECT of OWNER."
                         (let ((sha (alist-get 'sha256 test))
                               (run (alist-get 'run_number test)))
                           (mayhem-row
-                           (concat "  " (substring sha 0 (min 8 (length sha)))
+                           (concat (substring sha 0 (min 8 (length sha)))
                                    (format "  run %-4s" run)
                                    (propertize
                                     (format "%5dms" (round (* 1000 (or (alist-get 'execution_time test)
@@ -137,7 +137,8 @@ SOURCE is \"api\" or \"code\"."
                                      (alist-get 'source defect) (alist-get 'evidence data))
      (mayhem-block "Description"
                            (string-fill (or (alist-get 'description defect) "")
-                                        mayhem-defect--fill-width))
+                                        (max 20 (min mayhem-defect--fill-width
+                                                     (mayhem-page-width)))))
      (when (equal (alist-get 'source defect) "code")
        (mayhem-defect--testcases owner project target (alist-get 'evidence data)))
      (mayhem-defect--evidence-blocks (alist-get 'source defect) (alist-get 'evidence data)))))
@@ -157,7 +158,7 @@ SOURCE is \"api\" or \"code\"."
    (mayhem-skeleton '((60) (52) (64) (40)))
    (vui-newline)
    (mayhem-heading "Test cases")
-   (mayhem-skeleton '(("  " 24) ("  " 24) ("  " 24)))))
+   (mayhem-skeleton '((24) (24) (24)))))
 
 (vui-defcomponent mayhem-defect-page (owner project target number run)
   "The page of defect NUMBER of TARGET of PROJECT of OWNER, as RUN saw it."

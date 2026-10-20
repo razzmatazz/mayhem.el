@@ -70,8 +70,12 @@ Bitbucket.
 
 Defect trends cover the last 12 months, 3 months, 30 days, 7 days or
 24 hours; pick one with RET.  Only members of a workspace can see its
-trends.  Hover over a chart, or leave point on it, to see its numbers;
+trends; others' pages leave the trend out.  Hover over a chart, or leave point on it, to see its numbers;
 timestamps show the exact time the same way.
+
+Pages follow their window's width up to `mayhem-max-width` columns
+(100 by default): in a narrow window, titles and names are cut with
+`…` and descriptions and charts narrow, so rows keep to one line.
 
 ## Web links
 
@@ -90,6 +94,7 @@ Links mayhem.el has no page for still go to the browser.
 | Option | Default | What it does |
 |---|---|---|
 | `mayhem-open-urls` | `t` | open web app links in mayhem.el |
+| `mayhem-max-width` | `100` | most columns a page takes; nil for the whole window |
 | `mayhem-run-refresh-interval` | `10` | seconds between refreshes of a running run |
 | `mayhem-sync-fresh-for` | `30` | seconds a page's data is reused before refetching |
 | `mayhem-sync-settled-for` | a day | the same, for data that no longer changes: finished runs, defects, test cases |

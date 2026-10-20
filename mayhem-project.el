@@ -29,45 +29,49 @@
 (define-derived-mode mayhem-project-mode mayhem-page-mode "Mayhem Project"
   "Major mode for a Mayhem project's page.")
 
-(defun mayhem-project--target-row (owner project target now)
-  "Return the row of TARGET, an alist, on PROJECT of OWNER's page at NOW."
+(defun mayhem-project--target-name (target)
+  "Return the name TARGET, an alist, is listed by."
+  (or (alist-get 'target_name target) (alist-get 'slug target)))
+
+(defun mayhem-project--target-row (owner project target name-width now)
+  "Return the row of TARGET, an alist, on PROJECT of OWNER's page at NOW.
+Its name is padded to NAME-WIDTH columns."
   (let* ((slug (alist-get 'slug target))
          (run (alist-get 'latest target))
          (lines (alist-get 'n_lines_total run))
          (all (or (alist-get 'n_testcase_reports run) 0))
          (factors (alist-get 'n_exploitability_factors_total run))
-         (line (concat "  "
-                       (propertize (format "%-5s" (or (alist-get 'type target) ""))
-                                   'face 'mayhem-label)
-                       (propertize (format "%-30s" (or (alist-get 'target_name target) slug))
-                                   'face 'mayhem-target)
-                       (if (not run)
-                           (propertize (format " %5d runs" (or (alist-get 'n_runs target) 0))
-                                       'face 'mayhem-label)
-                         (concat
-                          (propertize (if (and lines (> lines 0))
-                                          (format "%5d%%"
-                                                  (round (* 100.0 (or (alist-get 'n_lines_covered run) 0))
-                                                         lines))
-                                        "      ")
-                                      'help-echo "Line coverage")
-                          (format " %4d defects" (or (alist-get 'n_defects run) 0))
-                          (propertize (if (and factors (> factors 0))
-                                          (format "  %d/%d" (or (alist-get 'n_exploitability_factors_passing
-                                                                           run)
-                                                                0)
-                                                  factors)
-                                        "     ")
-                                      'face 'mayhem-label 'help-echo "Exploitability factors")
-                          (propertize (format "  %4d/%-4d tests"
-                                              (- all (or (alist-get 'n_crash_reports run) 0)) all)
-                                      'face 'mayhem-label 'help-echo "Passing tests of all")
-                          "  "
-                          (propertize (or (mayhem--format-age (alist-get 'created_at run) now) "")
-                                      'face 'mayhem-label)
-                          (when-let* ((counts (mayhem-severity-counts run)))
-                            (concat "  " counts))))
-                       "\n")))
+         (line (list (propertize (format "%-5s" (or (alist-get 'type target) ""))
+                                 'face 'mayhem-label)
+                     (mayhem-fit (propertize (mayhem-project--target-name target)
+                                             'face 'mayhem-target)
+                                 name-width t)
+                     (if (not run)
+                         (propertize (format " %5d runs" (or (alist-get 'n_runs target) 0))
+                                     'face 'mayhem-label)
+                       (concat
+                        (propertize (if (and lines (> lines 0))
+                                        (format "%5d%%"
+                                                (round (* 100.0 (or (alist-get 'n_lines_covered run) 0))
+                                                       lines))
+                                      "      ")
+                                    'help-echo "Line coverage")
+                        (format " %4d defects" (or (alist-get 'n_defects run) 0))
+                        (propertize (if (and factors (> factors 0))
+                                        (format "  %d/%d" (or (alist-get 'n_exploitability_factors_passing
+                                                                         run)
+                                                              0)
+                                                factors)
+                                      "     ")
+                                    'face 'mayhem-label 'help-echo "Exploitability factors")
+                        (propertize (format "  %4d/%-4d tests"
+                                            (- all (or (alist-get 'n_crash_reports run) 0)) all)
+                                    'face 'mayhem-label 'help-echo "Passing tests of all")
+                        "  "
+                        (propertize (or (mayhem--format-age (alist-get 'created_at run) now) "")
+                                    'face 'mayhem-label)
+                        (when-let* ((counts (mayhem-severity-counts run)))
+                          (concat "  " counts)))))))
     (mayhem-row line (lambda () (mayhem-target-open owner project slug))
                 "RET: open target")))
 
@@ -94,6 +98,9 @@ nil; ON-TAB is called with the other's key, to show it."
          (tabs `((active ,(format "Targets (%d)" (length active)) ,active)
                  (archived ,(format "Archived (%d)" (length archived)) ,archived)))
          (shown (or (assq tab tabs) (car tabs)))
+         (name-width (apply #'max 1 (mapcar (lambda (target)
+                                              (string-width (mayhem-project--target-name target)))
+                                            (nth 2 shown))))
          (now (current-time)))
     (vui-fragment
      (mayhem-repo-field (alist-get 'repository_url info))
@@ -113,19 +120,16 @@ nil; ON-TAB is called with the other's key, to show it."
        (mayhem-field "Runs" (format "%d" runs)))
      (mayhem-field "Updated" (mayhem--format-age (alist-get 'updated_at info) now))
      (vui-newline)
-     (vui-component 'mayhem-trend :owner owner :project project :target nil)
-     (vui-newline)
+     (mayhem-trend-view owner project nil)
      (mayhem-tab-row (mapcar (pcase-lambda (`(,key ,label ,_))
                                (list label (format "RET: show %s" (downcase label))
                                      (unless (eq key (car shown))
                                        (lambda () (funcall on-tab key)))))
-                             tabs)
-                     70)
-     (vui-newline)
+                             tabs))
      (if (nth 2 shown)
          (apply #'vui-fragment
                 (mapcar (lambda (target)
-                          (mayhem-project--target-row owner project target now))
+                          (mayhem-project--target-row owner project target name-width now))
                         (nth 2 shown)))
        (mayhem-notice (if (eq (car shown) 'archived) "No archived targets" "No targets"))))))
 
@@ -137,12 +141,10 @@ nil; ON-TAB is called with the other's key, to show it."
    (mayhem-field "Fixed" (mayhem-skeleton-bar 20))
    (mayhem-field "Updated" (mayhem-skeleton-bar 12))
    (vui-newline)
-   (mayhem-heading "Defect trend")
-   (mayhem-skeleton (make-list mayhem-trend--height (list "       " mayhem-trend--width)))
-   (vui-newline)
-   (mayhem-skeleton '(("  " 30 " " 5 "  " 9 "  " 20)
-                      ("  " 24 "       " 5 "  " 9 "  " 18)
-                      ("  " 28 "   " 5 "  " 9 "  " 22)))))
+   (mayhem-trend-skeleton)
+   (mayhem-skeleton '((30 " " 5 "  " 9 "  " 20)
+                      (24 "       " 5 "  " 9 "  " 18)
+                      (28 "   " 5 "  " 9 "  " 22)))))
 
 (vui-defcomponent mayhem-project-page (owner project)
   "The page of PROJECT of OWNER."

@@ -6,6 +6,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'ert)
 (require 'mayhem-vui)
 
@@ -38,12 +39,38 @@
         ((vui-vnode-text-p vnode) (list (vui-vnode-text-content vnode)))))
 
 (ert-deftest mayhem-vui-test-page-heading-links-enclosing-pages ()
-  (should (equal (mayhem-vui-tests--parts (mayhem-page-heading nil nil nil))
-                 '("Mayhem" "\n")))
-  (should (equal (mayhem-vui-tests--parts (mayhem-page-heading "o" "p" "t"))
-                 '((link "Mayhem") "/" (link "o") "/" (link "p") "/" "t" "\n")))
-  (should (equal (mayhem-vui-tests--parts (mayhem-page-heading "o" "p" "t" " #3"))
-                 '((link "Mayhem") "/" (link "o") "/" (link "p") "/" (link "t") " #3" "\n"))))
+  (cl-letf (((symbol-function 'mayhem--host) (lambda () "h.example")))
+    (should (equal (mayhem-vui-tests--parts (mayhem-page-heading nil nil nil))
+                   '("h.example" "\n")))
+    (should (equal (mayhem-vui-tests--parts (mayhem-page-heading "o" "p" "t"))
+                   '((link "h.example") "/" (link "o") "/" (link "p") "/" "t" "\n")))
+    (should (equal (mayhem-vui-tests--parts (mayhem-page-heading "o" "p" "t" " #3"))
+                   '((link "h.example") "/" (link "o") "/" (link "p") "/" (link "t") " #3"
+                     "\n")))
+    (should (equal (mayhem-vui-tests--parts
+                    (mayhem-page-heading "o" "p" "stretch-20171101-6-75k-unknown-adv-3"))
+                   '((link "h.example") "/" (link "o") "/" (link "p") "/"
+                     "stretch-2017…known-adv-3" "\n")))))
+
+(defun mayhem-vui-tests--line (max-width parts)
+  "Return the text of the `mayhem-line' of PARTS, on a page MAX-WIDTH wide."
+  (let ((mayhem-max-width max-width))
+    (with-temp-buffer
+      (vui-render (mayhem-line parts))
+      (buffer-substring-no-properties (point-min) (point-max)))))
+
+(ert-deftest mayhem-vui-test-line-fits-page ()
+  ;; Padded to the column's width when the page has room...
+  (should (equal (mayhem-vui-tests--line 40 (list "ab " (mayhem-fit "t" 4) " #1"))
+                 "ab t    #1\n"))
+  ;; ...and cut when it has not.
+  (should (equal (mayhem-vui-tests--line 20 (list "ab " (mayhem-fit "title long name" 30) " #1"))
+                 "ab title long na… #1\n")))
+
+(ert-deftest mayhem-vui-test-cut-middle ()
+  (should (equal (mayhem-cut-middle "short" 10) "short"))
+  (should (equal (mayhem-cut-middle "stretch-20171101-adv-3" 11) "stret…adv-3"))
+  (should (= (string-width (mayhem-cut-middle "stretch-20171101-adv-3" 11)) 11)))
 
 (provide 'mayhem-vui-tests)
 ;;; mayhem-vui-tests.el ends here

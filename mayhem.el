@@ -55,21 +55,20 @@
 
 (defun mayhem-dashboard--workspaces (workspaces)
   "Return the vnodes listing WORKSPACES, as from `mayhem--workspaces'."
-  (apply #'vui-fragment
-         (mapcar (pcase-lambda (`(,owner . ,count))
-                   (mayhem-row (concat "  "
-                                       (propertize (format "%-30s" owner) 'face 'mayhem-project)
+  (let ((width (apply #'max 1 (mapcar (lambda (w) (string-width (car w))) workspaces))))
+    (apply #'vui-fragment
+           (mapcar (pcase-lambda (`(,owner . ,count))
+                     (mayhem-row (list (mayhem-fit (propertize owner 'face 'mayhem-project) width t)
                                        (propertize (format " %3d project%s" count
                                                            (if (= count 1) "" "s"))
-                                                   'face 'mayhem-label)
-                                       "\n")
-                               (lambda () (mayhem-workspace-open owner))
-                               "RET: open workspace"))
-                 workspaces)))
+                                                   'face 'mayhem-label))
+                                 (lambda () (mayhem-workspace-open owner))
+                                 "RET: open workspace"))
+                   workspaces))))
 
-(vui-defcomponent mayhem-dashboard (host)
+(vui-defcomponent mayhem-dashboard ()
   "The dashboard: the workspaces of every project visible to the user.
-HOST is the Mayhem server's, shown with the user logged in."
+Its heading is the Mayhem server's host."
   :render
   (let* ((snapshot (mayhem-sync-use-resource '(projects)))
          (workspaces (mayhem--workspaces (plist-get snapshot :data))))
@@ -78,15 +77,14 @@ HOST is the Mayhem server's, shown with the user logged in."
      (mayhem-snapshot-view (mayhem-sync-use-resource '(me)) "user"
                            (mayhem-skeleton '(("User        " 30)))
                            (lambda (me) (mayhem-field "User" (mayhem--user-label me))))
-     (mayhem-field "Host" host)
      (vui-newline)
      (mayhem-heading (if (plist-get snapshot :fetched-at)
                          (format "Workspaces (%d)" (length workspaces))
                        "Workspaces"))
      (mayhem-snapshot-view snapshot "workspaces"
-                           (mayhem-skeleton '(("  " 14 "  " 11) ("  " 22 "  " 11)
-                                              ("  " 10 "  " 11) ("  " 18 "  " 11)
-                                              ("  " 12 "  " 11) ("  " 16 "  " 11)))
+                           (mayhem-skeleton '((14 "  " 11) (22 "  " 11)
+                                              (10 "  " 11) (18 "  " 11)
+                                              (12 "  " 11) (16 "  " 11)))
                            (lambda (_)
                              (if workspaces
                                  (mayhem-dashboard--workspaces workspaces)
@@ -97,7 +95,7 @@ HOST is the Mayhem server's, shown with the user logged in."
   "Open the Mayhem dashboard."
   (interactive)
   (mayhem-open-page "*mayhem*" #'mayhem-dashboard-mode
-                    (lambda () (vui-component 'mayhem-dashboard :host (mayhem--host)))
+                    (lambda () (vui-component 'mayhem-dashboard))
                     '(dashboard)))
 
 ;;;###autoload

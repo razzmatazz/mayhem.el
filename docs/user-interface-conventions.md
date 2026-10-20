@@ -16,8 +16,10 @@ users expect.
 - Brackets mean an action (`[Stop]`, `[Load more]`); plain text is content.
   A page's own name is never a button.
 - **Walk without a jump.**  A page's heading is a breadcrumb: each part
-  naming an enclosing page (`Mayhem` for the dashboard, then owner,
-  project, target, run) links to it; build it with `mayhem-page-heading`.
+  naming an enclosing page (the server's host for the dashboard, then
+  owner, project, target, run) links to it; build it with
+  `mayhem-page-heading`.  A long name in it is cut in the middle
+  (`mayhem-cut-middle`), whole on hover.
   A field naming another page (`Run  #7`) links to it, with
   `mayhem-page-link` or `mayhem-run-link`.
 - `help-echo` reads `"RET: <imperative>"`, e.g. `"RET: open target"`.
@@ -45,6 +47,17 @@ users expect.
 ## Layout
 
 - Timestamps: relative age (`3 days ago`), exact time in `help-echo`.
+- Table rows, notices and charts start at column 0; only a tree (the
+  workspace's targets under their projects) indents.
+- A page keeps within `mayhem-page-width`: its window's width, at most
+  `mayhem-max-width`.  vui re-renders a page when its window's width
+  changes.  A row whose title or name can be long builds its line with
+  `mayhem-line` parts, the long one a `mayhem-fit` (padded to the
+  table's longest, cut with `…` when the window is too narrow); tab
+  bars span the page width, wrapped text and charts narrow with it.
+- A tab bar is followed directly by what its tab shows, no blank line.
+- What the user may not see (a defect trend outside one's workspaces)
+  is left out, heading and all, not replaced by a notice.
 - Text a user may copy (backtraces, logs) starts at column 0.
 
 ## Windows and buffers

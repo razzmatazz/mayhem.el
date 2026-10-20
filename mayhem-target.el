@@ -34,8 +34,7 @@
   "Return the line of RUN, an alist, as of NOW."
   (let ((all (or (alist-get 'n_testcase_reports run) 0))
         (lines (alist-get 'n_lines_total run)))
-    (concat "  "
-            (format "#%-5s" (or (alist-get 'run_number run) "?"))
+    (concat (format "#%-5s" (or (alist-get 'run_number run) "?"))
             (format " %-10s" (mayhem--run-status run))
             (propertize (if (and lines (> lines 0))
                             (format "%4d%%" (round (* 100.0 (or (alist-get 'n_lines_covered run) 0))
@@ -57,24 +56,23 @@
             "\n")))
 
 (defun mayhem-target--defect-line (defect now)
-  "Return the line of DEFECT, an alist, as of NOW."
-  (let ((level (or (alist-get 'severity_level defect) "")))
-    (concat "  "
-            (propertize (format "%-7s" level) 'face (mayhem-defect-severity-face level))
-            (propertize (format "%4s " (or (alist-get 'severity defect) "")) 'face 'mayhem-label)
-            (or (alist-get 'title defect) "")
-            (propertize (concat (when-let* ((cwe (alist-get 'cwe_number defect)))
-                                  (format "  CWE-%s" cwe))
-                                (format "  #%s" (alist-get 'defect_number defect))
-                                (unless (equal (alist-get 'state defect) "open")
-                                  (format "  %s" (alist-get 'state defect)))
-                                (when-let* ((run (alist-get 'last_seen_run_number defect)))
-                                  (format "  run %s" run))
-                                "  ")
-                        'face 'mayhem-label)
-            (propertize (or (mayhem--format-age (alist-get 'last_seen defect) now) "")
-                        'face 'mayhem-label)
-            "\n")))
+  "Return the line of DEFECT, an alist, as of NOW, as `mayhem-line' parts."
+  (let ((level (or (alist-get 'severity_level defect) ""))
+        (title (or (alist-get 'title defect) "")))
+    (list (propertize (format "%-7s" level) 'face (mayhem-defect-severity-face level))
+          (propertize (format "%4s " (or (alist-get 'severity defect) "")) 'face 'mayhem-label)
+          (mayhem-fit title (string-width title))
+          (propertize (concat (when-let* ((cwe (alist-get 'cwe_number defect)))
+                                (format "  CWE-%s" cwe))
+                              (format "  #%s" (alist-get 'defect_number defect))
+                              (unless (equal (alist-get 'state defect) "open")
+                                (format "  %s" (alist-get 'state defect)))
+                              (when-let* ((run (alist-get 'last_seen_run_number defect)))
+                                (format "  run %s" run))
+                              "  ")
+                      'face 'mayhem-label)
+          (propertize (or (mayhem--format-age (alist-get 'last_seen defect) now) "")
+                      'face 'mayhem-label))))
 
 (defun mayhem-target--render (owner project target data tab on-tab)
   "Return the vnodes of TARGET of PROJECT of OWNER's page, showing DATA.
@@ -108,15 +106,12 @@ nil; ON-TAB is called with the other's key, to show it."
         (when-let* ((suite (alist-get 'n_optimized_set_testcases latest)))
           (mayhem-field "Test suite" (format "%d test case%s" suite (if (= suite 1) "" "s"))))))
      (vui-newline)
-     (vui-component 'mayhem-trend :owner owner :project project :target target)
-     (vui-newline)
+     (mayhem-trend-view owner project target)
      (mayhem-tab-row (mapcar (pcase-lambda (`(,key ,label))
                                (list label (format "RET: show %s" (downcase label))
                                      (unless (eq key shown)
                                        (lambda () (funcall on-tab key)))))
-                             tabs)
-                     70)
-     (vui-newline)
+                             tabs))
      (pcase shown
        ('defects
         (vui-fragment
@@ -155,10 +150,8 @@ nil; ON-TAB is called with the other's key, to show it."
    (mayhem-field "Defects" (mayhem-skeleton-bar 20))
    (mayhem-field "Crashes" (mayhem-skeleton-bar 3))
    (vui-newline)
-   (mayhem-heading "Defect trend")
-   (mayhem-skeleton (make-list mayhem-trend--height (list "       " mayhem-trend--width)))
-   (vui-newline)
-   (mayhem-skeleton (make-list 8 '("  " 6 " " 10 " " 30 "  " 12)))))
+   (mayhem-trend-skeleton)
+   (mayhem-skeleton (make-list 8 '(6 " " 10 " " 30 "  " 12)))))
 
 (vui-defcomponent mayhem-target-page (owner project target)
   "The page of TARGET of PROJECT of OWNER."

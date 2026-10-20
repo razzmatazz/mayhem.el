@@ -43,13 +43,12 @@ RUN is a run of TARGET of PROJECT of OWNER."
                       (let ((level (or (alist-get 'severity_level defect) ""))
                             (number (alist-get 'defect_number defect)))
                         (mayhem-row
-                         (concat "  "
-                                 (propertize (format "%-7s" level)
-                                             'face (mayhem-defect-severity-face level))
-                                 " "
-                                 (or (alist-get 'title defect) "")
-                                 (propertize (format "  #%s" number) 'face 'mayhem-label)
-                                 "\n")
+                         (list (propertize (format "%-7s" level)
+                                           'face (mayhem-defect-severity-face level))
+                               " "
+                               (mayhem-fit (or (alist-get 'title defect) "")
+                                           (string-width (or (alist-get 'title defect) "")))
+                               (propertize (format "  #%s" number) 'face 'mayhem-label))
                          (lambda () (mayhem-defect-open owner project target number run))
                          "RET: open defect")))
                     defects)))))
@@ -101,7 +100,7 @@ RUN is a run of TARGET of PROJECT of OWNER."
    (mayhem-field "Execution" (mayhem-skeleton-bar 6))
    (vui-newline)
    (mayhem-heading "Defects")
-   (mayhem-skeleton '(("  " 6 " " 28) ("  " 6 " " 36) ("  " 6 " " 22)))))
+   (mayhem-skeleton '((6 " " 28) (6 " " 36) (6 " " 22)))))
 
 (vui-defcomponent mayhem-testcase-page (owner project target run sha256)
   "The page of test case SHA256 of RUN of TARGET of PROJECT of OWNER."
@@ -110,7 +109,7 @@ RUN is a run of TARGET of PROJECT of OWNER."
                    (list 'testcase owner project target run sha256))))
     (vui-fragment
      (mayhem-page-heading owner project target " "
-                          (mayhem-run-link owner project target run nil
+                          (mayhem-run-link owner project target run (format "run #%s" run)
                                            '(link mayhem-section-heading))
                           (format " test case %s" (substring sha256 0 (min 8 (length sha256)))))
      (vui-newline)

@@ -48,11 +48,11 @@
               (mapcan
                (lambda (project)
                  (let ((slug (car project)))
-                   (cons (mayhem-row (concat "  " (propertize slug 'face 'mayhem-project) "\n")
+                   (cons (mayhem-row (concat (propertize slug 'face 'mayhem-project) "\n")
                                      (lambda () (mayhem-project-open owner slug))
                                      "RET: open project")
                          (mapcar (lambda (target)
-                                   (mayhem-row (concat "    "
+                                   (mayhem-row (concat "  "
                                                        (propertize target 'face 'mayhem-target)
                                                        "\n")
                                                (lambda () (mayhem-target-open owner slug target))
@@ -64,9 +64,9 @@
   "Return grey bars shaped like a workspace's page, shown until its data lands."
   (vui-fragment
    (mayhem-heading "Projects")
-   (mayhem-skeleton '(("  " 22) ("    " 14) ("    " 20)
-                      ("  " 18) ("    " 10)
-                      ("  " 26) ("    " 16) ("    " 12)))))
+   (mayhem-skeleton '((22) ("  " 14) ("  " 20)
+                      (18) ("  " 10)
+                      (26) ("  " 16) ("  " 12)))))
 
 (vui-defcomponent mayhem-workspace-page (owner)
   "The page of the workspace OWNER."

@@ -23,6 +23,27 @@
 (require 'mayhem-core)
 (require 'mayhem-sync)
 
+(defcustom mayhem-max-width 100
+  "Most columns a page's lines take, or nil for the whole window.
+In a narrower window the pages narrow too: a row gives up columns of
+its title or name, cut with …, and wrapped text wraps sooner."
+  :type '(choice (const :tag "No limit" nil) integer)
+  :group 'mayhem)
+
+(defun mayhem-page-width ()
+  "Return the columns the current page's lines keep within.
+That is what fits a line of the window showing the page, else of the
+selected window, at most `mayhem-max-width'.  vui re-renders a page
+when its window's width changes, so the page follows it.
+
+`window-max-chars-per-line' selects the window, which resets the
+buffer's point to the window's point; mid-render that scrambles the
+page, so point is saved around it."
+  (let ((width (save-excursion
+                 (window-max-chars-per-line (or (get-buffer-window nil t)
+                                                (selected-window))))))
+    (if mayhem-max-width (min width mayhem-max-width) width)))
+
 (defface mayhem-section-heading
   '((t :inherit bold))
   "Face for section headings."
@@ -176,16 +197,68 @@ fresh, as opening a page does."
       (setq mayhem-page page))
     (mayhem-display-buffer buf)))
 
+(defconst mayhem-fit-min-width 10
+  "Fewest columns a `mayhem-fit' part is cut to, so it stays readable.")
+
+(defun mayhem-cut-middle (string width)
+  "Return STRING cut to WIDTH columns by a … in its middle, or STRING if it fits.
+Names differ at either end (`fuzz-foo-1', `fuzz-foo-2'), so both stay."
+  (if (<= (string-width string) width)
+      string
+    (let* ((room (max 0 (1- width)))
+           (head (truncate-string-to-width string (- room (/ room 2))))
+           (start (length string)))
+      (while (and (> start 0)
+                  (<= (string-width (substring string (1- start))) (/ room 2)))
+        (setq start (1- start)))
+      (concat head (apply #'propertize "…" (text-properties-at 0 string))
+              (substring string start)))))
+
+(defun mayhem-fit (string width &optional middle)
+  "Return STRING as the part of a `mayhem-line' that fits it to the page.
+It is padded to WIDTH columns, or, on a page too narrow for the line,
+cut with … to the columns the line's other parts leave, but no fewer
+than `mayhem-fit-min-width'.  With MIDDLE, it is cut in the middle, as
+names are; else at the end, as titles are."
+  (list :fit string width middle))
+
+(defun mayhem-line (parts &optional decorate)
+  "Return a vnode of the line of PARTS, and its newline.
+PARTS are strings, and at most one `mayhem-fit' part, which keeps the
+line within `mayhem-page-width'.  DECORATE, when non-nil, is called on
+each string shown, and returns it to show."
+  (let ((decorate (or decorate #'identity)))
+    (vui-fragment
+     (apply #'vui-flex :width (mayhem-page-width) :spacing 0
+            (mapcar (lambda (part)
+                      (pcase part
+                        (`(:fit ,string ,width ,middle)
+                         (vui-flex-item
+                          (lambda (room)
+                            (let ((fit (min width (max room mayhem-fit-min-width))))
+                              (vui-text (funcall decorate
+                                                 (truncate-string-to-width
+                                                  (if middle (mayhem-cut-middle string fit) string)
+                                                  fit nil ?\s "…")))))))
+                        (_ (vui-text (funcall decorate part)))))
+                    (remq nil parts)))
+     (vui-text (funcall decorate "\n")))))
+
 (defun mayhem-row (line on-visit help-echo)
-  "Return a RET-able row showing LINE, a propertized string ending in newline.
-ON-VISIT is a function of no arguments that RET calls.  HELP-ECHO reads
-\"RET: <imperative>\", such as \"RET: open project\"."
-  (let ((map (make-sparse-keymap)))
+  "Return a RET-able row showing LINE.
+LINE is a propertized string ending in newline, or the parts of a
+`mayhem-line'.  ON-VISIT is a function of no arguments that RET calls.
+HELP-ECHO reads \"RET: <imperative>\", such as \"RET: open project\"."
+  (let ((map (make-sparse-keymap))
+        (decorate (lambda (s)
+                    (mayhem--default-help-echo (propertize s 'mouse-face 'highlight)
+                                               help-echo))))
     (define-key map (kbd "RET") (lambda () (interactive) (funcall on-visit)))
     (define-key map [mouse-1] (lambda () (interactive) (funcall on-visit)))
     (vui-region :keymap map
-      (vui-text (mayhem--default-help-echo (propertize line 'mouse-face 'highlight)
-                                           help-echo)))))
+      (if (stringp line)
+          (vui-text (funcall decorate line))
+        (mayhem-line line decorate)))))
 
 (defun mayhem--default-help-echo (string help-echo)
   "Return a copy of STRING with HELP-ECHO on the parts lacking a `help-echo'.
@@ -225,16 +298,21 @@ FACE is as for `mayhem-page-link'."
                     (lambda () (mayhem-run-open owner project target number))
                     face))
 
+(defconst mayhem-heading-part-width 24
+  "Most columns a name takes in a page's heading; longer ones are cut.")
+
 (defun mayhem-page-heading (owner project target &rest self)
-  "Return a page's heading: Mayhem/OWNER/PROJECT/TARGET, then SELF.
+  "Return a page's heading: HOST/OWNER/PROJECT/TARGET, then SELF.
+HOST is the Mayhem server's, `mayhem--host', naming the dashboard.
 OWNER, PROJECT and TARGET may be nil, from the end.  Each part links
 to its page, the dashboard first, so one can walk up, except the last
-when SELF is empty: that is the page itself.  SELF are strings or
-vnodes, such as a `mayhem-run-link'."
+when SELF is empty: that is the page itself.  A name longer than
+`mayhem-heading-part-width' is cut in the middle, whole on hover.  SELF
+are strings or vnodes, such as a `mayhem-run-link'."
   (let* ((face 'mayhem-section-heading)
          (parts (seq-filter
                  #'car
-                 (list (list "Mayhem" "RET: open dashboard" #'mayhem)
+                 (list (list (or (mayhem--host) "Mayhem") "RET: open dashboard" #'mayhem)
                        (list owner "RET: open workspace"
                              (lambda () (mayhem-workspace-open owner)))
                        (list project "RET: open project"
@@ -245,10 +323,14 @@ vnodes, such as a `mayhem-run-link'."
     (apply #'vui-fragment
            (append
             (cdr (mapcan (pcase-lambda (`(,name ,help ,open))
-                           (list (vui-text "/" :face face)
-                                 (if (and (eq name (car last)) (null self))
-                                     (vui-text name :face face)
-                                   (mayhem-page-link name help open (list 'link face)))))
+                           (let* ((shown (mayhem-cut-middle name mayhem-heading-part-width))
+                                  (cut (not (eq shown name))))
+                             (list (vui-text "/" :face face)
+                                   (if (and (eq name (car last)) (null self))
+                                       (vui-text (if cut (propertize shown 'help-echo name) shown)
+                                                 :face face)
+                                     (mayhem-page-link shown (if cut (concat help " " name) help)
+                                                       open (list 'link face))))))
                          parts))
             (mapcar (lambda (part) (if (stringp part) (vui-text part :face face) part))
                     self)
@@ -306,7 +388,7 @@ links to its page on its host."
 
 (defun mayhem-notice (text &optional face)
   "Return a vnode for TEXT where data would be, in FACE or `shadow'."
-  (vui-text (concat "  " (propertize text 'face (or face 'shadow)) "\n")))
+  (vui-text (concat (propertize text 'face (or face 'shadow)) "\n")))
 
 (defun mayhem-skeleton-bar (width)
   "Return a grey bar WIDTH columns wide, as a string."
@@ -357,8 +439,9 @@ Each frame's number and function, its source below; inlined calls follow."
           frame "\n")))
      frames "\n")))
 
-(defun mayhem-tab-row (tabs width)
+(defun mayhem-tab-row (tabs &optional width)
   "Return a row of TABS underlined across WIDTH columns, as a tab bar.
+WIDTH is `mayhem-page-width' when nil.
 Each tab is (LABEL HELP ON-CLICK); the current one has no ON-CLICK and
 is drawn as a heading, the others as buttons."
   (let* ((nodes (mapcar (pcase-lambda (`(,label ,help ,on-click))
@@ -371,7 +454,8 @@ is drawn as a heading, the others as buttons."
          (used (+ (apply #'+ (mapcar (pcase-lambda (`(,label ,_ ,on-click))
                                        (+ (string-width label) (if on-click 2 0)))
                                      tabs))
-                  (* 2 (1- (length tabs))))))
+                  (* 2 (1- (length tabs)))))
+         (width (or width (mayhem-page-width))))
     ;; One node, so the gaps between the tabs are underlined too.
     (vui-fragment
      (apply #'vui-hstack :spacing 0
@@ -408,6 +492,13 @@ failed: then it says fetching WHAT failed."
 (defconst mayhem-trend--width 60
   "Columns of a defect trend chart, at most.")
 
+(defconst mayhem-trend--margin 5
+  "Columns left of a defect trend chart, for its scale.")
+
+(defun mayhem-trend--chart-width ()
+  "Return the columns of a defect trend chart on the current page."
+  (max 10 (min mayhem-trend--width (- (mayhem-page-width) mayhem-trend--margin))))
+
 (defconst mayhem-trend--height 4
   "Rows of a defect trend chart.")
 
@@ -430,11 +521,12 @@ with none are left out; nil when there are none."
                              mayhem-severities))))
     (and parts (string-join parts ", "))))
 
-(defun mayhem-trend--chart (points window)
+(defun mayhem-trend--chart (points window width)
   "Return the vnodes charting POINTS of a defect trend over WINDOW.
 POINTS are as `mayhem--fetch-defect-trend' gives them; WINDOW is a key
-of `mayhem--trend-windows'.  Active defects are stacked by severity;
-each column's time and counts are its `help-echo'."
+of `mayhem--trend-windows'.  The chart is at most WIDTH columns, its
+scale aside.  Active defects are stacked by severity; each column's
+time and counts are its `help-echo'."
   (cond
    ((eq points 'members-only)
     (mayhem-notice "Only members of the workspace see its defect trend"))
@@ -442,7 +534,7 @@ each column's time and counts are its `help-echo'."
     (mayhem-notice "No data"))
    (t
     (let* ((time-format (nth 4 (assq window mayhem--trend-windows)))
-           (colw (max 1 (/ mayhem-trend--width (length points))))
+           (colw (max 1 (/ width (length points))))
            (count (lambda (p level) (or (alist-get (intern (concat "active_" level)) p) 0)))
            (stacks (mapcar (lambda (p) (mapcar (lambda (l) (funcall count p l))
                                                mayhem-severities))
@@ -459,8 +551,8 @@ each column's time and counts are its `help-echo'."
                                        "")))
                            points stacks))
            (top (apply #'max 0 (mapcar (lambda (s) (apply #'+ s)) stacks)))
-           (margin (max 4 (length (number-to-string top))))
-           (pad (make-string (+ 3 margin) ?\s))
+           (margin (max (1- mayhem-trend--margin) (length (number-to-string top))))
+           (pad (make-string (1+ margin) ?\s))
            (rows (mayhem--stack-rows stacks mayhem-trend--height))
            (width (* colw (length points)))
            (first (funcall time (car points)))
@@ -469,8 +561,7 @@ each column's time and counts are its `help-echo'."
        (concat
         (mapconcat
          (lambda (row)
-           (concat "  "
-                   (propertize (format (format "%%%ds " margin) (if (eq row (car rows)) top ""))
+           (concat (propertize (format (format "%%%ds " margin) (if (eq row (car rows)) top ""))
                                'face 'mayhem-label)
                    (apply #'concat
                           (seq-mapn (pcase-lambda (`(,char . ,layer) tip)
@@ -494,12 +585,23 @@ each column's time and counts are its `help-echo'."
                        mayhem-severities "  ")
         "\n"))))))
 
+(defun mayhem-trend-skeleton ()
+  "Return grey bars shaped like a defect trend, and the blank line after."
+  (vui-fragment
+   (mayhem-heading "Defect trend")
+   (mayhem-skeleton (make-list mayhem-trend--height
+                               (list (make-string mayhem-trend--margin ?\s)
+                                     (mayhem-trend--chart-width))))
+   (vui-newline)))
+
 (vui-defcomponent mayhem-trend (owner project target)
   "The defect trend of TARGET of PROJECT of OWNER, with its window selector.
-Of the whole PROJECT when TARGET is nil."
+Of the whole PROJECT when TARGET is nil.  Then a blank line.  Pages
+show it through `mayhem-trend-view'."
   :state ((window 'month))
   :render
-  (let ((snapshot (mayhem-sync-use-resource (list 'defect-trend owner project target window))))
+  (let ((snapshot (mayhem-sync-use-resource (list 'defect-trend owner project target window)))
+        (width (mayhem-trend--chart-width)))
     (vui-fragment
      (mayhem-heading "Defect trend")
      (mayhem-tab-row (mapcar (pcase-lambda (`(,key ,label . ,_))
@@ -507,12 +609,24 @@ Of the whole PROJECT when TARGET is nil."
                                      (unless (eq key window)
                                        (lambda () (vui-set-state :window key)))))
                              mayhem--trend-windows)
-                     mayhem-trend--width)
-     (vui-newline)
+                     (+ mayhem-trend--margin width))
      (mayhem-snapshot-view snapshot "defect trend"
                            (mayhem-skeleton (make-list mayhem-trend--height
-                                                       (list "       " mayhem-trend--width)))
-                           (lambda (points) (mayhem-trend--chart points window))))))
+                                                       (list (make-string mayhem-trend--margin ?\s)
+                                                             width)))
+                           (lambda (points) (mayhem-trend--chart points window width)))
+     (vui-newline))))
+
+(defun mayhem-trend-view (owner project target)
+  "Return the `mayhem-trend' of TARGET of PROJECT of OWNER, for a page.
+Nil for one who may not see it, so not a member of the workspace: the
+page leaves it out.  The page decides, not the component, as vui wipes
+the buffer when a component that rendered nothing re-renders alone."
+  (unless (eq (plist-get (mayhem-sync-use-resource
+                          (list 'defect-trend owner project target 'month))
+                         :data)
+              'members-only)
+    (vui-component 'mayhem-trend :owner owner :project project :target target)))
 
 (provide 'mayhem-vui)
 ;;; mayhem-vui.el ends here
