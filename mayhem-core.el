@@ -20,6 +20,7 @@
 (require 'url)
 (require 'url-http)
 (require 'url-parse)
+(require 'eldoc)
 (require 'iso8601)
 
 (defvar url-http-response-status)
@@ -198,9 +199,10 @@ order.  Targets of other projects are dropped."
 
 ;; A page is named by a list (KIND ARGS...): (dashboard), (workspace
 ;; OWNER), (project OWNER PROJECT), (target OWNER PROJECT TARGET), (run
-;; OWNER PROJECT TARGET NUMBER) or (defect OWNER PROJECT TARGET NUMBER
-;; RUN).  Links to the web app map to pages and back.  Its routes come
-;; from its JS bundle; "-" starts a segment that is not a slug.
+;; OWNER PROJECT TARGET NUMBER), (defect OWNER PROJECT TARGET NUMBER
+;; RUN) or (testcase OWNER PROJECT TARGET RUN SHA256).  Links to the web
+;; app map to pages and back.  Its routes come from its JS bundle; "-"
+;; starts a segment that is not a slug.
 
 (defun mayhem--url-number (string)
   "Return STRING as a number if it is all digits, else nil."
@@ -229,6 +231,9 @@ Nil also when URL is on another host, or shows something no page does."
           (`(,o) (list 'workspace o))
           (`(,o ,p) (list 'project o p))
           (`(,o ,p ,tg) (list 'target o p tg))
+          (`(,o ,p ,tg ,(app mayhem--url-number (and n (pred identity))) "tests")
+           (when-let* ((sha (cadr (assoc "testcase" params))))
+             (list 'testcase o p tg n sha)))
           (`(,o ,p ,tg ,(app mayhem--url-number (and n (pred identity))) . ,(or 'nil '("defects")))
            (if defect (list 'defect o p tg defect n) (list 'run o p tg n))))))))
 
@@ -242,6 +247,9 @@ Nil also when URL is on another host, or shows something no page does."
       (if run
           (format "%s?defect=%s" (mayhem--path "/%s/%s/%s/%s" o p tg (format "%s" run)) n)
         (mayhem--path "/%s/%s/%s/-/defects/%s" o p tg (format "%s" n))))
+     (`(testcase ,o ,p ,tg ,run ,sha)
+      (format "%s?testcase=%s" (mayhem--path "/%s/%s/%s/%s/tests" o p tg (format "%s" run))
+              (url-hexify-string sha)))
      (`(,_ . ,args)
       (apply #'mayhem--path (mapconcat (lambda (_) "/%s") args "")
              (mapcar (lambda (a) (format "%s" a)) args))))))
@@ -348,14 +356,39 @@ message."
 (defconst mayhem--run-fields
   '(run_id run_number description pending started stopped ended failed
            started_at ended_at duration started_by branch_name revision
-           scm_commit_subject n_defects tests_run edges_covered api_run)
+           scm_commit_subject n_defects tests_run tests_per_second edges_covered
+           api_run docker_pullable fetched_docker_image_digest
+           n_exploitability_factors_passing n_exploitability_factors_total
+           n_testcase_reports n_regression_testcase_reports
+           n_regression_defect_reports n_optimized_set_testcases
+           ;; From its `run_attributes'.
+           n_lines_covered n_lines_total n_blocks_covered n_blocks_total
+           n_functions_covered n_functions_total)
   "Fields of a run kept for its page.")
 
+(defun mayhem--counts (data)
+  "Return the `stats' of DATA, a count over time, as (TIMESTAMP . COUNT)."
+  (mapcar (lambda (p) (cons (alist-get 'timestamp p) (alist-get 'count p)))
+          (alist-get 'stats data)))
+
+(defun mayhem--testcase-summary (report)
+  "Return test case REPORT, as the API lists it, trimmed for a run's page.
+Its defects are counted by severity, as `high', `medium' and `low'."
+  (let ((levels (mapcar (lambda (d) (alist-get 'severity_level d))
+                        (alist-get 'defects report))))
+    (append (mayhem--pick report '(sha256 is_regression n_defects execution_time
+                                          created_at))
+            (mapcar (lambda (level)
+                      (cons (intern level) (seq-count (lambda (l) (equal l level)) levels)))
+                    '("high" "medium" "low")))))
+
 (defun mayhem--fetch-run (owner project target number callback)
-  "Fetch run NUMBER of TARGET of PROJECT of OWNER, with its defects.
-An API run's endpoints come too.  Call CALLBACK with (OK DATA): DATA is
-an alist with `run', `defects' and `endpoints' (nil for a code run),
-each trimmed to the fields its page shows, or an error message."
+  "Fetch run NUMBER of TARGET of PROJECT of OWNER, with its defects and events.
+An API run's endpoints come too; a code run's progress and failing
+tests.  Call CALLBACK with (OK DATA): DATA is an alist with `run',
+`defects', `events', `endpoints', `progress' and `tests' (nil when the
+run has none), each trimmed to the fields its page shows, or an error
+message."
   (let ((path (mayhem--path "/api/v2/owner/%s/project/%s/target/%s/run/%s"
                             owner project target (format "%s" number))))
     (mayhem--api-get
@@ -367,7 +400,8 @@ each trimmed to the fields its page shows, or an error message."
            (mayhem--fetch-each
             `((run . ,(lambda (cb)
                         (funcall cb t (mayhem--pick
-                                       (cons (cons 'api_run (and api t)) run)
+                                       (append (list (cons 'api_run (and api t)))
+                                               run (alist-get 'run_attributes run))
                                        mayhem--run-fields))))
               ;; Defects filter on the run's id, not its number.
               (defects . ,(lambda (cb)
@@ -394,7 +428,44 @@ each trimmed to the fields its page shows, or an error message."
                                                                     e '(method path passing
                                                                         covered defects_total)))
                                                                  data)
-                                                    data))))))))
+                                                    data)))))))
+              (events . ,(lambda (cb)
+                           (mayhem--api-get-all
+                            (concat path "/event") 'events
+                            (lambda (ok data)
+                              (funcall cb ok (if ok (mapcar (lambda (e)
+                                                              (mayhem--pick
+                                                               e '(created_at event_level
+                                                                   event_phase event_desc)))
+                                                            data)
+                                               data))))))
+              ;; How many test cases were processed and defects found by
+              ;; when, to chart; each a list of (TIMESTAMP . COUNT).
+              (progress . ,(lambda (cb)
+                             (if api
+                                 (funcall cb t nil)
+                               (mayhem--fetch-each
+                                (mapcar (pcase-lambda (`(,key . ,endpoint))
+                                          (cons key (lambda (cb)
+                                                      (mayhem--api-get
+                                                       (concat path endpoint) nil
+                                                       (lambda (ok data)
+                                                         (funcall cb ok (if ok (mayhem--counts data)
+                                                                          data)))))))
+                                        '((testcases . "/testcase_over_time")
+                                          (defects . "/defect_over_time")))
+                                cb))))
+              ;; Only the failing ones: the rest are many and their
+              ;; reports are large.
+              (tests . ,(lambda (cb)
+                          (if api
+                              (funcall cb t nil)
+                            (mayhem--api-get-all
+                             (concat path "/testcase-result") 'testcase_reports
+                             (lambda (ok data)
+                               (funcall cb ok (if ok (mapcar #'mayhem--testcase-summary data)
+                                                data)))
+                             '((crashes_only "true")))))))
             callback)))))))
 
 (defconst mayhem--defect-fields
@@ -503,6 +574,97 @@ case's crash."
                                 (funcall done ok (if ok (mayhem--code-evidence reports) reports)))))
             (t (funcall done t nil)))))))))
 
+(defconst mayhem--testcase-fields
+  '(sha256 is_regression crashed crash_type signal_number faulting_address
+           n_valgrind_errors execution_time created_at repro_cmdline
+           hexdump output)
+  "Fields of a test case kept for its page.")
+
+(defun mayhem--fetch-testcase (owner project target run sha256 callback)
+  "Fetch the test case SHA256 of RUN of TARGET of PROJECT of OWNER.
+Call CALLBACK with (OK DATA): DATA is an alist with `testcase', its
+defects, frames and backtrace, trimmed to what its page shows, and the
+`run''s start, or an error message."
+  (let ((path (mayhem--path "/api/v2/owner/%s/project/%s/target/%s/run/%s"
+                            owner project target (format "%s" run))))
+    (mayhem--fetch-each
+     `((testcase . ,(lambda (cb)
+                      (mayhem--api-get
+                       (concat path (mayhem--path "/testcase_report/%s" sha256)) nil
+                       (lambda (ok report)
+                         (funcall
+                          cb ok
+                          (if (not ok)
+                              report
+                            (append
+                             (mayhem--pick report mayhem--testcase-fields)
+                             (list
+                              (cons 'defects
+                                    (mapcar (lambda (d)
+                                              (mayhem--pick d '(defect_number severity_level
+                                                                              title)))
+                                            (alist-get 'defects report)))
+                              (cons 'frames (mayhem--backtrace-frames
+                                             (alist-get 'parsed_backtrace report)))
+                              (cons 'backtrace
+                                    (when-let* ((bt (alist-get 'backtrace report)))
+                                      (truncate-string-to-width bt mayhem--evidence-max
+                                                                nil nil "…")))))))))))
+       (run . ,(lambda (cb)
+                 (mayhem--api-get path nil
+                                  (lambda (ok run)
+                                    (funcall cb ok (if ok (mayhem--pick run '(started_at))
+                                                     run)))))))
+     callback)))
+
+(defun mayhem--split-command (cmd)
+  "Return shell command CMD with each of its commands on its own line.
+Lines end in a backslash, so the text still pastes into a shell whole.
+Quoting is ignored: Mayhem's command lines don't quote separators."
+  ;; The character before the separator keeps 2>&1 whole.
+  (replace-regexp-in-string "\\([^<>&|;]\\(?:;\\|&&?\\|||?\\)\\)[ \t]+"
+                            "\\1 \\\\\n  " cmd))
+
+(defun mayhem--format-elapsed (seconds)
+  "Return SECONDS as a clock, \"5:07\" or \"1:02:03\"."
+  (let* ((s (max 0 (truncate seconds))) (h (/ s 3600)) (m (/ (% s 3600) 60)))
+    (if (> h 0)
+        (format "%d:%02d:%02d" h m (% s 60))
+      (format "%d:%02d" m (% s 60)))))
+
+(defun mayhem--elapsed (timestamp start)
+  "Return the seconds from START to TIMESTAMP, both ISO 8601 strings."
+  (float-time (time-subtract (encode-time (iso8601-parse timestamp))
+                             (encode-time (iso8601-parse start)))))
+
+(defun mayhem--step-series (points span width)
+  "Return the values of POINTS over SPAN seconds, sampled WIDTH times.
+POINTS are (SECONDS . VALUE), by time.  Each sample is the value of the
+last point by its end, 0 before the first, as in the web app's chart."
+  (let ((span (max 1 span)))
+    (mapcar (lambda (i)
+              (let ((at (* span (/ (1+ i) (float width)))) (v 0))
+                (dolist (p points v)
+                  (when (<= (car p) at) (setq v (cdr p))))))
+            (number-sequence 0 (1- width)))))
+
+(defconst mayhem--bar-chars " ▁▂▃▄▅▆▇█"
+  "A bar's top, by how many eighths of a row it fills.")
+
+(defun mayhem--bar-rows (values height)
+  "Return VALUES as a bar chart HEIGHT rows tall, a string per row, top first.
+Bars scale to the largest value; any value above 0 shows."
+  (let* ((top (max 1 (apply #'max 0 values)))
+         (eighths (mapcar (lambda (v)
+                            (if (> v 0) (max 1 (round (* 8 height v) top)) 0))
+                          values)))
+    (mapcar (lambda (row)
+              (apply #'string
+                     (mapcar (lambda (e)
+                               (aref mayhem--bar-chars (min 8 (max 0 (- e (* 8 row))))))
+                             eighths)))
+            (number-sequence (1- height) 0 -1))))
+
 (defun mayhem--format-duration (seconds)
   "Return SECONDS as \"1h 5m\", \"3m 20s\" or \"45s\"; nil gives nil."
   (when seconds
@@ -522,20 +684,41 @@ case's crash."
 
 (defun mayhem--format-age (timestamp now)
   "Return how long before NOW, a time value, TIMESTAMP was, as \"3 days ago\".
-TIMESTAMP is an ISO 8601 string, as the API gives; nil gives nil."
+TIMESTAMP is an ISO 8601 string, as the API gives; nil gives nil.  The
+exact local time is the `help-echo' (mouse hover) and `mayhem-ts'
+\(ElDoc at point, see `mayhem--ts-eldoc-setup') of the text."
   (when timestamp
-    (let ((secs (float-time (time-subtract now (encode-time (iso8601-parse timestamp))))))
-      (pcase-let ((`(,n ,unit)
-                   (cond ((< secs 60) '(0 nil))
-                         ((< secs 3600) (list (/ secs 60) "minute"))
-                         ((< secs 86400) (list (/ secs 3600) "hour"))
-                         ((< secs (* 30 86400)) (list (/ secs 86400) "day"))
-                         ((< secs (* 365 86400)) (list (/ secs (* 30 86400)) "month"))
-                         (t (list (/ secs (* 365 86400)) "year")))))
-        (if (null unit)
-            "just now"
-          (let ((n (truncate n)))
-            (format "%d %s%s ago" n unit (if (= n 1) "" "s"))))))))
+    (let* ((time (encode-time (iso8601-parse timestamp)))
+           (exact (format-time-string "%a %Y-%m-%d %H:%M:%S %Z" time)))
+      (propertize (mayhem--age-text (float-time (time-subtract now time)))
+                  'help-echo exact 'mayhem-ts exact))))
+
+(defun mayhem--age-text (secs)
+  "Return SECS seconds as an age, such as \"3 days ago\"."
+  (pcase-let ((`(,n ,unit)
+               (cond ((< secs 60) '(0 nil))
+                     ((< secs 3600) (list (/ secs 60) "minute"))
+                     ((< secs 86400) (list (/ secs 3600) "hour"))
+                     ((< secs (* 30 86400)) (list (/ secs 86400) "day"))
+                     ((< secs (* 365 86400)) (list (/ secs (* 30 86400)) "month"))
+                     (t (list (/ secs (* 365 86400)) "year")))))
+    (if (null unit)
+        "just now"
+      (let ((n (truncate n)))
+        (format "%d %s%s ago" n unit (if (= n 1) "" "s"))))))
+
+(defun mayhem--ts-eldoc (&rest _)
+  "Return the exact time of the timestamp at point, or nil.
+An `eldoc-documentation-functions' member."
+  (get-text-property (point) 'mayhem-ts))
+
+(defun mayhem--ts-eldoc-setup ()
+  "Show the exact time of the timestamp at point in the echo area.
+Call from a major-mode body.  ElDoc shows it after `eldoc-idle-delay'
+when `global-eldoc-mode' is on (the default)."
+  (add-hook 'eldoc-documentation-functions #'mayhem--ts-eldoc nil t)
+  ;; vui motions, so ElDoc reacts to them like to `next-line'.
+  (eldoc-add-command-completions "vui-forward" "vui-backward"))
 
 (provide 'mayhem-core)
 ;;; mayhem-core.el ends here

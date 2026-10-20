@@ -38,8 +38,7 @@
                       'face 'mayhem-label)
           " "
           (propertize (or (mayhem--format-age (alist-get 'created_at run) now) "")
-                      'face 'mayhem-label
-                      'help-echo (alist-get 'created_at run))
+                      'face 'mayhem-label)
           "\n"))
 
 (defun mayhem-target--render (owner project target data)

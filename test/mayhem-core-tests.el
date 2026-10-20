@@ -119,6 +119,37 @@
     (should (equal (mayhem--format-age "2024-10-01T12:00:00+00:00" now) "2 years ago"))
     (should-not (mayhem--format-age nil now))))
 
+(ert-deftest mayhem-core-test-format-age-exact-time ()
+  (let* ((now (encode-time (iso8601-parse "2026-10-19T12:00:00+00:00")))
+         (age (mayhem--format-age "2026-10-16T12:00:00+00:00" now))
+         (exact (format-time-string "%a %Y-%m-%d %H:%M:%S %Z"
+                                    (encode-time (iso8601-parse "2026-10-16T12:00:00+00:00")))))
+    (should (equal (get-text-property 0 'help-echo age) exact))
+    (should (equal (get-text-property 0 'mayhem-ts age) exact))))
+
+(ert-deftest mayhem-core-test-format-elapsed ()
+  (should (equal (mayhem--format-elapsed 0) "0:00"))
+  (should (equal (mayhem--format-elapsed 292.9) "4:52"))
+  (should (equal (mayhem--format-elapsed 3723) "1:02:03")))
+
+(ert-deftest mayhem-core-test-step-series ()
+  ;; Each of 4 steps of 10 s takes the last point by its end.
+  (should (equal (mayhem--step-series '((0 . 1) (12 . 5) (31 . 9)) 40 4) '(1 5 5 9)))
+  (should (equal (mayhem--step-series '((15 . 2)) 40 4) '(0 2 2 2)))
+  (should (equal (mayhem--step-series nil 40 2) '(0 0))))
+
+(ert-deftest mayhem-core-test-bar-rows ()
+  (should (equal (mayhem--bar-rows '(0 1 4 8) 1) '(" ▁▄█")))
+  (should (equal (mayhem--bar-rows '(0 1 8) 2) '("  █" " ▂█"))))
+
+(ert-deftest mayhem-core-test-testcase-summary ()
+  (should (equal (mayhem--testcase-summary
+                  '((sha256 . "ab") (n_defects . 3) (is_regression) (maps . "big")
+                    (defects ((severity_level . "high")) ((severity_level . "medium"))
+                             ((severity_level . "high")))))
+                 '((sha256 . "ab") (is_regression) (n_defects . 3) (execution_time)
+                   (created_at) (high . 2) (medium . 1) (low . 0)))))
+
 (ert-deftest mayhem-core-test-format-duration ()
   (should (equal (mayhem--format-duration 45) "45s"))
   (should (equal (mayhem--format-duration 200) "3m 20s"))
@@ -182,13 +213,17 @@
                    '(defect "o" "p" "t" 34 2)))
     (should-not (mayhem--url-page "https://app.mayhem.security/-/settings/user" h))
     (should-not (mayhem--url-page "https://app.mayhem.security/o/-/projects" h))
+    (should (equal (mayhem--url-page (concat base "/1/tests?testcase=ab12") h)
+                   '(testcase "o" "p" "t" 1 "ab12")))
+    (should-not (mayhem--url-page (concat base "/1/tests") h))
     (should-not (mayhem--url-page (concat base "/1/testcases/ab") h))
     (should-not (mayhem--url-page "https://example.com/o" h))
     (should-not (mayhem--url-page "mailto:x@app.mayhem.security" h))))
 
 (ert-deftest mayhem-core-test-page-url-round-trips ()
   (dolist (page '((dashboard) (workspace "o") (project "o" "p") (target "o" "p" "t")
-                  (run "o" "p" "t" 1) (defect "o" "p" "t" 34 1) (defect "o" "p" "t" 34 nil)))
+                  (run "o" "p" "t" 1) (defect "o" "p" "t" 34 1) (defect "o" "p" "t" 34 nil)
+                  (testcase "o" "p" "t" 1 "ab12")))
     (should (equal (mayhem--url-page (mayhem--page-url "https://app.mayhem.security/" page)
                                      "app.mayhem.security")
                    page)))

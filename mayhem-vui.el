@@ -18,6 +18,7 @@
 
 (require 'browse-url)
 (require 'seq)
+(require 'subr-x)
 (require 'vui)
 (require 'mayhem-core)
 (require 'mayhem-sync)
@@ -147,7 +148,8 @@ A browser even when `mayhem-open-urls' would bring the link back here."
 (define-derived-mode mayhem-page-mode vui-mode "Mayhem"
   "Base mode of every mayhem.el page."
   ;; So `revert-buffer', and `gr' under Evil, refresh as `g' does.
-  (setq-local revert-buffer-function #'mayhem-sync-revert-buffer))
+  (setq-local revert-buffer-function #'mayhem-sync-revert-buffer)
+  (mayhem--ts-eldoc-setup))
 
 (defun mayhem-open-page (name mode component &optional page)
   "Show the page buffer NAME, in MODE, with COMPONENT's vnode.
@@ -177,7 +179,19 @@ ON-VISIT is a function of no arguments that RET calls.  HELP-ECHO reads
     (define-key map (kbd "RET") (lambda () (interactive) (funcall on-visit)))
     (define-key map [mouse-1] (lambda () (interactive) (funcall on-visit)))
     (vui-region :keymap map
-      (vui-text (propertize line 'mouse-face 'highlight 'help-echo help-echo)))))
+      (vui-text (mayhem--default-help-echo (propertize line 'mouse-face 'highlight)
+                                           help-echo)))))
+
+(defun mayhem--default-help-echo (string help-echo)
+  "Return a copy of STRING with HELP-ECHO on the parts lacking a `help-echo'.
+So a timestamp in a row keeps its exact time on hover."
+  (let ((s (copy-sequence string)) (pos 0))
+    (while (< pos (length s))
+      (let ((next (next-single-property-change pos 'help-echo s (length s))))
+        (unless (get-text-property pos 'help-echo s)
+          (put-text-property pos next 'help-echo help-echo s))
+        (setq pos next)))
+    s))
 
 (defun mayhem-field (label value)
   "Return a vnode for a LABEL: VALUE line of a page's header."
@@ -206,6 +220,64 @@ an indent or a field label."
                                             row "")
                                  "\n"))
                        rows "")))
+
+(defun mayhem-block (title text)
+  "Return a section TITLE with TEXT below it from column 0, for copying.
+Nothing when TEXT is empty."
+  (when (and text (not (string-empty-p (string-trim text))))
+    (vui-fragment
+     (vui-newline)
+     (mayhem-heading title)
+     (vui-text (concat (string-trim-right text) "\n")))))
+
+(defun mayhem-backtrace (frames)
+  "Return FRAMES, as `mayhem--backtrace-frames' gives them, as text.
+Each frame's number and function, its source below; inlined calls follow."
+  (let ((n -1))
+    (mapconcat
+     (lambda (frame)
+       (setq n (1+ n))
+       (let ((first t))
+         (mapconcat
+          (pcase-lambda (`(,fn . ,src))
+            (concat (if (not first)
+                        (propertize "    inlined by " 'face 'mayhem-label)
+                      (setq first nil)
+                      (propertize (format "#%-3d" n) 'face 'mayhem-label))
+                    ;; Dim a Rust symbol's +0x offset.
+                    (if (string-match "\\+0x[[:xdigit:]]+\\'" fn)
+                        (concat (propertize (substring fn 0 (match-beginning 0))
+                                            'face 'mayhem-target)
+                                (propertize (match-string 0 fn) 'face 'mayhem-label))
+                      (propertize fn 'face 'mayhem-target))
+                    (when src
+                      (concat "\n      " (propertize src 'face 'mayhem-label)))))
+          frame "\n")))
+     frames "\n")))
+
+(defun mayhem-tab-row (tabs width)
+  "Return a row of TABS underlined across WIDTH columns, as a tab bar.
+Each tab is (LABEL HELP ON-CLICK); the current one has no ON-CLICK and
+is drawn as a heading, the others as buttons."
+  (let* ((nodes (mapcar (pcase-lambda (`(,label ,help ,on-click))
+                          (if on-click
+                              (vui-button label :face '(mayhem-label underline)
+                                          :help-echo help :on-click on-click)
+                            (vui-text label :face '(mayhem-section-heading underline))))
+                        tabs))
+         ;; Buttons are drawn in brackets.
+         (used (+ (apply #'+ (mapcar (pcase-lambda (`(,label ,_ ,on-click))
+                                       (+ (string-width label) (if on-click 2 0)))
+                                     tabs))
+                  (* 2 (1- (length tabs))))))
+    ;; One node, so the gaps between the tabs are underlined too.
+    (vui-fragment
+     (apply #'vui-hstack :spacing 0
+            (append (cdr (mapcan (lambda (n) (list (vui-text "  " :face 'underline) n))
+                                 nodes))
+                    (list (vui-text (make-string (max 0 (- width used)) ?\s)
+                                    :face 'underline))))
+     (vui-newline))))
 
 (defun mayhem-snapshot-view (snapshot what skeleton render)
   "Return the vnode of a page part showing SNAPSHOT, a sync snapshot.

@@ -44,6 +44,7 @@
 (require 'mayhem-target)
 (require 'mayhem-defect)
 (require 'mayhem-run)
+(require 'mayhem-testcase)
 (require 'mayhem-search)
 
 (mayhem-sync-define-resource me ()
@@ -120,7 +121,8 @@ Candidates are \"owner\", \"owner/project\" and \"owner/project/target\"."
     (`(project . ,args) (apply #'mayhem-project-open args))
     (`(target . ,args) (apply #'mayhem-target-open args))
     (`(run . ,args) (apply #'mayhem-run-open args))
-    (`(defect . ,args) (apply #'mayhem-defect-open args))))
+    (`(defect . ,args) (apply #'mayhem-defect-open args))
+    (`(testcase . ,args) (apply #'mayhem-testcase-open args))))
 
 (defun mayhem--url-handled-p (url)
   "Return non-nil if URL is a link to a page of the configured web app."

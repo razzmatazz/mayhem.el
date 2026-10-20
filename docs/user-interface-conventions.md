@@ -10,6 +10,7 @@ users expect.
 | The whole line opens something | RET-able row: `vui-text` in a `vui-region` with a RET keymap, `mouse-face 'highlight`, `help-echo` |
 | One control among others on a line | `vui-button` |
 | A foldable block | `vui-collapsible` |
+| Parts of a page shown one at a time | `mayhem-tab-row`: the current tab a heading, the others buttons, kept in the page's state |
 
 - Brackets mean an action (`[Stop]`, `[Load more]`); plain text is content.
   A page's identity (`project/target`) is never a button.

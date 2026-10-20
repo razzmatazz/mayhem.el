@@ -39,48 +39,6 @@
     ("medium" 'warning)
     (_ 'mayhem-label)))
 
-(defun mayhem-defect--block (title text)
-  "Return a section TITLE with TEXT below it from column 0, for copying.
-Nothing when TEXT is empty."
-  (when (and text (not (string-empty-p (string-trim text))))
-    (vui-fragment
-     (vui-newline)
-     (mayhem-heading title)
-     (vui-text (concat (string-trim-right text) "\n")))))
-
-(defun mayhem-defect--frames (frames)
-  "Return FRAMES, as `mayhem--backtrace-frames' gives them, as text.
-Each frame's number and function, its source below; inlined calls follow."
-  (let ((n -1))
-    (mapconcat
-     (lambda (frame)
-       (setq n (1+ n))
-       (let ((first t))
-         (mapconcat
-          (pcase-lambda (`(,fn . ,src))
-            (concat (if (not first)
-                        (propertize "    inlined by " 'face 'mayhem-label)
-                      (setq first nil)
-                      (propertize (format "#%-3d" n) 'face 'mayhem-label))
-                    ;; Dim a Rust symbol's +0x offset.
-                    (if (string-match "\\+0x[[:xdigit:]]+\\'" fn)
-                        (concat (propertize (substring fn 0 (match-beginning 0))
-                                            'face 'mayhem-target)
-                                (propertize (match-string 0 fn) 'face 'mayhem-label))
-                      (propertize fn 'face 'mayhem-target))
-                    (when src
-                      (concat "\n      " (propertize src 'face 'mayhem-label)))))
-          frame "\n")))
-     frames "\n")))
-
-(defun mayhem-defect--split-command (cmd)
-  "Return shell command CMD with each of its commands on its own line.
-Lines end in a backslash, so the text still pastes into a shell whole.
-Quoting is ignored: Mayhem's command lines don't quote separators."
-  ;; The character before the separator keeps 2>&1 whole.
-  (replace-regexp-in-string "\\([^<>&|;]\\(?:;\\|&&?\\|||?\\)\\)[ \t]+"
-                            "\\1 \\\\\n  " cmd))
-
 (defun mayhem-defect--evidence-fields (source evidence)
   "Return the fields of EVIDENCE of a defect from SOURCE, \"api\" or \"code\"."
   (pcase source
@@ -105,17 +63,17 @@ SOURCE is \"api\" or \"code\"."
   (pcase source
     ("api"
      (vui-fragment
-      (mayhem-defect--block "Request" (alist-get 'request evidence))
-      (mayhem-defect--block "Response" (alist-get 'response evidence))
-      (mayhem-defect--block "Stack trace" (alist-get 'stacktrace evidence))))
+      (mayhem-block "Request" (alist-get 'request evidence))
+      (mayhem-block "Response" (alist-get 'response evidence))
+      (mayhem-block "Stack trace" (alist-get 'stacktrace evidence))))
     ("code"
      (vui-fragment
-      (mayhem-defect--block "Reproduce"
+      (mayhem-block "Reproduce"
                             (when-let* ((cmd (alist-get 'repro_cmdline evidence)))
-                              (mayhem-defect--split-command cmd)))
-      (mayhem-defect--block "Backtrace"
+                              (mayhem--split-command cmd)))
+      (mayhem-block "Backtrace"
                             (if-let* ((frames (alist-get 'frames evidence)))
-                                (mayhem-defect--frames frames)
+                                (mayhem-backtrace frames)
                               (alist-get 'backtrace evidence)))))))
 
 (defun mayhem-defect--render (data)
@@ -140,7 +98,7 @@ SOURCE is \"api\" or \"code\"."
      (when-let* ((run (alist-get 'run data)))
        (mayhem-field "Run" (format "#%s" run)))
      (mayhem-defect--evidence-fields (alist-get 'source defect) (alist-get 'evidence data))
-     (mayhem-defect--block "Description"
+     (mayhem-block "Description"
                            (string-fill (or (alist-get 'description defect) "")
                                         mayhem-defect--fill-width))
      (mayhem-defect--evidence-blocks (alist-get 'source defect) (alist-get 'evidence data)))))

@@ -44,12 +44,20 @@ fallback only for what the API cannot do (none so far).
 | `GET .../target/{target}/run/{number}` | run page |
 | `GET /api/v2/owner/{owner}/project/{project}/defect?run={run_id}` | run page's defects |
 | `GET .../run/{number}/endpoints` | an API run page's endpoints |
+| `GET .../run/{number}/event` | run page's event log |
+| `GET .../run/{number}/testcase_over_time`, `.../defect_over_time` | code run page's progress chart |
+| `GET .../run/{number}/testcase-result?crashes_only=true` | code run page's failing tests |
+| `GET .../run/{number}/testcase_report/{sha256}` | test case page |
 | `GET .../target/{target}/defect/{number}` | defect page |
 | `GET .../target/{target}/run/{run}/api/rest/issue/{defect}` | API defect's stack trace, request and response (base64) |
 | `GET .../target/{target}/defect/{number}/testcase_report?per_page=1` | code defect's crash, backtrace and reproducer |
 
 - The defect list's `run` filter takes the run's `run_id`, not its
   number; with a number it silently returns nothing.
+- A run's coverage counts (`n_lines_covered` and the like) are under its
+  `run_attributes`.
+- `testcase-result` reports are large (the target's memory maps, ~4 KB
+  each), so the run page fetches only the failing ones.
 
 - `GET /api/v2/owner/{owner}/project` answers only members of the
   workspace (404 "No resource found ... has access to"), so workspace

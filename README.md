@@ -28,14 +28,19 @@ data.
 RET opens what is at point in the same window; S-RET opens it in
 another window.  A workspace's page lists its projects with their
 targets, a project's page its details and targets, and a target's page
-its latest runs; RET on a run opens its page, with its defects and,
-for an API run, its endpoints.  RET on a defect opens its page: its CWE
-and description, and its evidence: the stack trace, request and
-response of an API defect, or the backtrace and reproducer of a crash.
+its latest runs; RET on a run opens its page.  A code run's page charts
+the test cases processed and defects found over time; below, in tabs,
+are its defects, tests (counts and failing test cases), coverage and
+event log, or for an API run its defects, endpoints and event log.  A run page refetches every 10
+seconds (`mayhem-run-refresh-interval`) while the run is going.  RET on
+a defect opens its page: its CWE and description, and its evidence: the
+stack trace, request and response of an API defect, or the backtrace
+and reproducer of a crash.  RET on a test case opens its page: its
+defects, how to reproduce it, its bytes, output and backtrace.
 
 | Key | Command |
 |---|---|
-| `RET` | open the workspace, project, target, run or defect at point |
+| `RET` | open the workspace, project, target, run, defect or test case at point |
 | `S-RET` | `mayhem-visit-other-window`: open it in another window |
 | `g` | `mayhem-refresh`: fetch again (`gr` under Evil) |
 | `C-c C-o` | `mayhem-browse`: open the page in the web app, in a browser |
@@ -52,7 +57,7 @@ keystroke.  It works anywhere; bind it globally if you like:
 ```
 
 Links to the web app (`https://app.mayhem.security/owner/project/target/1`,
-or a defect's `...?defect=N`) open in mayhem.el's page for them,
+a defect's `...?defect=N`, or a test case's `.../1/tests?testcase=SHA`) open in mayhem.el's page for them,
 wherever Emacs follows a link, once mayhem.el is loaded; links it has
 no page for still go to the browser.  `M-x mayhem-browse-url` opens a
 pasted one.  Set `mayhem-open-urls` to nil to turn this off.

@@ -43,7 +43,7 @@
   "Functions called with a resource's key and whether it is now loading.
 Loading changes no data, so pages show it in the mode line only.")
 
-(defconst mayhem-sync--schema 2
+(defconst mayhem-sync--schema 3
   "Version of the store's tables, kept in SQLite's `user_version'.
 Bump it also when a resource's data changes shape: the store is then
 recreated rather than read in the old shape.")
