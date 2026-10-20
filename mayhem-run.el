@@ -327,7 +327,7 @@ ON-TAB is called with the key of another one, to show it."
          (shown (car (or (assq tab tabs) (car tabs))))
          (now (current-time)))
     (vui-fragment
-     (mayhem-field "Status" (concat (mayhem--run-status run)
+     (mayhem-field "Status" (concat (mayhem-run-status run)
                                     (when-let* ((d (alist-get 'description run)))
                                       (propertize (concat "  " d) 'face 'mayhem-label))))
      (mayhem-field "Started" (concat (or (mayhem--format-age (alist-get 'started_at run) now)

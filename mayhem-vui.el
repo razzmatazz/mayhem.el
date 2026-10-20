@@ -492,6 +492,15 @@ is drawn as a heading, the others as buttons."
     ("medium" 'warning)
     (_ 'mayhem-label)))
 
+(defun mayhem-run-status (run)
+  "Return the status of RUN, an alist, coloured by how it went."
+  (let ((status (mayhem--run-status run)))
+    (propertize status 'face (pcase status
+                               ("completed" 'success)
+                               ("failed" 'error)
+                               ("running" 'warning)
+                               (_ 'mayhem-label)))))
+
 (defun mayhem-snapshot-view (snapshot what skeleton render)
   "Return the vnode of a page part showing SNAPSHOT, a sync snapshot.
 RENDER is called with the data once there is some.  Before that, it

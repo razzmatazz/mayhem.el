@@ -55,6 +55,16 @@ users expect.
 
 ## Layout
 
+- **Colour says how something went**, so a list can be read at a
+  glance: `success` (green) for what went well (a completed run, a
+  passing test case), `error` (red) for what failed (a failed run, a
+  failing test case, a high-severity defect), `warning` (yellow) for
+  what is still going or needs a look (a running run, a medium
+  defect), and `mayhem-label` (grey) for what ended without a verdict
+  or hasn't started (stopped, pending).  Use the shared helpers so a
+  status is the same colour on every page: `mayhem-run-status` for a
+  run, `mayhem-defect-severity-face` for a defect.  Colour only the
+  status word itself, never the whole row.
 - Timestamps: relative age (`3 days ago`), exact time in `help-echo`.
 - Table rows, notices and charts start at column 0; only a tree (the
   workspace's targets under their projects) indents.
