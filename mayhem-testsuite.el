@@ -11,7 +11,8 @@
 
 ;; A target's test suite, `*mayhem: owner/project/target/N/testsuite*':
 ;; the optimized set of its test cases at the end of run N, newest
-;; first, each with its size, where it came from, its age and its first
+;; first, each with whether it passes, whether it is new or a
+;; regression, its size, where it came from, its age and its first
 ;; bytes.  RET on one opens its page; `w' saves its file.
 ;;
 ;; The API gives a suite only as a tarball of its files.  It is unpacked
@@ -56,8 +57,10 @@ often as other data.")
   :max-age (lambda (data)
              (if (alist-get 'live data) mayhem-testsuite--live-max-age t)))
 
-(mayhem-sync-define-resource target-testcases (owner project target)
-  :fetch (lambda (done) (mayhem--fetch-target-testcases owner project target done)))
+(mayhem-sync-define-resource run-testcases (owner project target run)
+  :fetch (lambda (done) (mayhem--fetch-run-testcases owner project target run done))
+  ;; Each report is large, so as rarely as the suite.
+  :max-age mayhem-testsuite--live-max-age)
 
 (defvar-keymap mayhem-testsuite-mode-map
   :parent mayhem-page-mode-map
@@ -70,7 +73,7 @@ often as other data.")
 
 (defun mayhem-testsuite--sorted (files info)
   "Return FILES, as the `testsuite' resource has them, newest first.
-INFO maps a sha256 to its test case, as `target-testcases' has it; those
+INFO maps a sha256 to its test case, as `run-testcases' has it; those
 it lacks come last."
   (let ((created (lambda (file)
                    (or (alist-get 'created_at (gethash (car file) info)) ""))))
@@ -97,7 +100,11 @@ RUN is a run of TARGET of PROJECT of OWNER; INFO is as for
                (tc (gethash sha info)))
     (mayhem-row
      (list (propertize (substring sha 0 (min 8 (length sha))) 'mayhem-sha256 sha)
-           (propertize (format "  %7s" (file-size-human-readable size))
+           (format "  %-7s" (if tc (mayhem-testcase-status (alist-get 'n_defects tc)) ""))
+           (propertize (format "  %-10s" (if tc (mayhem-testcase-type (alist-get 'is_regression tc))
+                                           ""))
+                       'face 'mayhem-label)
+           (propertize (format "  %5s" (file-size-human-readable size))
                        'face 'mayhem-label)
            (propertize (format "  %-10s" (or (alist-get 'source tc) ""))
                        'face 'mayhem-label)
@@ -111,7 +118,7 @@ RUN is a run of TARGET of PROJECT of OWNER; INFO is as for
 (defun mayhem-testsuite--render (owner project target run data testcases)
   "Return the vnodes of the test suite of RUN, showing DATA.
 RUN is a run of TARGET of PROJECT of OWNER.  TESTCASES are the target's,
-as `target-testcases' has them, or nil before they land."
+as `run-testcases' has them, or nil before they land."
   (let ((info (make-hash-table :test #'equal))
         (now (current-time)))
     (dolist (tc testcases)
@@ -141,13 +148,13 @@ as `target-testcases' has them, or nil before they land."
    (mayhem-field "Sources" (mayhem-skeleton-bar 24))
    (vui-newline)
    (mayhem-heading "Test cases")
-   (mayhem-skeleton (make-list 8 '(8 "  " 7 "  " 10 "  " 14 "  " 24)))))
+   (mayhem-skeleton (make-list 8 '(8 "  " 7 "  " 10 "  " 5 "  " 10 "  " 14 "  " 24)))))
 
 (vui-defcomponent mayhem-testsuite-page (owner project target run)
   "The page of the test suite of RUN of TARGET of PROJECT of OWNER."
   :render
   (let ((suite (mayhem-sync-use-resource (list 'testsuite owner project target run)))
-        (testcases (mayhem-sync-use-resource (list 'target-testcases owner project target))))
+        (testcases (mayhem-sync-use-resource (list 'run-testcases owner project target run))))
     (vui-fragment
      (mayhem-page-heading owner project target " "
                           (mayhem-run-link owner project target run nil

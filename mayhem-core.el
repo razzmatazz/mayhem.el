@@ -770,7 +770,7 @@ cases and the first one's crash."
 (defconst mayhem--testcase-fields
   '(sha256 is_regression crashed crash_type signal_number faulting_address
            n_valgrind_errors execution_time created_at repro_cmdline
-           hexdump output)
+           hexdump output testcase_source)
   "Fields of a test case kept for its page.")
 
 (defun mayhem--fetch-testcase (owner project target run sha256 callback)
@@ -1063,19 +1063,24 @@ error message."
                     t))))
      callback)))
 
-(defun mayhem--fetch-target-testcases (owner project target callback)
-  "Fetch every test case of TARGET of PROJECT of OWNER, from any run.
+(defun mayhem--fetch-run-testcases (owner project target run callback)
+  "Fetch how RUN of TARGET of PROJECT of OWNER saw each of its test cases.
 Call CALLBACK with (OK DATA): DATA is a list of alists of each one's
-`sha256', `source' (such as \"libfuzzer\") and `created_at', or an
-error message."
+`sha256', `source' (such as \"libfuzzer\"), `created_at', `n_defects'
+and `is_regression', or an error message."
   (mayhem--api-get-all
-   (mayhem--path "/api/v2/owner/%s/project/%s/target/%s/testcase" owner project target)
-   'testcases
+   (mayhem--path "/api/v2/owner/%s/project/%s/target/%s/run/%s/testcase-result"
+                 owner project target (format "%s" run))
+   'testcase_reports
    (lambda (ok data)
-     (funcall callback ok (if ok
-                              (mapcar (lambda (tc) (mayhem--pick tc '(sha256 source created_at)))
-                                      data)
-                            data)))))
+     (funcall callback ok
+              (if ok
+                  (mapcar (lambda (tc)
+                            `((sha256 . ,(alist-get 'sha256 tc))
+                              (source . ,(alist-get 'testcase_source tc))
+                              ,@(mayhem--pick tc '(created_at n_defects is_regression))))
+                          data)
+                data)))))
 
 (provide 'mayhem-core)
 ;;; mayhem-core.el ends here

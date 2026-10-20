@@ -501,6 +501,16 @@ is drawn as a heading, the others as buttons."
                                ("running" 'warning)
                                (_ 'mayhem-label)))))
 
+(defun mayhem-testcase-status (defects)
+  "Return a test case's status: \"failing\" with DEFECTS, a count, above 0."
+  (if (> (or defects 0) 0)
+      (propertize "failing" 'face 'error)
+    (propertize "passing" 'face 'success)))
+
+(defun mayhem-testcase-type (regression)
+  "Return a test case's type: \"regression\" if REGRESSION, else \"new\"."
+  (if regression "regression" "new"))
+
 (defun mayhem-snapshot-view (snapshot what skeleton render)
   "Return the vnode of a page part showing SNAPSHOT, a sync snapshot.
 RENDER is called with the data once there is some.  Before that, it

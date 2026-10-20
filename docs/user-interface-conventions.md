@@ -63,7 +63,8 @@ users expect.
   defect), and `mayhem-label` (grey) for what ended without a verdict
   or hasn't started (stopped, pending).  Use the shared helpers so a
   status is the same colour on every page: `mayhem-run-status` for a
-  run, `mayhem-defect-severity-face` for a defect.  Colour only the
+  run, `mayhem-testcase-status` for a test case,
+  `mayhem-defect-severity-face` for a defect.  Colour only the
   status word itself, never the whole row.
 - Timestamps: relative age (`3 days ago`), exact time in `help-echo`.
 - Table rows, notices and charts start at column 0; only a tree (the
