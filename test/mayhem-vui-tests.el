@@ -53,6 +53,18 @@
                    '((link "h.example") "/" (link "o") "/" (link "p") "/"
                      "stretch-2017…known-adv-3" "  target" "\n")))))
 
+(ert-deftest mayhem-vui-test-columns-fit-widest ()
+  (should (equal (mayhem-columns '(("#2" "completed" "" "1 defect")
+                                   ("#10" "failed" "" "0 defects"))
+                                 '(3))
+                 '("#2   completed   1 defect"
+                   "#10  failed     0 defects"))))
+
+(ert-deftest mayhem-vui-test-defect-ids-pad-alike ()
+  (should (equal (mayhem-defect-ids '(((defect_number . 7)) ((defect_number . 1234))))
+                 '("!7   " "!1234")))
+  (should (equal (mayhem-defect-ids nil) nil)))
+
 (defun mayhem-vui-tests--line (max-width parts)
   "Return the text of the `mayhem-line' of PARTS, on a page MAX-WIDTH wide."
   (let ((mayhem-max-width max-width))

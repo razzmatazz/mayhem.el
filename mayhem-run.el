@@ -64,33 +64,24 @@ often as other data.")
 (define-derived-mode mayhem-run-mode mayhem-page-mode "Mayhem Run"
   "Major mode for a Mayhem run's page.")
 
-(defun mayhem-run--defects (owner project target run defects &optional counts)
-  "Return the vnodes listing DEFECTS of RUN of TARGET of PROJECT of OWNER.
-COUNTS, the run's alist, gives how many are active and fixed by severity."
-  (vui-fragment
-   (when-let* ((active (mayhem-severity-counts counts)))
-     (mayhem-field "Active" active))
-   (when-let* ((fixed (mayhem-severity-counts counts "fixed")))
-     (mayhem-field "Fixed" fixed))
-   (when (and defects (or (mayhem-severity-counts counts)
-                          (mayhem-severity-counts counts "fixed")))
-     (vui-newline))
-   (if (null defects)
-       (mayhem-notice "No defects")
-     (apply #'vui-fragment
-            (mapcar (lambda (defect)
-                      (let ((level (or (alist-get 'severity_level defect) ""))
-                            (number (alist-get 'defect_number defect)))
-                        (mayhem-row
-                         (list (propertize (format "%-7s" level)
-                                           'face (mayhem-defect-severity-face level))
-                               " "
-                               (mayhem-fit (or (alist-get 'title defect) "")
-                                           (string-width (or (alist-get 'title defect) "")))
-                               (propertize (format "  defect !%s" number) 'face 'mayhem-label))
-                         (lambda () (mayhem-defect-open owner project target number run))
-                         "RET: open defect")))
-                    defects)))))
+(defun mayhem-run--defects (owner project target run defects)
+  "Return the vnodes listing DEFECTS of RUN of TARGET of PROJECT of OWNER."
+  (if (null defects)
+      (mayhem-notice "No defects")
+    (apply #'vui-fragment
+           (seq-mapn (lambda (defect id)
+                       (let ((level (or (alist-get 'severity_level defect) ""))
+                             (number (alist-get 'defect_number defect)))
+                         (mayhem-row
+                          (list id "  "
+                                (propertize (format "%-7s" level)
+                                            'face (mayhem-defect-severity-face level))
+                                " "
+                                (mayhem-fit (or (alist-get 'title defect) "")
+                                            (string-width (or (alist-get 'title defect) ""))))
+                          (lambda () (mayhem-defect-open owner project target number run))
+                          "RET: open defect")))
+                     defects (mayhem-defect-ids defects)))))
 
 (defun mayhem-run--endpoints (endpoints)
   "Return the vnodes listing ENDPOINTS of an API run."
@@ -537,7 +528,7 @@ RUN is the alist from DATA's `run'."
   "Return the vnodes of TAB, a key of `mayhem-run--tabs', of RUN.
 RUN is run NUMBER of TARGET of PROJECT of OWNER, from DATA."
   (pcase tab
-    ('defects (mayhem-run--defects owner project target number (alist-get 'defects data) run))
+    ('defects (mayhem-run--defects owner project target number (alist-get 'defects data)))
     ('tests (vui-component 'mayhem-run-tests-tab :owner owner :project project
                            :target target :number number :run run))
     ('events (mayhem-run--events (alist-get 'events data)))

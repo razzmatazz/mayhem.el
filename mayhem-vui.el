@@ -542,6 +542,34 @@ is drawn as a heading, the others as buttons."
     ("medium" 'warning)
     (_ 'mayhem-label)))
 
+(defun mayhem-columns (rows &optional right)
+  "Return ROWS, each a list of strings, as lines in aligned columns.
+Each column is as wide as its widest cell and two spaces from the
+next; one empty in every row is left out.  The columns whose indexes
+are in RIGHT are aligned right."
+  (let* ((n (apply #'max 0 (mapcar #'length rows)))
+         (widths (mapcar (lambda (i)
+                           (apply #'max 0 (mapcar (lambda (row) (string-width (or (nth i row) "")))
+                                                  rows)))
+                         (number-sequence 0 (1- n)))))
+    (mapcar (lambda (row)
+              (let (cells)
+                (dotimes (i n)
+                  (let* ((cell (or (nth i row) ""))
+                         (pad (make-string (- (nth i widths) (string-width cell)) ?\s)))
+                    (when (> (nth i widths) 0)
+                      (push (if (memq i right) (concat pad cell) (concat cell pad)) cells))))
+                (string-trim-right (string-join (nreverse cells) "  "))))
+            rows)))
+
+(defun mayhem-defect-ids (defects)
+  "Return the numbers of DEFECTS, alists, as \"!N\" padded to one width.
+Each leads its defect's row, so the rows after it line up."
+  (let* ((ids (mapcar (lambda (defect) (format "!%s" (alist-get 'defect_number defect)))
+                      defects))
+         (width (apply #'max 0 (mapcar #'string-width ids))))
+    (mapcar (lambda (id) (string-pad id width)) ids)))
+
 (defun mayhem-run-status (run)
   "Return the status of RUN, an alist, coloured by how it went."
   (let ((status (mayhem--run-status run)))

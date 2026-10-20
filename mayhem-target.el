@@ -32,44 +32,41 @@
 (declare-function mayhem-testsuite-open "mayhem-testsuite" (owner project target run))
 (declare-function mayhem-defect-open "mayhem-defect" (owner project target number &optional run))
 
-(defun mayhem-target--run-line (run now)
-  "Return the line of RUN, an alist, as of NOW."
+(defun mayhem-target--run-cells (run now)
+  "Return the cells of RUN's line, an alist, as of NOW, for `mayhem-columns'."
   (let ((all (or (alist-get 'n_testcase_reports run) 0))
-        (lines (alist-get 'n_lines_total run)))
-    (concat (format "#%-5s" (or (alist-get 'run_number run) "?"))
-            (format " %-10s" (mayhem-run-status run))
-            (propertize (if (and lines (> lines 0))
-                            (format "%4d%%" (round (* 100.0 (or (alist-get 'n_lines_covered run) 0))
-                                                   lines))
-                          "    ")
-                        'help-echo "Line coverage")
-            (let ((n (or (alist-get 'n_defects run) 0)))
-              (format " %4d %-7s" n (if (= n 1) "defect" "defects")))
-            (propertize (format "  %4d/%-4d tests" (- all (or (alist-get 'n_crash_reports run) 0)) all)
-                        'face 'mayhem-label 'help-echo "Passing tests of all")
-            "  "
-            (propertize (format "%-12s" (or (alist-get 'branch_name run)
-                                            (alist-get 'started_by run) ""))
-                        'face 'mayhem-label)
-            " "
-            (propertize (or (mayhem--format-age (alist-get 'created_at run) now) "")
-                        'face 'mayhem-label)
-            (when-let* ((counts (mayhem-severity-counts run)))
-              (concat "  " counts))
-            "\n")))
+        (lines (alist-get 'n_lines_total run))
+        (n (or (alist-get 'n_defects run) 0)))
+    (list (format "#%s" (or (alist-get 'run_number run) "?"))
+          (mayhem-run-status run)
+          (if (and lines (> lines 0))
+              (propertize (format "%d%%" (round (* 100.0 (or (alist-get 'n_lines_covered run) 0))
+                                                lines))
+                          'help-echo "Line coverage")
+            "")
+          (format "%d %s" n (if (= n 1) "defect" "defects"))
+          (propertize (format "%d/%d tests" (- all (or (alist-get 'n_crash_reports run) 0)) all)
+                      'face 'mayhem-label 'help-echo "Passing tests of all")
+          (propertize (or (alist-get 'branch_name run) (alist-get 'started_by run) "")
+                      'face 'mayhem-label)
+          (propertize (or (mayhem--format-age (alist-get 'created_at run) now) "")
+                      'face 'mayhem-label)
+          (or (mayhem-severity-counts run) ""))))
 
-(defun mayhem-target--defect-line (defect now)
-  "Return the line of DEFECT, an alist, as of NOW, as `mayhem-line' parts."
+(defun mayhem-target--defect-line (defect id now)
+  "Return the line of DEFECT, an alist, as of NOW, as `mayhem-line' parts.
+ID is its number, from `mayhem-defect-ids'."
   (let ((level (or (alist-get 'severity_level defect) ""))
         (title (or (alist-get 'title defect) "")))
-    (list (propertize (format "%-7s" level) 'face (mayhem-defect-severity-face level))
+    (list id "  "
+          (propertize (format "%-7s" level) 'face (mayhem-defect-severity-face level))
           (propertize (format "%4s " (or (alist-get 'severity defect) "")) 'face 'mayhem-label)
           (mayhem-fit title (string-width title))
           (propertize (concat (when-let* ((cwe (alist-get 'cwe_number defect)))
                                 (format "  CWE-%s" cwe))
-                              (format "  defect !%s" (alist-get 'defect_number defect))
-                              (unless (equal (alist-get 'state defect) "open")
-                                (format "  %s" (alist-get 'state defect)))
+                              (when-let* ((state (alist-get 'state defect))
+                                          ((not (equal state "open"))))
+                                (format "  %s" state))
                               (when-let* ((run (alist-get 'last_seen_run_number defect)))
                                 (format "  run #%s" run))
                               "  ")
@@ -137,13 +134,13 @@ nil; ON-TAB is called with the other's key, to show it."
         (vui-fragment
          (if defects
              (apply #'vui-fragment
-                    (mapcar (lambda (defect)
-                              (mayhem-row (mayhem-target--defect-line defect now)
-                                          (lambda ()
-                                            (mayhem-defect-open owner project target
-                                                                (alist-get 'defect_number defect)))
-                                          "RET: open defect"))
-                            defects))
+                    (seq-mapn (lambda (defect id)
+                                (mayhem-row (mayhem-target--defect-line defect id now)
+                                            (lambda ()
+                                              (mayhem-defect-open owner project target
+                                                                  (alist-get 'defect_number defect)))
+                                            "RET: open defect"))
+                              defects (mayhem-defect-ids defects)))
            (mayhem-notice "No defects"))
          (when (> n-defects (length defects))
            (mayhem-notice (format "%d less severe defects not shown"
@@ -152,12 +149,15 @@ nil; ON-TAB is called with the other's key, to show it."
         (vui-fragment
          (if runs
              (apply #'vui-fragment
-                    (mapcar (lambda (run)
-                              (let ((number (alist-get 'run_number run)))
-                                (mayhem-row (mayhem-target--run-line run now)
-                                            (lambda () (mayhem-run-open owner project target number))
-                                            "RET: open run")))
-                            runs))
+                    (seq-mapn (lambda (run line)
+                                (let ((number (alist-get 'run_number run)))
+                                  (mayhem-row (concat line "\n")
+                                              (lambda () (mayhem-run-open owner project target number))
+                                              "RET: open run")))
+                              runs
+                              (mayhem-columns (mapcar (lambda (run) (mayhem-target--run-cells run now))
+                                                      runs)
+                                              '(2))))
            (mayhem-notice "No runs"))
          (when (> count (length runs))
            (mayhem-notice (format "%d older runs not shown" (- count (length runs)))))))))))
