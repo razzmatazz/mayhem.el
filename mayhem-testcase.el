@@ -85,7 +85,7 @@ RUN is a run of TARGET of PROJECT of OWNER."
                               ", ")))
      (mayhem-testcase--defects owner project target run (alist-get 'defects test))
      (mayhem-block "Reproduce" (when-let* ((cmd (alist-get 'repro_cmdline test)))
-                                 (mayhem--split-command cmd)))
+                                 (mayhem-command cmd)))
      (mayhem-block "Test case" (if mayhem-other-view
                                    (mayhem--bytes-text
                                     (mayhem--hexdump-bytes (alist-get 'hexdump test)))

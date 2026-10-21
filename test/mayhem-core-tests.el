@@ -392,4 +392,12 @@ RAW is as for `mayhem--api-response'."
   (should (equal (mayhem--page-url "https://h/" '(testsuite "o" "p" "t" 7)) "https://h/o/p/t/7/tests")))
 
 (provide 'mayhem-core-tests)
+;; A long command wraps between words, never inside a quote.
+(ert-deftest mayhem-core-test-split-command-wraps ()
+  (should (equal (mayhem--split-command "A=1 /bin/x 0123456789" 16)
+                 "A=1 /bin/x \\\n  0123456789"))
+  (should (equal (mayhem--split-command "a && /bin/x 'q r' s" 12)
+                 "a && \\\n  /bin/x \\\n    'q r' \\\n    s"))
+  (should (equal (mayhem--split-command "a && b") "a && \\\n  b")))
+
 ;;; mayhem-core-tests.el ends here

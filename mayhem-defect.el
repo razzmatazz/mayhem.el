@@ -129,7 +129,7 @@ SOURCE is \"api\" or \"code\"."
      (vui-fragment
       (mayhem-block "Reproduce"
                             (when-let* ((cmd (alist-get 'repro_cmdline evidence)))
-                              (mayhem--split-command cmd)))
+                              (mayhem-command cmd)))
       (mayhem-block "Backtrace"
                             (if-let* ((frames (alist-get 'frames evidence)))
                                 (mayhem-backtrace frames)

@@ -568,6 +568,14 @@ an indent or a field label."
                                  "\n"))
                        rows "")))
 
+(defconst mayhem-command-width 72
+  "Most columns a shell command shown for copying takes before it wraps.")
+
+(defun mayhem-command (cmd)
+  "Return shell command CMD wrapped for a page, as `mayhem--split-command'.
+It keeps within `mayhem-command-width' and the page's width."
+  (mayhem--split-command cmd (max 20 (min mayhem-command-width (mayhem-page-width)))))
+
 (defun mayhem-block (title text)
   "Return a section TITLE with TEXT below it from column 0, for copying.
 Nothing when TEXT is empty."

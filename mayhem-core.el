@@ -908,13 +908,46 @@ defects, frames and backtrace, trimmed to what its page shows, and the
                                                      run)))))))
      callback)))
 
-(defun mayhem--split-command (cmd)
+(defun mayhem--split-command (cmd &optional width)
   "Return shell command CMD with each of its commands on its own line.
 Lines end in a backslash, so the text still pastes into a shell whole.
-Quoting is ignored: Mayhem's command lines don't quote separators."
+With WIDTH, a command wider than that goes on between its words, two
+columns further in.  Quoting is ignored in finding separators, as
+Mayhem's command lines don't quote them, but no line breaks a quote."
   ;; The character before the separator keeps 2>&1 whole.
-  (replace-regexp-in-string "\\([^<>&|;]\\(?:;\\|&&?\\|||?\\)\\)[ \t]+"
-                            "\\1 \\\\\n  " cmd))
+  (let ((split (replace-regexp-in-string "\\([^<>&|;]\\(?:;\\|&&?\\|||?\\)\\)[ \t]+"
+                                         "\\1 \\\\\n  " cmd)))
+    (if (not width)
+        split
+      (mapconcat (lambda (line)
+                   (let* ((indent (progn (string-match "\\` *" line) (match-string 0 line)))
+                          (more (concat indent "  "))
+                          (lines nil) (current nil))
+                     (dolist (word (mayhem--shell-words line))
+                       (if (and current
+                                (> (+ (string-width current) 1 (string-width word) 2) width))
+                           (setq lines (cons current lines) current (concat more word))
+                         (setq current (if current (concat current " " word)
+                                         (concat indent word)))))
+                     (string-join (nreverse (cons current lines)) " \\\n")))
+                 (split-string split " \\\\\n") " \\\n"))))
+
+(defun mayhem--shell-words (line)
+  "Return the words of shell command LINE, split at blanks outside quotes.
+A backslash keeps the character after it in its word."
+  (let ((words nil) (start nil) (quoting nil) (i 0) (n (length line)))
+    (while (< i n)
+      (let ((c (aref line i)))
+        (cond (quoting (cond ((eq c quoting) (setq quoting nil))
+                           ((and (eq c ?\\) (eq quoting ?\")) (setq i (1+ i)))))
+              ((memq c '(?\s ?\t))
+               (when start (push (substring line start i) words) (setq start nil)))
+              (t (unless start (setq start i))
+                 (cond ((memq c '(?\" ?')) (setq quoting c))
+                       ((eq c ?\\) (setq i (1+ i)))))))
+      (setq i (1+ i)))
+    (when start (push (substring line start (min i n)) words))
+    (nreverse words)))
 
 (defun mayhem--format-elapsed (seconds)
   "Return SECONDS as a clock, \"5:07\" or \"1:02:03\"."
