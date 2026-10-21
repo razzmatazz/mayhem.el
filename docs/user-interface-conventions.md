@@ -62,7 +62,7 @@ users expect.
   above the list either (`Runs (78)`): the whole page is the list.
   Pages below a run (its test suite, a test case) name the run too,
   linked: `host/o/p/t  code target, run #7, test case abcd1234`,
-  `host/o/p/t  code target, run #7, tests`.
+  `host/o/p/t  code target, run #7, test suite`.
 - A long name in a heading is cut in the middle (`mayhem-cut-middle`),
   whole on hover.
   A field naming another page (`Run  run #7`) links to it, with

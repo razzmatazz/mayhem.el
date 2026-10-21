@@ -611,6 +611,15 @@ INDENT, a string, goes before its label."
                             (or (alist-get 'n_exploitability_factors_passing run) 0)
                             factors)))))
 
+(defun mayhem-suite-size (run)
+  "Return how many test cases are in RUN's test suite, or nil if unknown.
+RUN is an alist.  A run can count 0 in its optimized set when the set
+was never counted, yet its suite then holds every one of its test cases."
+  (let ((optimized (alist-get 'n_optimized_set_testcases run)))
+    (if (and optimized (> optimized 0))
+        optimized
+      (alist-get 'n_testcase_reports run))))
+
 (defun mayhem-heading (text)
   "Return a vnode for the section heading TEXT and its newline."
   (vui-text (concat (propertize text 'face 'mayhem-section-heading) "\n")))
@@ -717,6 +726,16 @@ is drawn as a heading, the others as buttons."
     ("medium" 'warning)
     (_ 'mayhem-label)))
 
+(defun mayhem-table (lines items open help-echo)
+  "Return LINES, from `mayhem-columns' with a header, as a table of ITEMS.
+The header is plain; each line after it is a RET-able row calling OPEN
+with its item.  HELP-ECHO is the rows'."
+  (apply #'vui-fragment
+         (vui-text (concat (car lines) "\n"))
+         (seq-mapn (lambda (item line)
+                     (mayhem-row (concat line "\n") (lambda () (funcall open item)) help-echo))
+                   items (cdr lines))))
+
 (defun mayhem-columns (rows &optional right header)
   "Return ROWS, each a list of strings, as lines in aligned columns.
 Each column is as wide as its widest cell and two spaces from the
@@ -800,6 +819,16 @@ Each leads its defect's row, so the rows after it line up."
   (if (> (or defects 0) 0)
       (propertize "failing" 'face 'error)
     (propertize "passing" 'face 'success)))
+
+(defun mayhem-testcase-severities (test)
+  "Return TEST's defects by severity, as \"1 high, 2 low\", or \"\".
+TEST is as `mayhem--testcase-summary' has it."
+  (mapconcat (lambda (level)
+               (propertize (format "%d %s" (alist-get (intern level) test) level)
+                           'face (mayhem-defect-severity-face level)))
+             (seq-filter (lambda (level) (> (or (alist-get (intern level) test) 0) 0))
+                         '("high" "medium" "low"))
+             ", "))
 
 (defun mayhem-testcase-type (regression)
   "Return a test case's type: \"regression\" if REGRESSION, else \"new\"."

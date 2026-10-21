@@ -122,7 +122,8 @@ Candidates are \"owner\", \"owner/project\" and \"owner/project/target\"."
     (`(run . ,args) (apply #'mayhem-run-open args))
     (`(defect . ,args) (apply #'mayhem-defect-open args))
     (`(testcase . ,args) (apply #'mayhem-testcase-open args))
-    (`(testsuite . ,args) (apply #'mayhem-testsuite-open args))))
+    (`(testsuite . ,args) (apply #'mayhem-testsuite-open args))
+    (`(testcases . ,args) (apply #'mayhem-testcases-open args))))
 
 (defun mayhem--url-handled-p (url)
   "Return non-nil if URL is a link to a page of the configured web app."

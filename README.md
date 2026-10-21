@@ -78,6 +78,11 @@ say because your token expired, the error shows in the header line.
   bytes; RET on `Test suite` on the target page, or on `Optimized` on
   the run's Tests tab, opens it.  `w` saves the test case at point to a
   file.  A finished run's suite is downloaded once and kept.
+- **Test cases**: every test case of a run, the ones the optimized
+  suite dropped too, newest first, each with its status, type, defects,
+  source and execution time; filter them by status, type or source.
+  RET on `All` on the run's Tests tab, or on the run's count on its
+  test suite page, opens it.
 - **Test case**: its defects, how to reproduce it, its bytes, the
   target's output and the backtrace.
 

@@ -217,8 +217,9 @@ order.  Targets of other projects are dropped."
 ;; A page is named by a list (KIND ARGS...): (dashboard), (workspace
 ;; OWNER), (project OWNER PROJECT), (target OWNER PROJECT TARGET), (run
 ;; OWNER PROJECT TARGET NUMBER), (defect OWNER PROJECT TARGET NUMBER
-;; RUN), (testcase OWNER PROJECT TARGET RUN SHA256) or (testsuite OWNER
-;; PROJECT TARGET RUN), which the web app shows with the run's tests.
+;; RUN), (testcase OWNER PROJECT TARGET RUN SHA256), (testsuite OWNER
+;; PROJECT TARGET RUN) or (testcases OWNER PROJECT TARGET RUN); the web
+;; app shows those last two with the run's tests.
 ;; Links to the web app map to pages and back.  Its routes come from
 ;; its JS bundle; "-" starts a segment that is not a slug.
 
@@ -265,7 +266,7 @@ Nil also when URL is on another host, or shows something no page does."
       (if run
           (format "%s?defect=%s" (mayhem--path "/%s/%s/%s/%s" o p tg (format "%s" run)) n)
         (mayhem--path "/%s/%s/%s/-/defects/%s" o p tg (format "%s" n))))
-     (`(testsuite ,o ,p ,tg ,run)
+     (`(,(or 'testsuite 'testcases) ,o ,p ,tg ,run)
       (mayhem--path "/%s/%s/%s/%s/tests" o p tg (format "%s" run)))
      ;; The web app lists them on the target's page.
      (`(,(or 'target-runs 'target-defects) ,o ,p ,tg)

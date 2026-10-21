@@ -49,7 +49,7 @@ fallback only for what the API cannot do (none so far).
 | `GET .../run/{number}/endpoints` | an API run page's endpoints |
 | `GET .../run/{number}/event` | run page's event log |
 | `GET .../run/{number}/testcase_over_time`, `.../defect_over_time` | code run page's progress chart |
-| `GET .../run/{number}/testcase-result?crashes_only=true` | code run page's failing tests |
+| `GET .../run/{number}/testcase-result` | code run page's failing tests; a run's test cases |
 | `GET .../run/{number}/testcase_report/{sha256}` | test case page |
 | `GET .../target/{target}/testsuite.tar?run_number={number}&optimized_only=true` | test suite page: the run's suite, a tarball of the files, each named by its sha256 |
 | `GET .../target/{target}/testcase` | test suite page: each test case's `source` and `created_at` |
@@ -74,6 +74,9 @@ fallback only for what the API cannot do (none so far).
   "Download Test Suite" use it), and other lists ignore it.  The
   target's `testcase` list is every test case of every run.  The
   tarball pads names with spaces, not NULs.
+- A run's `n_optimized_set_testcases` is not the size of its suite: it
+  matches `n_testcase_reports` (105) where the suite holds fewer (94),
+  and can be 0 where the suite holds every test case.
 
 - `GET /api/v2/owner/{owner}/project` answers only members of the
   workspace (404 "No resource found ... has access to"), so workspace

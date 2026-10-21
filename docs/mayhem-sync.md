@@ -110,7 +110,7 @@ what is stale.
 | `defect` | owner project target number run | defect |
 | `testcase` | owner project target run sha256 | test case |
 | `testsuite` | owner project target run | test suite; its files go to the `file` table |
-| `run-testcases` | owner project target run | run's Tests tab (failing tests), test suite (each test case's status, type, source and age) |
+| `run-testcases` | owner project target run | run's Tests tab (failing tests), test suite (each test case's status, type, source and age), run's test cases |
 
 `mayhem-jump` reads `projects` and `workspace-targets` straight from
 the store (`mayhem-sync-read`) and requests them behind its prompt.

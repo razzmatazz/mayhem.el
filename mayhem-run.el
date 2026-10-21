@@ -30,6 +30,7 @@
 
 (declare-function mayhem-testcase-open "mayhem-testcase" (owner project target run sha256))
 (declare-function mayhem-testsuite-open "mayhem-testsuite" (owner project target run))
+(declare-function mayhem-testcases-open "mayhem-testsuite" (owner project target run))
 
 (defcustom mayhem-run-refresh-interval 10
   "Seconds between refetches of a run's page while the run is going."
@@ -161,7 +162,7 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
   (let* ((all (or (alist-get 'n_testcase_reports run) 0))
          (regression (or (alist-get 'n_regression_testcase_reports run) 0))
          (failing (or (alist-get 'n_regression_defect_reports run) 0))
-         (optimized (alist-get 'n_optimized_set_testcases run))
+         (optimized (mayhem-suite-size run))
          (starting (alist-get 'n_starting_testcases run))
          (measured (alist-get 'n_initial_coverage_collection_processed run))
          (to-measure (alist-get 'n_initial_coverage_collection_total run))
@@ -173,7 +174,10 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
                                       (or (alist-get (intern (format "n_regression_%s" key)) run) 0))
                               'face 'mayhem-label))))
     (vui-fragment
-     (mayhem-field "All" (format "%d test case%s" all (if (= all 1) "" "s")))
+     (mayhem-field "All" (mayhem-page-link (format "%d test case%s" all (if (= all 1) "" "s"))
+                                           "RET: open every test case"
+                                           (lambda ()
+                                             (mayhem-testcases-open owner project target number))))
      (mayhem-field "Regression" (format "%d of %d passing" (- regression failing) regression))
      (mayhem-field "New" (format "%d discovered" (- all regression)))
      (when starting
@@ -265,6 +269,10 @@ and counts are its `help-echo'.  Nothing before the run starts."
                          'face 'mayhem-label)
          "\n"))))))
 
+(defconst mayhem-run--test-header
+  '("Test case" "Type" "Defects" nil "Time" "Seen")
+  "The names of the columns of a run's failing tests.")
+
 (defun mayhem-run--tests (owner project target number run failing)
   "Return the vnodes listing FAILING, the failing test cases of RUN.
 RUN is run NUMBER of TARGET of PROJECT of OWNER."
@@ -273,33 +281,25 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
      (mayhem-heading (format "Failing tests (%d)" (length failing)))
      (if (null failing)
          (mayhem-notice "No failing tests")
-       (apply #'vui-fragment
-              (mapcar (lambda (test)
-                        (let ((sha (alist-get 'sha256 test))
-                              (n (or (alist-get 'n_defects test) 0)))
-                          (mayhem-row
-                           (concat (substring sha 0 (min 8 (length sha)))
-                                   (propertize (if (alist-get 'is_regression test)
-                                                   "  regression" "  new       ")
-                                               'face 'mayhem-label)
-                                   (format "  %3d defect%s " n (if (= n 1) " " "s"))
-                                   (propertize
-                                    (format "%5dms  " (round (* 1000 (or (alist-get 'execution_time test)
-                                                                         0))))
-                                    'face 'mayhem-label)
-                                   (mayhem-run--elapsed-text (alist-get 'created_at test) start)
-                                   "  "
-                                   (mapconcat
-                                    (lambda (level)
-                                      (propertize (format "%d %s" (alist-get (intern level) test) level)
-                                                  'face (mayhem-defect-severity-face level)))
-                                    (seq-filter (lambda (level) (> (alist-get (intern level) test) 0))
-                                                '("high" "medium" "low"))
-                                    ", ")
-                                   "\n")
-                           (lambda () (mayhem-testcase-open owner project target number sha))
-                           "RET: open test case")))
-                      failing))))))
+       (let ((lines (mayhem-columns
+                     (mapcar (lambda (test)
+                               (let ((sha (alist-get 'sha256 test)))
+                                 (list (substring sha 0 (min 8 (length sha)))
+                                       (propertize (mayhem-testcase-type (alist-get 'is_regression test))
+                                                   'face 'mayhem-label)
+                                       (format "%d" (or (alist-get 'n_defects test) 0))
+                                       (mayhem-testcase-severities test)
+                                       (propertize
+                                        (format "%dms" (round (* 1000 (or (alist-get 'execution_time test)
+                                                                           0))))
+                                        'face 'mayhem-label)
+                                       (mayhem-run--elapsed-text (alist-get 'created_at test) start))))
+                             failing)
+                     '(2 4 5) mayhem-run--test-header)))
+         (mayhem-table lines failing
+                       (lambda (test)
+                         (mayhem-testcase-open owner project target number (alist-get 'sha256 test)))
+                       "RET: open test case"))))))
 
 (vui-defcomponent mayhem-run-tests-tab (owner project target number run)
   "The Tests tab of RUN, run NUMBER of TARGET of PROJECT of OWNER.

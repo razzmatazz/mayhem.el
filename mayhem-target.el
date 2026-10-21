@@ -88,21 +88,11 @@ ID is its number, as \"!N\"."
                       'face 'mayhem-label))))
 
 ;; Each list shows its first few rows; the full one is a page of its own.
-(defun mayhem-target--rows (lines items open help-echo)
-  "Return LINES, from `mayhem-columns' with a header, as a table of ITEMS.
-The header is plain; each line after it is a RET-able row calling OPEN
-with its item.  HELP-ECHO is the rows'."
-  (apply #'vui-fragment
-         (vui-text (concat (car lines) "\n"))
-         (seq-mapn (lambda (item line)
-                     (mayhem-row (concat line "\n") (lambda () (funcall open item)) help-echo))
-                   items (cdr lines))))
-
 (defun mayhem-target--defect-rows (owner project target defects now)
   "Return a table of the defects of TARGET, as of NOW, a RET-able row each.
 TARGET is of PROJECT of OWNER; DEFECTS are the ones shown, most severe
 first."
-  (mayhem-target--rows
+  (mayhem-table
    (mayhem-columns (seq-mapn (lambda (defect id) (mayhem-target--defect-cells defect id now))
                              defects (mayhem-defect-ids defects))
                    '(2) mayhem-target--defect-header)
@@ -114,7 +104,7 @@ first."
 (defun mayhem-target--run-rows (owner project target runs now)
   "Return a table with a RET-able row for each run of TARGET, as of NOW.
 TARGET is of PROJECT of OWNER; RUNS are the ones shown, newest first."
-  (mayhem-target--rows
+  (mayhem-table
    (mayhem-columns (mapcar (lambda (run) (mayhem-target--run-cells run now)) runs)
                    '(2 3 5) mayhem-target--run-header)
    runs
@@ -169,7 +159,7 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
         (mayhem-hardening-field latest)
         (mayhem-repo-field (alist-get 'scm_remote_origin latest))
         (mayhem-image-field latest)
-        (when-let* ((suite (alist-get 'n_optimized_set_testcases latest)))
+        (when-let* ((suite (mayhem-suite-size latest)))
           (mayhem-field "Test suite"
                         (mayhem-page-link (format "%d test case%s" suite (if (= suite 1) "" "s"))
                                           "RET: open test suite"
