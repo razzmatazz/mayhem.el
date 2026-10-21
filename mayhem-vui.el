@@ -409,19 +409,21 @@ Just TEXT when REPO is nil, or its host's KIND links are not known."
       (mayhem-link text url)
     text))
 
-(defun mayhem-repo-field (url)
+(defun mayhem-repo-field (url &optional indent)
   "Return the Repo field for the repository at URL, nil when URL is.
-It shows the host, so it is plain where its links lead."
+It shows the host, so it is plain where its links lead.  INDENT, a
+string, goes before its label."
   (when url
     (let ((repo (mayhem--repo url)))
-      (mayhem-field "Repo" (if repo
+      (mayhem-field (concat indent "Repo") (if repo
                                (mayhem-repo-link repo (concat (car repo) "/" (cdr repo)))
                              url)))))
 
-(defun mayhem-scm-fields (scm)
+(defun mayhem-scm-fields (scm &optional indent)
   "Return the Repo, Branch, Commit and CI fields of SCM.
 SCM is a run's alist with `mayhem--scm-fields'.  On GitHub, each
-links to its page on its host."
+links to its page on its host.  INDENT, a string, goes before each
+label."
   (let* ((repo (mayhem--repo (alist-get 'scm_remote_origin scm)))
          (branch (alist-get 'branch_name scm))
          (base (alist-get 'merge_base_branch_name scm))
@@ -429,15 +431,15 @@ links to its page on its host."
          (ci-url (mayhem--clean-url (alist-get 'ci_url scm)))
          (ci-type (alist-get 'ci_type scm)))
     (vui-fragment
-     (mayhem-repo-field (alist-get 'scm_remote_origin scm))
+     (mayhem-repo-field (alist-get 'scm_remote_origin scm) indent)
      (when branch
-       (mayhem-field "Branch" (mayhem-repo-link repo branch 'branch branch)
+       (mayhem-field (concat indent "Branch") (mayhem-repo-link repo branch 'branch branch)
                      (when (and base (not (equal base branch)))
                        (propertize "  base " 'face 'mayhem-label))
                      (when (and base (not (equal base branch)))
                        (mayhem-repo-link repo base 'branch base))))
      (when revision
-       (mayhem-field "Commit"
+       (mayhem-field (concat indent "Commit")
                      (mayhem-repo-link repo (substring revision 0 (min 7 (length revision)))
                                        'commit revision)
                      (when-let* ((subject (alist-get 'scm_commit_subject scm)))
@@ -446,7 +448,7 @@ links to its page on its host."
                        (propertize (concat "  by " author) 'face 'mayhem-label
                                    'help-echo (alist-get 'scm_commit_author_email scm)))))
      (when (or ci-url ci-type)
-       (mayhem-field "CI" (if ci-url
+       (mayhem-field (concat indent "CI") (if ci-url
                               (mayhem-link (mayhem--ci-label ci-type ci-url) ci-url)
                             ci-type))))))
 

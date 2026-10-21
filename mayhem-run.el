@@ -475,6 +475,36 @@ when OPEN.  ON-OPEN is called with KEY and whether it is to be."
      ;; Folded, its title line has no newline of its own.
      (unless open (vui-newline)))))
 
+(defun mayhem-run--source (run open on-open)
+  "Return RUN's repo, branch, commit and parent, folded under one line.
+The line names its branch and commit.  OPEN and ON-OPEN are as for
+`mayhem-run--field-or-fold'."
+  (let* ((repo (mayhem--repo (alist-get 'scm_remote_origin run)))
+         (parent (alist-get 'parent_revision run))
+         (revision (alist-get 'revision run))
+         (unfold (memq 'source open))
+         (summary (string-join
+                   (delq nil (list (alist-get 'branch_name run)
+                                   (and revision (substring revision 0 (min 7 (length revision))))
+                                   (alist-get 'scm_commit_subject run)))
+                   "  ")))
+    (when (or (alist-get 'scm_remote_origin run) revision (alist-get 'branch_name run) parent)
+      (vui-fragment
+       (vui-collapsible :key 'source
+                        :title (concat (string-pad "Source" 10)
+                                       (truncate-string-to-width
+                                        summary (max 10 (- (mayhem-page-width) 12)) nil nil "…"))
+                        :title-face 'mayhem-label :indent 0
+                        :expanded unfold
+                        :on-toggle (lambda (open) (funcall on-open 'source open))
+                        (vui-fragment
+                         (mayhem-scm-fields run "  ")
+                         (when parent
+                           (mayhem-field "  Parent"
+                                         (mayhem-repo-link repo (substring parent 0 (min 7 (length parent)))
+                                                           'commit parent)))))
+       (unless unfold (vui-newline))))))
+
 (defun mayhem-run--started-with (run open on-open)
   "Return the fields of what the CLI started RUN with, beyond its Mayhemfile.
 What it overrode, the environment it added and the files sent, each
@@ -543,8 +573,6 @@ called with the key of another one, to show it.  OPEN and ON-OPEN
 are for the header's folds, as in `mayhem-run--started-with'."
   (let* ((run (alist-get 'run data))
          (code (not (alist-get 'api_run run)))
-         (repo (mayhem--repo (alist-get 'scm_remote_origin run)))
-         (parent (alist-get 'parent_revision run))
          (start (alist-get 'started_at run))
          (queued (alist-get 'created_at run))
          (cpu (alist-get 'cputime run))
@@ -593,10 +621,7 @@ are for the header's folds, as in `mayhem-run--started-with'."
      (when (alist-get 'phases run)
        (mayhem-field "Tasks" (mayhem-run--tasks run)))
      (mayhem-hardening-field run)
-     (mayhem-scm-fields run)
-     (when parent
-       (mayhem-field "Parent" (mayhem-repo-link repo (substring parent 0 (min 7 (length parent)))
-                                                'commit parent)))
+     (mayhem-run--source run open on-open)
      (when-let* ((build (alist-get 'build_id run)))
        (mayhem-field "Build" (format "%s" build)))
      (mayhem-image-field run)
@@ -620,8 +645,7 @@ are for the header's folds, as in `mayhem-run--started-with'."
    (mayhem-field "Status" (mayhem-skeleton-bar 22))
    (mayhem-field "Started" (mayhem-skeleton-bar 20))
    (mayhem-field "Duration" (mayhem-skeleton-bar 6))
-   (mayhem-field "Branch" (mayhem-skeleton-bar 8))
-   (mayhem-field "Commit" (mayhem-skeleton-bar 30))
+   (mayhem-field "Source" (mayhem-skeleton-bar 30))
    (vui-newline)
    (mayhem-heading "Defects")
    (mayhem-skeleton '((6 " " 28) (6 " " 36) (6 " " 22) (6 " " 30)))))
