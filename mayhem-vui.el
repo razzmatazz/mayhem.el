@@ -467,11 +467,12 @@ It links to the image's page when it has one; its digest is the
                                           (lambda () (browse-url url)))
                       (propertize image 'help-echo digest))))))
 
-(defun mayhem-hardening-field (run)
-  "Return the Hardening field of RUN, an alist, or nil without one."
+(defun mayhem-hardening-field (run &optional indent)
+  "Return the Hardening field of RUN, an alist, or nil without one.
+INDENT, a string, goes before its label."
   (let ((factors (alist-get 'n_exploitability_factors_total run)))
     (when (and factors (> factors 0))
-      (mayhem-field "Hardening"
+      (mayhem-field (concat indent "Hardening")
                     (format "%s of %s exploitability factors"
                             (or (alist-get 'n_exploitability_factors_passing run) 0)
                             factors)))))

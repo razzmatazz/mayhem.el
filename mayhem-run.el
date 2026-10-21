@@ -247,8 +247,10 @@ and counts are its `help-echo'.  Nothing before the run starts."
        (vui-text
         (concat
          pad (propertize (concat (propertize "▆" 'face 'mayhem-target)
-                                 " test cases processed  "
-                                 (propertize "●" 'face 'error) " defects found")
+                                 (format " %d test case%s processed  " top (if (= top 1) "" "s"))
+                                 (propertize "●" 'face 'error)
+                                 (let ((found (apply #'max 0 defects)))
+                                   (format " %d defect%s found" found (if (= found 1) "" "s"))))
                          'face 'mayhem-label)
          "\n"
          (mapconcat (lambda (row)
@@ -395,17 +397,13 @@ It is read-only, in the mode YAML files get; `q' goes back."
       (view-mode 1))
     (mayhem-display-buffer buffer)))
 
-(defun mayhem-run--mayhemfile-field (owner project target number run)
-  "Return the Mayhemfile field of RUN, run NUMBER of TARGET of PROJECT of OWNER.
-RET on it shows the Mayhemfile."
-  (when-let* ((text (alist-get 'mayhemfile_flat run)))
-    (let ((lines (length (split-string (string-trim-right text) "\n"))))
-      (mayhem-field "Mayhemfile"
-                    (mayhem-page-link (format "%d line%s" lines (if (= lines 1) "" "s"))
-                                      "RET: view Mayhemfile"
-                                      (lambda ()
-                                        (mayhem-run-show-mayhemfile owner project target
-                                                                    number text)))))))
+(defun mayhem-run--mayhemfile-link (owner project target number run text)
+  "Return TEXT linking to RUN's Mayhemfile, or nil without one.
+RUN is run NUMBER of TARGET of PROJECT of OWNER."
+  (when-let* ((mayhemfile (alist-get 'mayhemfile_flat run)))
+    (mayhem-page-link text "RET: view Mayhemfile"
+                      (lambda ()
+                        (mayhem-run-show-mayhemfile owner project target number mayhemfile)))))
 
 (defun mayhem-run--task-face (phase)
   "Return the face of the status of PHASE, one of a run's tasks."
@@ -446,116 +444,144 @@ and start are its `help-echo'."
                  (when took (propertize (concat " " took) 'face 'mayhem-label 'help-echo help)))))
      phases "  ")))
 
-(defun mayhem-run--pairs (pairs &optional separator)
-  "Return PAIRS, an alist, as KEY VALUE lines from column 0, for copying.
-SEPARATOR goes between them; without it, the values line up."
-  (let ((width (apply #'max 0 (mapcar (lambda (pair) (string-width (format "%s" (car pair))))
-                                      pairs))))
-    (vui-text (mapconcat (pcase-lambda (`(,key . ,value))
-                           (concat (if separator
-                                       (format "%s%s" key separator)
-                                     (string-pad (format "%s" key) (+ width 2)))
-                                   (mayhem--format-value value) "\n"))
-                         pairs ""))))
-
-(defun mayhem-run--field-or-fold (key title line summary open on-open body)
-  "Return the field TITLE showing LINE, or a fold of BODY if LINE is too wide.
-The fold is titled TITLE and SUMMARY and named KEY; it is unfolded
-when OPEN.  ON-OPEN is called with KEY and whether it is to be."
-  (if (<= (+ 12 (string-width line)) (mayhem-page-width))
-      (mayhem-field title line)
+(defun mayhem-run--fold (key title open on-open summary parts body)
+  "Return the fold TITLE of BODY, named KEY, unfolded when OPEN.
+Unfolded, its line goes on with SUMMARY, plain; folded, with PARTS,
+so TAB reaches their links.  Each of PARTS is a string or (TEXT
+. VNODE); those that don't fit go.  ON-OPEN is called with KEY and
+whether it is to be unfolded."
+  (let ((room (- (mayhem-page-width) 12)))
     (vui-fragment
-     ;; The arrow and its space stand in for two of a field label's columns.
      (vui-collapsible :key key
-                      :title (concat (string-pad title (max 10 (1+ (length title)))) summary)
+                      :title (if open
+                                 (concat (string-pad title 10)
+                                         (truncate-string-to-width summary (max 10 room)
+                                                                   nil nil "…"))
+                               title)
                       :title-face 'mayhem-label :indent 0
                       :expanded open
                       :on-toggle (lambda (open) (funcall on-open key open))
                       body)
-     ;; Folded, its title line has no newline of its own.
-     (unless open (vui-newline)))))
+     ;; Folded, its title line has no newline of its own, so the parts
+     ;; go on it, lined up with the fields' values.
+     (unless open
+       (let ((used 0) shown)
+         (catch 'full
+           (dolist (part parts)
+             (let* ((sep (if shown 2 0))
+                    (text (if (consp part) (car part) part)))
+               (when (> (+ used sep (string-width text)) room)
+                 (throw 'full nil))
+               (setq used (+ used sep (string-width text)))
+               (when shown (push (vui-text "  ") shown))
+               (push (if (consp part) (cdr part) (vui-text part)) shown))))
+         (apply #'vui-fragment (vui-text (make-string (- 10 (string-width title)) ?\s))
+                (nreverse (cons (vui-newline) shown))))))))
+
+(defun mayhem-run--lines (label lines)
+  "Return the field LABEL showing LINES, strings, each on a line of its own."
+  (apply #'vui-fragment (mayhem-field label (car lines))
+         (mapcar (lambda (line) (mayhem-field "" line)) (cdr lines))))
 
 (defun mayhem-run--source (run open on-open)
   "Return RUN's repo, branch, commit and parent, folded under one line.
 The line names its branch, commit and subject; folded, the branch and
-commit link to their pages, so TAB reaches them, as the fields do
-unfolded.  OPEN and ON-OPEN are as for `mayhem-run--field-or-fold'."
+commit link to their pages.  OPEN lists the keys of the header's folds
+unfolded; ON-OPEN is as for `mayhem-run--fold'."
   (let* ((repo (mayhem--repo (alist-get 'scm_remote_origin run)))
          (parent (alist-get 'parent_revision run))
          (revision (alist-get 'revision run))
          (branch (alist-get 'branch_name run))
          (short (and revision (substring revision 0 (min 7 (length revision)))))
-         (subject (alist-get 'scm_commit_subject run))
-         (unfold (memq 'source open))
-         (fit (lambda (text used)
-                (truncate-string-to-width text (max 10 (- (mayhem-page-width) used))
-                                          nil nil "…"))))
+         (subject (alist-get 'scm_commit_subject run)))
     (when (or (alist-get 'scm_remote_origin run) revision branch parent)
-      (vui-fragment
-       (vui-collapsible :key 'source
-                        :title (if unfold
-                                   (concat (string-pad "Source" 10)
-                                           (funcall fit (string-join (delq nil (list branch short subject))
-                                                                     "  ")
-                                                    12))
-                                 "Source")
-                        :title-face 'mayhem-label :indent 0
-                        :expanded unfold
-                        :on-toggle (lambda (open) (funcall on-open 'source open))
-                        (vui-fragment
-                         (mayhem-scm-fields run "  ")
-                         (when parent
-                           (mayhem-field "  Parent"
-                                         (mayhem-repo-link repo (substring parent 0 (min 7 (length parent)))
-                                                           'commit parent)))))
-       ;; Folded, its title line has no newline of its own, so the
-       ;; links go on it, lined up with the fields' values.
-       (unless unfold
-         (let ((parts (delq nil (list (and branch (mayhem-repo-link repo branch 'branch branch))
-                                      (and short (mayhem-repo-link repo short 'commit revision))))))
-           (apply #'vui-fragment
-                  (vui-text (make-string 4 ?\s))
-                  (append (cdr (mapcan (lambda (part) (list (vui-text "  ") part)) parts))
-                          (when subject
-                            (list (vui-text (concat (and parts "  ")
-                                                    (funcall fit subject
-                                                             (+ 14 (length branch) (length short)))))))
-                          (list (vui-newline))))))))))
+      (mayhem-run--fold
+       'source "Source" (memq 'source open) on-open
+       (string-join (delq nil (list branch short subject)) "  ")
+       (delq nil (list (and branch (cons branch (mayhem-repo-link repo branch 'branch branch)))
+                       (and short (cons short (mayhem-repo-link repo short 'commit revision)))
+                       (and subject
+                            (truncate-string-to-width
+                             subject (max 10 (- (mayhem-page-width) 16
+                                                (length branch) (length short)))
+                             nil nil "…"))))
+       (vui-fragment
+        (mayhem-scm-fields run "  ")
+        (when parent
+          (mayhem-field "  Parent"
+                        (mayhem-repo-link repo (substring parent 0 (min 7 (length parent)))
+                                          'commit parent))))))))
 
-(defun mayhem-run--started-with (run open on-open)
-  "Return the fields of what the CLI started RUN with, beyond its Mayhemfile.
-What it overrode, the environment it added and the files sent, each
-on a line, or folded when too wide for one.  OPEN lists the keys of
-those unfolded; ON-OPEN is as for `mayhem-run--field-or-fold'."
-  (let ((overrides (alist-get 'overrides run))
-        (env (alist-get 'env_vars run))
-        (files (alist-get 'run_files run))
-        (line (lambda (pairs separator)
-                (mapconcat (pcase-lambda (`(,k . ,v)) (format "%s%s%s" k separator
-                                                              (mayhem--format-value v)))
-                           pairs "  ")))
-        (count (lambda (n what) (format "%d %s%s" n what (if (= n 1) "" "s")))))
-    (vui-fragment
-     (when overrides
-       (mayhem-run--field-or-fold 'overrides "Overrides" (funcall line overrides " ")
-                                  (mapconcat (lambda (o) (symbol-name (car o))) overrides ", ")
-                                  (memq 'overrides open) on-open (mayhem-run--pairs overrides)))
-     (when env
-       (mayhem-run--field-or-fold 'env "Environment" (funcall line env "=")
-                                  (funcall count (length env) "variable")
-                                  (memq 'env open) on-open (mayhem-run--pairs env "=")))
-     (when files
-       (let ((files (mapcar (lambda (f) (cons (alist-get 'path f) (alist-get 'sha256 f)))
-                            files)))
-         (mayhem-run--field-or-fold
-          'files "Files"
-          (mapconcat (pcase-lambda (`(,path . ,sha))
-                       (concat path " "
-                               (propertize (substring (or sha "") 0 (min 8 (length (or sha ""))))
-                                           'face 'mayhem-label 'help-echo sha)))
-                     files "  ")
-          (funcall count (length files) "file")
-          (memq 'files open) on-open (mayhem-run--pairs files)))))))
+(defun mayhem-run--setup (owner project target number run open on-open)
+  "Return what RUN was set up with, folded under one line.
+Its build, hardening, Mayhemfile, what the CLI overrode in
+it, the environment it added, the files it sent, and the CLI's
+version.  Folded, the line links to the Mayhemfile and counts what
+the CLI added.  RUN is run NUMBER of TARGET of PROJECT of OWNER;
+OPEN and ON-OPEN are as for `mayhem-run--source'."
+  (let* ((build (alist-get 'build_id run))
+         (factors (alist-get 'n_exploitability_factors_total run))
+         (hardening (and factors (> factors 0)
+                         (format "hardening %s/%s"
+                                 (or (alist-get 'n_exploitability_factors_passing run) 0)
+                                 factors)))
+         (mayhemfile (alist-get 'mayhemfile_flat run))
+         (overrides (alist-get 'overrides run))
+         (env (alist-get 'env_vars run))
+         (files (alist-get 'run_files run))
+         (cli (and (alist-get 'cli_version run)
+                   (concat "mayhem " (alist-get 'cli_version run))))
+         (link (lambda (text) (mayhem-run--mayhemfile-link owner project target number
+                                                           run text)))
+         (count (lambda (items what)
+                  (when items
+                    (let ((n (length items)))
+                      (format "%d %s%s" n what (if (= n 1) "" "s"))))))
+         (grey (lambda (text) (and text (propertize text 'face 'mayhem-label))))
+         (counts (delq nil (list (funcall count overrides "override")
+                                 (funcall count env "variable")
+                                 (funcall count files "file")
+                                 hardening))))
+    (when (or build hardening mayhemfile overrides env files cli)
+      (mayhem-run--fold
+       'setup "Setup" (memq 'setup open) on-open
+       (string-join (delq nil (cons (and mayhemfile "Mayhemfile") counts)) "  ")
+       (append (and mayhemfile (list (cons "Mayhemfile" (funcall link "Mayhemfile"))))
+               (mapcar grey counts))
+       (vui-fragment
+        (when build
+          (mayhem-field "  Build" (format "%s" build)))
+        (mayhem-hardening-field run "  ")
+        (when mayhemfile
+          (let ((lines (length (split-string (string-trim-right mayhemfile) "\n"))))
+            ;; "Mayhemfile", indented, leaves no room after the label.
+            (mayhem-field "  Config" (funcall link "Mayhemfile")
+                          (funcall grey (format "  %d line%s" lines (if (= lines 1) "" "s"))))))
+        (when overrides
+          (let ((width (apply #'max (mapcar (lambda (o) (length (symbol-name (car o))))
+                                            overrides))))
+            (mayhem-run--lines "  Overrides"
+                               (mapcar (pcase-lambda (`(,key . ,value))
+                                         (concat (string-pad (symbol-name key) (+ width 2))
+                                                 (if value
+                                                     (mayhem--format-value value)
+                                                   (funcall grey "null"))))
+                                       overrides))))
+        (when env
+          (mayhem-run--lines "  Env"
+                             (mapcar (pcase-lambda (`(,key . ,value))
+                                       (format "%s=%s" key (mayhem--format-value value)))
+                                     env)))
+        (when files
+          (mayhem-run--lines "  Files"
+                             (mapcar (lambda (f)
+                                       (let ((sha (or (alist-get 'sha256 f) "")))
+                                         (concat (alist-get 'path f) "  "
+                                                 (propertize (substring sha 0 (min 8 (length sha)))
+                                                             'face 'mayhem-label 'help-echo sha))))
+                                     files)))
+        (when cli
+          (mayhem-field "  CLI" cli)))))))
 
 (defun mayhem-run--tabs (run data)
   "Return the tabs of the page of RUN, showing DATA, as (KEY LABEL).
@@ -587,7 +613,7 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER, from DATA."
 TAB is the key of the tab shown; when nil or not the run's, the
 log for a failed run, which says why, else the first.  ON-TAB is
 called with the key of another one, to show it.  OPEN and ON-OPEN
-are for the header's folds, as in `mayhem-run--started-with'."
+are for the header's folds, as in `mayhem-run--source'."
   (let* ((run (alist-get 'run data))
          (code (not (alist-get 'api_run run)))
          (start (alist-get 'started_at run))
@@ -637,15 +663,9 @@ are for the header's folds, as in `mayhem-run--started-with'."
                                  'face 'mayhem-label)))
      (when (alist-get 'phases run)
        (mayhem-field "Tasks" (mayhem-run--tasks run)))
-     (mayhem-hardening-field run)
      (mayhem-run--source run open on-open)
-     (when-let* ((build (alist-get 'build_id run)))
-       (mayhem-field "Build" (format "%s" build)))
      (mayhem-image-field run)
-     (mayhem-run--mayhemfile-field owner project target number run)
-     (mayhem-run--started-with run open on-open)
-     (when-let* ((cli (alist-get 'cli_version run)))
-       (mayhem-field "CLI" (concat "mayhem " cli)))
+     (mayhem-run--setup owner project target number run open on-open)
      (when code
        (mayhem-run--chart run (alist-get 'progress data) now))
      (vui-newline)
@@ -663,6 +683,7 @@ are for the header's folds, as in `mayhem-run--started-with'."
    (mayhem-field "Started" (mayhem-skeleton-bar 20))
    (mayhem-field "Duration" (mayhem-skeleton-bar 6))
    (mayhem-field "Source" (mayhem-skeleton-bar 30))
+   (mayhem-field "Setup" (mayhem-skeleton-bar 30))
    (vui-newline)
    (mayhem-heading "Defects")
    (mayhem-skeleton '((6 " " 28) (6 " " 36) (6 " " 22) (6 " " 30)))))
