@@ -477,23 +477,28 @@ when OPEN.  ON-OPEN is called with KEY and whether it is to be."
 
 (defun mayhem-run--source (run open on-open)
   "Return RUN's repo, branch, commit and parent, folded under one line.
-The line names its branch and commit.  OPEN and ON-OPEN are as for
-`mayhem-run--field-or-fold'."
+The line names its branch, commit and subject; folded, the branch and
+commit link to their pages, so TAB reaches them, as the fields do
+unfolded.  OPEN and ON-OPEN are as for `mayhem-run--field-or-fold'."
   (let* ((repo (mayhem--repo (alist-get 'scm_remote_origin run)))
          (parent (alist-get 'parent_revision run))
          (revision (alist-get 'revision run))
+         (branch (alist-get 'branch_name run))
+         (short (and revision (substring revision 0 (min 7 (length revision)))))
+         (subject (alist-get 'scm_commit_subject run))
          (unfold (memq 'source open))
-         (summary (string-join
-                   (delq nil (list (alist-get 'branch_name run)
-                                   (and revision (substring revision 0 (min 7 (length revision))))
-                                   (alist-get 'scm_commit_subject run)))
-                   "  ")))
-    (when (or (alist-get 'scm_remote_origin run) revision (alist-get 'branch_name run) parent)
+         (fit (lambda (text used)
+                (truncate-string-to-width text (max 10 (- (mayhem-page-width) used))
+                                          nil nil "…"))))
+    (when (or (alist-get 'scm_remote_origin run) revision branch parent)
       (vui-fragment
        (vui-collapsible :key 'source
-                        :title (concat (string-pad "Source" 10)
-                                       (truncate-string-to-width
-                                        summary (max 10 (- (mayhem-page-width) 12)) nil nil "…"))
+                        :title (if unfold
+                                   (concat (string-pad "Source" 10)
+                                           (funcall fit (string-join (delq nil (list branch short subject))
+                                                                     "  ")
+                                                    12))
+                                 "Source")
                         :title-face 'mayhem-label :indent 0
                         :expanded unfold
                         :on-toggle (lambda (open) (funcall on-open 'source open))
@@ -503,7 +508,19 @@ The line names its branch and commit.  OPEN and ON-OPEN are as for
                            (mayhem-field "  Parent"
                                          (mayhem-repo-link repo (substring parent 0 (min 7 (length parent)))
                                                            'commit parent)))))
-       (unless unfold (vui-newline))))))
+       ;; Folded, its title line has no newline of its own, so the
+       ;; links go on it, lined up with the fields' values.
+       (unless unfold
+         (let ((parts (delq nil (list (and branch (mayhem-repo-link repo branch 'branch branch))
+                                      (and short (mayhem-repo-link repo short 'commit revision))))))
+           (apply #'vui-fragment
+                  (vui-text (make-string 4 ?\s))
+                  (append (cdr (mapcan (lambda (part) (list (vui-text "  ") part)) parts))
+                          (when subject
+                            (list (vui-text (concat (and parts "  ")
+                                                    (funcall fit subject
+                                                             (+ 14 (length branch) (length short)))))))
+                          (list (vui-newline))))))))))
 
 (defun mayhem-run--started-with (run open on-open)
   "Return the fields of what the CLI started RUN with, beyond its Mayhemfile.
