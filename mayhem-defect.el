@@ -65,20 +65,12 @@ The defect is of TARGET of PROJECT of OWNER."
 (defconst mayhem-defect--testcases-shown 5
   "Most test cases a defect's page lists until asked for all of them.")
 
-(vui-defcomponent mayhem-defect-testcases (owner project target evidence)
-  "The table of the test cases in EVIDENCE of a code defect.
+(defun mayhem-defect--testcases (owner project target evidence)
+  "Return the table of the test cases in EVIDENCE of a code defect.
 The defect is of TARGET of PROJECT of OWNER.  It lists the first
-`mayhem-defect--testcases-shown', and a button the rest, which
-unfold and fold back as a `mayhem-fold' does."
-  :state ((all nil) (shown mayhem-defect--testcases-shown))
-  :render
+`mayhem-defect--testcases-shown', and a button the rest."
   (let* ((testcases (alist-get 'testcases evidence))
          (count (or (alist-get 'count evidence) 0))
-         (limit (min mayhem-defect--testcases-shown (length testcases)))
-         (more (> (length testcases) limit))
-         (now (mayhem-use-unfold (or shown limit) (if all (length testcases) limit)
-                                 (if all limit (length testcases))))
-         (rows (seq-take testcases now))
          (lines (mayhem-columns
                  (mapcar (lambda (test)
                            (let ((sha (alist-get 'sha256 test)))
@@ -95,26 +87,19 @@ unfold and fold back as a `mayhem-fold' does."
      (vui-newline)
      (if (null testcases)
          (mayhem-notice "No test cases")
-       (apply #'vui-fragment
-              (vui-text (concat (car lines) "\n"))
-              (seq-mapn (lambda (test line)
-                          (mayhem-row (concat line "\n")
-                                      (lambda ()
-                                        (mayhem-testcase-open owner project target
-                                                              (alist-get 'run_number test)
-                                                              (alist-get 'sha256 test)))
-                                      "RET: open test case"))
-                        rows (seq-take (cdr lines) now))))
-     (when more
        (vui-fragment
-        (vui-button (if all
-                        "Show fewer"
-                      (format "Show all %d test cases" (length testcases)))
-                    :help-echo (if all
-                                   (format "RET: list the first %d" mayhem-defect--testcases-shown)
-                                 "RET: list every one")
-                    :on-click (lambda () (vui-set-state :all (not all))))
-        (vui-newline)))
+        (vui-text (concat (car lines) "\n"))
+        (vui-component
+         'mayhem-unfold-list
+         :limit mayhem-defect--testcases-shown :what "test cases"
+         :rows (seq-mapn (lambda (test line)
+                           (mayhem-row (concat line "\n")
+                                       (lambda ()
+                                         (mayhem-testcase-open owner project target
+                                                               (alist-get 'run_number test)
+                                                               (alist-get 'sha256 test)))
+                                       "RET: open test case"))
+                         testcases (cdr lines)))))
      (when (> count (length testcases))
        (mayhem-notice (format "%d more in the web app" (- count (length testcases))))))))
 
@@ -169,8 +154,7 @@ SOURCE is \"api\" or \"code\"."
                                         (max 20 (min mayhem-defect--fill-width
                                                      (mayhem-page-width)))))
      (when (equal (alist-get 'source defect) "code")
-       (vui-component 'mayhem-defect-testcases :owner owner :project project
-                      :target target :evidence (alist-get 'evidence data)))
+       (mayhem-defect--testcases owner project target (alist-get 'evidence data)))
      (mayhem-defect--evidence-blocks (alist-get 'source defect) (alist-get 'evidence data)))))
 
 (defun mayhem-defect--skeleton ()

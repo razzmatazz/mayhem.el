@@ -558,6 +558,28 @@ open itself."
      (vui-newline)
      (apply #'vui-fragment (seq-take lines now)))))
 
+(vui-defcomponent mayhem-unfold-list (rows limit what)
+  "The first LIMIT of ROWS, and a button unfolding the rest, animated.
+ROWS are vnodes of a line each.  The button reads \"Show all 12 WHAT\",
+then \"Show fewer\"; the rows unfold and fold back as a `mayhem-fold'
+does.  Nil ROWS show nothing."
+  :state ((all nil) (shown nil))
+  :render
+  (let* ((count (length rows))
+         (limit (min limit count))
+         (now (mayhem-use-unfold (or shown limit) (if all count limit)
+                                 (if all limit count))))
+    (vui-fragment
+     (apply #'vui-fragment (seq-take rows now))
+     (when (> count limit)
+       (vui-fragment
+        (vui-button (if all "Show fewer" (format "Show all %d %s" count what))
+                    :help-echo (if all
+                                   (format "RET: list the first %d" limit)
+                                 "RET: list every one")
+                    :on-click (lambda () (vui-set-state :all (not all))))
+        (vui-newline))))))
+
 (defun mayhem-source-fold (scm)
   "Return SCM's repo, branch, commit and parent, a `mayhem-fold'.
 SCM is a run's alist with `mayhem--scm-fields', or a defect's.  The

@@ -64,10 +64,10 @@ say because your token expired, the error shows in the header line.
   the environment it added and the files sent are each a line, folded
   when too wide for one.  A code run also has a chart of test cases
   processed and defects found over time, as in the web app, and its
-  coverage, with the inputs each engine tested.  Tabs: Defects (with
-  active and fixed counts), Tests (counts, crashes, Valgrind errors,
-  the corpus and the failing test cases) and Log; an API run has Defects,
-  Endpoints and Log.  A run that is still going refreshes itself every
+  coverage, with the inputs each engine tested.  Its defects follow,
+  the first 10 until `Show all` lists the rest.  Tabs: Tests (counts,
+  crashes, Valgrind errors, the corpus and the failing test cases) and
+  Log; an API run has Endpoints and Log.  A run that is still going refreshes itself every
   10 seconds.
 - **Defect**: severity, CWE, the commit of the run that saw it,
   description and evidence: for an API defect the request, response
