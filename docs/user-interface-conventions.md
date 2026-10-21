@@ -12,6 +12,21 @@ users expect.
 | A link out of mayhem.el (a GitHub commit, a CI build) | `mayhem-link`, which follows it with `browse-url` |
 | A foldable block | `vui-collapsible` |
 | Parts of a page shown one at a time | `mayhem-tab-row`: the current tab a heading, the others buttons, kept in the page's state |
+| A list longer than a glance (a target's runs or defects) | its first few rows, then `[Show all 78 runs]`, which opens a page with the whole list |
+| A page of a whole list | under its heading, a tally of every item (`mayhem-tally`), then the facets it filters by (`mayhem-list-filter-bar`, `F`) |
+
+- **Recent data at first glance.**  A page opens showing what changed
+  lately, so the user can see how things stand without a keypress.
+  Lists such as a target's runs and defects are therefore stacked one
+  under another, each cut to its newest or most severe few rows, and
+  not put behind tabs, where all but one would be hidden.  A list whose
+  table header names it (`RUN`) needs no heading; one that does, such
+  as defects under their tally, gives the whole count (`Defects (6)`).
+  A button naming that count (`[Show all 78 runs]`,
+  `[Show all 6 defects]`) opens the full list as a page of its own,
+  rather than growing the list in place, so the sections below stay
+  where they are and the long list can be fetched page by page.  Keep tabs for detail that is read one part at a time,
+  such as a run's tests, coverage and log.
 
 - **Anything outside Mayhem links to its own page.**  A repository,
   branch, commit, CI build, Docker image or CWE entry is shown as a
@@ -29,8 +44,18 @@ users expect.
   owner, project, target, run) links to it; build it with
   `mayhem-page-heading`.  Its last part is the page itself, followed by
   the page's kind in grey (`host/o/p/t/#7  run`,
-  `host/o  workspace`), since that part is often a bare name or
-  number.  A long name in it is cut in the middle
+  `host/o  workspace`) when that part is a bare name, number or hash.
+  When the part says it already (`host/o/p/t/#7/tests`), leave the
+  kind out (nil): the breadcrumb shows what the page is, and the label
+  would only repeat it.  A page the web app has no counterpart for,
+  such as every run of a target (the web app lists them on the target's
+  page), adds no part to the breadcrumb, which would read as a URL
+  that leads nowhere.  Its breadcrumb ends at the page it belongs to,
+  linked, and its kind says what of that page it shows
+  (`host/o/p/t  code target, runs`), with `mayhem-list-page-heading`.
+  Such a page has no heading of its own above the list either
+  (`Runs (78)`): the whole page is the list.
+  A long name in it is cut in the middle
   (`mayhem-cut-middle`), whole on hover.
   A field naming another page (`Run  run #7`) links to it, with
   `mayhem-page-link` or `mayhem-run-link`.
@@ -45,6 +70,39 @@ users expect.
   (`o/p/t/#7/abcd1234  test case`), and so does a table column of numbers
   under a heading that already names them, such as a target's run
   list (`#7`).
+- **Say what a target tests.**  A code target and an API target show
+  different things (tests and coverage, or endpoints), so a target's
+  type is shown wherever the target is: its page's kind (`host/o/p/t
+  code target`), its completion annotation (`code target`, `api
+  target`), and a grey `code` or `api` beside it in the project's and
+  workspace's lists.  Write it with `mayhem-target-type` and
+  `mayhem-target-kind`.
+- **Tally, then filter, a whole list.**  A page listing every defect or
+  run of a target says how they split, the way the web app does
+  (`4 high, 2 medium`, `73 completed, 5 stopped`), counting the whole
+  list so the line keeps still while a filter is set.  Below it is a
+  `Filter` line of a button per facet, as octocat.el's issue and PR
+  lists have; `RET` on one, or `F`, picks its value from those in the
+  list, and picking the one set clears it.  A set facet shows its value
+  (`[Severity: high]`), and `[clear]` drops them all, followed by how
+  many are left (`5 of 78`).  A blank line comes between the tally and
+  the filter, and between the filter and the list.  The filter is
+  buffer-local, kept across refreshes.  A page sets its facets in its mode
+  (`mayhem-list-facets`).  The items are all fetched, so filtering is
+  done here.
+- **Name a table's columns.**  A table of runs or defects starts with
+  a grey line naming its columns (`mayhem-columns` with a HEADER), so
+  a bare `6` or `64/89` reads as what it is.  The names are in
+  capitals, which reads as a header in any font, where bold may not.
+  Keep them short, abbreviated where need be (`COV`, `PASS`), so they
+  widen the table little if at all.  With the header saying what a
+  column holds, its cells drop the words they would otherwise repeat:
+  `6` under `DEFECTS`, not `6 defects`.  A name may span the columns
+  after it (nil names in the HEADER) where they tell one thing: a
+  count and its split by severity under `DEFECTS`, a level and its
+  score under `SEVERITY`.  A spanning name can be a whole word, as it
+  has the room.  A column empty in every row is left out, its name
+  with it.
 - `help-echo` reads `"RET: <imperative>"`, e.g. `"RET: open target"`.
 - Build interactive parts from vui components, not hand-made text
   properties: only vui's elements are TAB stops.

@@ -60,6 +60,22 @@
                  '("#2   completed   1 defect"
                    "#10  failed     0 defects"))))
 
+(ert-deftest mayhem-vui-test-columns-header ()
+  (should (equal (mapcar #'substring-no-properties
+                         (mayhem-columns '(("#2" "" "1") ("#10" "" "12"))
+                                         '(2) '("Run" "Cov" "Def")))
+                 '("RUN  DEF"
+                   "#2     1"
+                   "#10   12"))))
+
+(ert-deftest mayhem-vui-test-columns-header-span ()
+  (should (equal (mapcar #'substring-no-properties
+                         (mayhem-columns '(("#2" "1" "1 high") ("#10" "12" ""))
+                                         '(1) '("Run" "Defects" nil)))
+                 '("RUN  DEFECTS"
+                   "#2    1  1 high"
+                   "#10  12"))))
+
 (ert-deftest mayhem-vui-test-defect-ids-pad-alike ()
   (should (equal (mayhem-defect-ids '(((defect_number . 7)) ((defect_number . 1234))))
                  '("!7   " "!1234")))

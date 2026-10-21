@@ -41,8 +41,8 @@ fallback only for what the API cannot do (none so far).
 | `GET /api/v2/owner/{owner}/project/{project}/target?include_archived=true` | project page's targets, archived ones too |
 | `GET /api/v2/owner/{owner}/project/{project}/project-total` | project page's run count and targets passing their tests |
 | `GET /api/v2/owner/{owner}/project/{project}/target/{target}` | target page |
-| `GET .../target/{target}/run?per_page=20` | target page's latest runs |
-| `GET /api/v2/owner/{owner}/project/{project}/defect?target_slug={target}&sorted_by=-severity` | target page's defects, most severe first |
+| `GET .../target/{target}/run?per_page=5` | target page's latest runs; every page of it, a target's run list |
+| `GET /api/v2/owner/{owner}/project/{project}/defect?target_slug={target}&sorted_by=-severity` | target page's defects, most severe first; every page of it, a target's defect list |
 | `GET /api/v2/owner/{owner}/defect-trend?project=&target=&window_start_timestamp_seconds=&window_end_timestamp_seconds=&window_step_seconds=` | target page's defect trend |
 | `GET .../target/{target}/run/{number}` | run page |
 | `GET /api/v2/owner/{owner}/project/{project}/defect?run={run_id}` | run page's defects |

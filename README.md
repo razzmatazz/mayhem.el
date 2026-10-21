@@ -35,6 +35,7 @@ say because your token expired, the error shows in the header line.
 | `C-c C-j` | jump to a workspace, project or target by name |
 | `C-c C-o` | open this page in the web app, in a browser |
 | `C-c C-v` | switch the page's view, say a test case's bytes between hex and text |
+| `F` | filter a list of every defect or run, by severity, CWE, state, status or branch |
 | `q` | go back to the previous page |
 
 `mayhem-jump` (`C-c C-j`) works anywhere, so you may want it global:
@@ -50,8 +51,9 @@ say because your token expired, the error shows in the header line.
   targets pass their tests, a defect trend chart, and its targets
   (active and archived tabs), each with what its latest run found.
 - **Target**: its latest run, with what it found, its line coverage,
-  hardening, repository and image; its defect trend; and tabs for its
-  defects (most severe first) and latest runs.
+  hardening, repository and image; its defect trend; and its latest
+  runs and most severe defects, a few of each, with `[Show all 78 runs]`
+  opening a page of every one, tallied and filterable.
 - **Run**: status, when it started and how long it waited in the
   queue, how long it ran against its time limit and its CPU time, its
   repository, branch, commit and parent commit, the CI build and build

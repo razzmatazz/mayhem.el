@@ -186,6 +186,7 @@ A page with two sets it in its mode, and renders the other while
   "C-c C-j" #'mayhem-jump
   "C-c C-o" #'mayhem-browse
   "C-c C-v" #'mayhem-toggle-view
+  "F" #'mayhem-list-filter
   "g" #'mayhem-refresh
   "q" #'mayhem-quit-window
   "S-<return>" #'mayhem-visit-other-window)
@@ -342,13 +343,32 @@ NUMBER is a run of TARGET of PROJECT of OWNER.  FACE is as for
 
 (defun mayhem-page-heading (kind owner project target &rest more)
   "Return a page's heading: HOST/OWNER/PROJECT/TARGET/MORE KIND.
+See `mayhem--page-heading'."
+  (mayhem--page-heading kind nil owner project target more))
+
+(defun mayhem-list-page-heading (what owner project target)
+  "Return the heading of the page listing every WHAT of TARGET.
+WHAT is a plural, such as \"defects\".  It names TARGET's page,
+linked, as \"code target, runs\": the page has no web counterpart to
+name in the breadcrumb.  TARGET is of PROJECT of OWNER; its type is
+read from the store, if there."
+  (let ((type (alist-get 'type (alist-get 'target (plist-get (mayhem-sync-read
+                                                              (list 'target owner project target))
+                                                             :data)))))
+    (mayhem--page-heading (concat (mayhem-target-kind type) ", " what) t
+                          owner project target nil)))
+
+(defun mayhem--page-heading (kind link-last owner project target more)
+  "Return a page's heading: HOST/OWNER/PROJECT/TARGET/MORE KIND.
 HOST is the Mayhem server's, `mayhem--host', naming the dashboard.
 OWNER, PROJECT and TARGET may be nil, from the end.  Each part links
 to its page, the dashboard first, so one can walk up, except the last:
-that is the page itself.  MORE are parts below TARGET, strings or
-vnodes such as a `mayhem-run-link'.  KIND, such as \"target\", says in
-`shadow' what the page shows, as the last part is often a bare name or
-number.  A name longer than `mayhem-heading-part-width' is cut in the middle,
+that is the page itself, unless LINK-LAST.  MORE are parts below
+TARGET, strings or vnodes such as a `mayhem-run-link'.  KIND, such as
+\"target\", says in `shadow' what the page shows, as the last part is
+often a bare name or number; it is nil when the last part says it,
+such as \"tests\".
+A name longer than `mayhem-heading-part-width' is cut in the middle,
 whole on hover."
   (let* ((face 'mayhem-section-heading)
          (parts (seq-filter
@@ -367,7 +387,7 @@ whole on hover."
                            (let* ((shown (mayhem-cut-middle name mayhem-heading-part-width))
                                   (cut (not (eq shown name))))
                              (list (vui-text "/" :face face)
-                                   (if (and (eq name (car last)) (null more))
+                                   (if (and (eq name (car last)) (null more) (not link-last))
                                        (vui-text (if cut (propertize shown 'help-echo name) shown)
                                                  :face face)
                                      (mayhem-page-link shown (if cut (concat help " " name) help)
@@ -377,8 +397,8 @@ whole on hover."
                       (list (vui-text "/" :face face)
                             (if (stringp part) (vui-text part :face face) part)))
                     more)
-            (list (vui-text (concat "  " kind) :face (list 'shadow face))
-                  (vui-text "\n"))))))
+            (and kind (list (vui-text (concat "  " kind) :face (list 'shadow face))))
+            (list (vui-text "\n"))))))
 
 (defun mayhem-repo-link (repo text &optional kind ref)
   "Return TEXT linking to REPO or its KIND REF, as `mayhem--repo-url' does.
@@ -535,6 +555,14 @@ is drawn as a heading, the others as buttons."
                                     :face 'underline))))
      (vui-newline))))
 
+(defun mayhem-target-type (type)
+  "Return how a target of TYPE, \"code\" or \"api\", is named: as it is."
+  (if (stringp type) type ""))
+
+(defun mayhem-target-kind (type)
+  "Return what a target of TYPE is, such as \"code target\", for a heading."
+  (string-trim (concat (mayhem-target-type type) " target")))
+
 (defun mayhem-defect-severity-face (level)
   "Return the face for a defect of severity LEVEL, such as \"high\"."
   (pcase level
@@ -542,25 +570,62 @@ is drawn as a heading, the others as buttons."
     ("medium" 'warning)
     (_ 'mayhem-label)))
 
-(defun mayhem-columns (rows &optional right)
+(defun mayhem-columns (rows &optional right header)
   "Return ROWS, each a list of strings, as lines in aligned columns.
 Each column is as wide as its widest cell and two spaces from the
 next; one empty in every row is left out.  The columns whose indexes
-are in RIGHT are aligned right."
+are in RIGHT are aligned right.  HEADER, a list of a name per column,
+makes the first line theirs, in capitals and `mayhem-label'.  A name
+of nil continues the one before, which then spans both columns, as
+\"Defects\" over a count and its split by severity."
   (let* ((n (apply #'max 0 (mapcar #'length rows)))
          (widths (mapcar (lambda (i)
                            (apply #'max 0 (mapcar (lambda (row) (string-width (or (nth i row) "")))
                                                   rows)))
-                         (number-sequence 0 (1- n)))))
-    (mapcar (lambda (row)
-              (let (cells)
-                (dotimes (i n)
-                  (let* ((cell (or (nth i row) ""))
-                         (pad (make-string (- (nth i widths) (string-width cell)) ?\s)))
-                    (when (> (nth i widths) 0)
-                      (push (if (memq i right) (concat pad cell) (concat cell pad)) cells))))
-                (string-trim-right (string-join (nreverse cells) "  "))))
-            rows)))
+                         (number-sequence 0 (1- n))))
+         (spans (when header
+                  (let ((i 0) spans)
+                    (while (< i n)
+                      (let ((j (1+ i)))
+                        (while (and (< j n) (null (nth j header)))
+                          (setq j (1+ j)))
+                        (push (number-sequence i (1- j)) spans)
+                        (setq i j)))
+                    (nreverse spans))))
+         (shown (lambda (span) (seq-filter (lambda (k) (> (nth k widths) 0)) span)))
+         (room (lambda (cols)
+                 (+ (apply #'+ (mapcar (lambda (k) (nth k widths)) cols))
+                    (* 2 (max 0 (1- (length cols))))))))
+    ;; A name wider than its columns widens the first of them.
+    (dolist (span spans)
+      (let ((cols (funcall shown span))
+            (name (or (nth (car span) header) "")))
+        (when (and cols (> (string-width name) (funcall room cols)))
+          (setf (nth (car cols) widths)
+                (+ (nth (car cols) widths) (- (string-width name) (funcall room cols)))))))
+    (let ((lines (mapcar (lambda (row)
+                           (let (cells)
+                             (dotimes (i n)
+                               (when (> (nth i widths) 0)
+                                 (let* ((cell (or (nth i row) ""))
+                                        (pad (make-string (- (nth i widths) (string-width cell))
+                                                          ?\s)))
+                                   (push (if (memq i right) (concat pad cell) (concat cell pad))
+                                         cells))))
+                             (string-trim-right (string-join (nreverse cells) "  "))))
+                         rows)))
+      (if (not header)
+          lines
+        (cons (propertize
+               (string-trim-right
+                (mapconcat (lambda (cols)
+                             (let ((name (upcase (or (nth (car cols) header) ""))))
+                               (string-pad name (funcall room cols) nil
+                                           (and (null (cdr cols)) (memq (car cols) right)))))
+                           (delq nil (mapcar shown spans))
+                           "  "))
+               'face 'mayhem-label)
+              lines)))))
 
 (defun mayhem-defect-ids (defects)
   "Return the numbers of DEFECTS, alists, as \"!N\" padded to one width.
@@ -570,14 +635,18 @@ Each leads its defect's row, so the rows after it line up."
          (width (apply #'max 0 (mapcar #'string-width ids))))
     (mapcar (lambda (id) (string-pad id width)) ids)))
 
+(defun mayhem-run-status-face (status)
+  "Return the face of a run of STATUS, such as \"failed\", by how it went."
+  (pcase status
+    ("completed" 'success)
+    ("failed" 'error)
+    ("running" 'warning)
+    (_ 'mayhem-label)))
+
 (defun mayhem-run-status (run)
   "Return the status of RUN, an alist, coloured by how it went."
   (let ((status (mayhem--run-status run)))
-    (propertize status 'face (pcase status
-                               ("completed" 'success)
-                               ("failed" 'error)
-                               ("running" 'warning)
-                               (_ 'mayhem-label)))))
+    (propertize status 'face (mayhem-run-status-face status))))
 
 (defun mayhem-testcase-status (defects)
   "Return a test case's status: \"failing\" with DEFECTS, a count, above 0."
@@ -599,6 +668,128 @@ failed: then it says fetching WHAT failed."
          (vui-text (concat (propertize (format "Fetching %s failed: " what) 'face 'error)
                            (plist-get snapshot :error) "\n")))
         (t skeleton)))
+
+;;;; List filters
+
+;; A page listing every defect or run of a target fetches them all, so
+;; it filters them here.  Its mode sets `mayhem-list-facets'; the filter
+;; is buffer-local, kept across refreshes, and `F' or a facet's button
+;; changes it.  The items are the page's resource, `mayhem-page'.
+
+(defvar-local mayhem-list-facets nil
+  "What the page's list filters by, as (LABEL . FN), in button order.
+FN returns an item's value for the facet, a string or nil.  Nil when the
+page has no filters.")
+
+(defvar-local mayhem-list-filter nil
+  "The page's filter, as (LABEL . VALUE) for each facet set.")
+
+(defun mayhem-list-filtered (items)
+  "Return ITEMS that match `mayhem-list-filter'."
+  (seq-filter (lambda (item)
+                (seq-every-p (pcase-lambda (`(,label . ,value))
+                               (equal (funcall (alist-get label mayhem-list-facets
+                                                          nil nil #'equal)
+                                               item)
+                                      value))
+                             mayhem-list-filter))
+              items))
+
+(defun mayhem-list--check-filterable ()
+  "Signal a `user-error' unless the page's list has filters."
+  (unless mayhem-list-facets
+    (user-error "Mayhem: This page has no filters")))
+
+(defun mayhem-list--apply (filter)
+  "Make FILTER the page's filter and show what passes it."
+  (setq mayhem-list-filter filter)
+  (when-let* ((root (vui-get-instance (current-buffer))))
+    (vui-rerender root)))
+
+(defun mayhem-list-filter-by (label)
+  "Choose the value of the list's facet LABEL; the one set clears it."
+  (mayhem-list--check-filterable)
+  (let* ((fn (alist-get label mayhem-list-facets nil nil #'equal))
+         (items (plist-get (mayhem-sync-read mayhem-page) :data))
+         (values (seq-uniq (delq nil (mapcar fn items))))
+         (current (alist-get label mayhem-list-filter nil nil #'equal))
+         (marked (mapcar (lambda (v) (if (equal v current) (concat v " ✓") v))
+                         (if current (cons current (delete current values)) values)))
+         (table (lambda (string pred action)
+                  (if (eq action 'metadata)
+                      '(metadata (display-sort-function . identity))
+                    (complete-with-action action marked string pred))))
+         (value (string-remove-suffix
+                 " ✓" (completing-read (format "%s (✓ = set): " label) table nil t))))
+    (mayhem-list--apply
+     (append (seq-remove (lambda (f) (equal (car f) label)) mayhem-list-filter)
+             (unless (or (string-empty-p value) (equal value current))
+               (list (cons label value)))))))
+
+(defun mayhem-list-clear-filter ()
+  "Show the whole list."
+  (interactive)
+  (mayhem-list--check-filterable)
+  (mayhem-list--apply nil))
+
+(defun mayhem-list-filter ()
+  "Choose a facet of the list to filter by, or clear the filter."
+  (interactive)
+  (mayhem-list--check-filterable)
+  (let ((choice (completing-read "Filter by: "
+                                 (append (mapcar #'car mayhem-list-facets)
+                                         (and mayhem-list-filter '("Clear")))
+                                 nil t)))
+    (if (equal choice "Clear")
+        (mayhem-list-clear-filter)
+      (mayhem-list-filter-by choice))))
+
+(defun mayhem-list-filter-bar (items shown)
+  "Return the line of the list's facet buttons, a set one with its value.
+While a filter is set, a `[clear]' button follows, and how many of
+ITEMS are SHOWN."
+  (vui-fragment
+   (apply #'vui-hstack :spacing 2
+          (vui-text "Filter" :face 'mayhem-label)
+          (append
+           (mapcar (pcase-lambda (`(,label . ,_))
+                     (let ((value (alist-get label mayhem-list-filter nil nil #'equal)))
+                       (vui-button (if value (format "%s: %s" label value) label)
+                                   :key label
+                                   :face (unless value 'mayhem-label)
+                                   :help-echo (format "RET: filter by %s" (downcase label))
+                                   :on-click (lambda () (mayhem-list-filter-by label)))))
+                   mayhem-list-facets)
+           (and mayhem-list-filter
+                (list (vui-button "clear" :key 'clear :face 'mayhem-label
+                                  :help-echo "RET: show the whole list"
+                                  :on-click #'mayhem-list-clear-filter)
+                      (vui-text (format "%d of %d" (length shown) (length items))
+                                :face 'mayhem-label)))))
+   (vui-newline)))
+
+(defun mayhem-tally (items fn &optional order face)
+  "Return a line counting ITEMS by FN's value, as \"4 high, 2 medium\".
+Values in ORDER come first, in it, the rest by count; FACE, a function
+of a value, gives its face.  Nil when no item has a value."
+  (let (counts)
+    (dolist (item items)
+      (when-let* ((v (funcall fn item)))
+        (setf (alist-get v counts 0 nil #'equal) (1+ (alist-get v counts 0 nil #'equal)))))
+    (when counts
+      (setq counts (sort counts (lambda (a b)
+                                  (let ((i (seq-position order (car a)))
+                                        (j (seq-position order (car b))))
+                                    (cond ((and i j) (< i j))
+                                          (i t)
+                                          (j nil)
+                                          (t (> (cdr a) (cdr b))))))))
+      (vui-text (concat (mapconcat (pcase-lambda (`(,v . ,n))
+                                     (propertize (format "%d %s" n v)
+                                                 'face (if face (funcall face v) 'mayhem-label)))
+                                   counts
+                                   (propertize ", " 'face 'mayhem-label))
+                        "\n")))))
 
 ;;;; Defect trend
 

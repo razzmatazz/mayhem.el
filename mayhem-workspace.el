@@ -39,7 +39,8 @@
 
 (defun mayhem-workspace--render (owner projects targets)
   "Return the vnodes listing PROJECTS of OWNER, each with its TARGETS."
-  (let ((mine (seq-filter (lambda (p) (equal (alist-get 'owner p) owner)) projects)))
+  (let ((mine (seq-filter (lambda (p) (equal (alist-get 'owner p) owner)) projects))
+        (types (mayhem--target-types (list (cons owner targets)))))
     (vui-fragment
      (mayhem-heading (format "Projects (%d)" (length mine)))
      (if (null mine)
@@ -54,6 +55,13 @@
                          (mapcar (lambda (target)
                                    (mayhem-row (concat "  "
                                                        (propertize target 'face 'mayhem-target)
+                                                       (when-let* ((type (gethash
+                                                                          (concat owner "/" slug
+                                                                                  "/" target)
+                                                                          types)))
+                                                         (propertize
+                                                          (concat "  " (mayhem-target-type type))
+                                                          'face 'mayhem-label))
                                                        "\n")
                                                (lambda () (mayhem-target-open owner slug target))
                                                "RET: open target"))

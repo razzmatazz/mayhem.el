@@ -33,15 +33,16 @@
   "Return the name TARGET, an alist, is listed by."
   (or (alist-get 'target_name target) (alist-get 'slug target)))
 
-(defun mayhem-project--target-row (owner project target name-width now)
+(defun mayhem-project--target-row (owner project target name-width total-width counts-width
+                                         now)
   "Return the row of TARGET, an alist, on PROJECT of OWNER's page at NOW.
-Its name is padded to NAME-WIDTH columns."
+Its name is padded to NAME-WIDTH columns; its defects, as on the
+project's Defects field, are the total right-aligned in TOTAL-WIDTH and
+then by severity, padded to COUNTS-WIDTH."
   (let* ((slug (alist-get 'slug target))
          (run (alist-get 'latest target))
-         (lines (alist-get 'n_lines_total run))
          (all (or (alist-get 'n_testcase_reports run) 0))
-         (factors (alist-get 'n_exploitability_factors_total run))
-         (line (list (propertize (format "%-5s" (or (alist-get 'type target) ""))
+         (line (list (propertize (format "%-5s" (mayhem-target-type (alist-get 'type target)))
                                  'face 'mayhem-label)
                      (mayhem-fit (propertize (mayhem-project--target-name target)
                                              'face 'mayhem-target)
@@ -50,28 +51,16 @@ Its name is padded to NAME-WIDTH columns."
                          (propertize (format " %5d runs" (or (alist-get 'n_runs target) 0))
                                      'face 'mayhem-label)
                        (concat
-                        (propertize (if (and lines (> lines 0))
-                                        (format "%5d%%"
-                                                (round (* 100.0 (or (alist-get 'n_lines_covered run) 0))
-                                                       lines))
-                                      "      ")
-                                    'help-echo "Line coverage")
-                        (format " %4d defects" (or (alist-get 'n_defects run) 0))
-                        (propertize (if (and factors (> factors 0))
-                                        (format "  %d/%d" (or (alist-get 'n_exploitability_factors_passing
-                                                                         run)
-                                                              0)
-                                                factors)
-                                      "     ")
-                                    'face 'mayhem-label 'help-echo "Exploitability factors")
+                        "  "
+                        (string-pad (format "%d" (or (alist-get 'n_defects run) 0)) total-width nil t)
+                        "  "
+                        (string-pad (or (mayhem-severity-counts run) "") counts-width)
                         (propertize (format "  %4d/%-4d tests"
                                             (- all (or (alist-get 'n_crash_reports run) 0)) all)
                                     'face 'mayhem-label 'help-echo "Passing tests of all")
                         "  "
                         (propertize (or (mayhem--format-age (alist-get 'created_at run) now) "")
-                                    'face 'mayhem-label)
-                        (when-let* ((counts (mayhem-severity-counts run)))
-                          (concat "  " counts)))))))
+                                    'face 'mayhem-label))))))
     (mayhem-row line (lambda () (mayhem-target-open owner project slug))
                 "RET: open target")))
 
@@ -101,6 +90,14 @@ nil; ON-TAB is called with the other's key, to show it."
          (name-width (apply #'max 1 (mapcar (lambda (target)
                                               (string-width (mayhem-project--target-name target)))
                                             (nth 2 shown))))
+         (runs (mapcar (lambda (target) (alist-get 'latest target)) (nth 2 shown)))
+         (total-width (apply #'max 1 (mapcar (lambda (run)
+                                               (length (format "%d" (or (alist-get 'n_defects run)
+                                                                        0))))
+                                             runs)))
+         (counts-width (apply #'max 0 (mapcar (lambda (run)
+                                                (string-width (or (mayhem-severity-counts run) "")))
+                                              runs)))
          (now (current-time)))
     (vui-fragment
      (mayhem-repo-field (alist-get 'repository_url info))
@@ -129,7 +126,8 @@ nil; ON-TAB is called with the other's key, to show it."
      (if (nth 2 shown)
          (apply #'vui-fragment
                 (mapcar (lambda (target)
-                          (mayhem-project--target-row owner project target name-width now))
+                          (mayhem-project--target-row owner project target
+                                                      name-width total-width counts-width now))
                         (nth 2 shown)))
        (mayhem-notice (if (eq (car shown) 'archived) "No archived targets" "No targets"))))))
 

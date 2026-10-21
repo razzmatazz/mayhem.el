@@ -80,6 +80,14 @@ RAW is as for `mayhem--api-response'."
                     ("zed" ((owner . "zed") (project_slug . "other") (slug . "x")))))
                  '("acme" "acme/q" "acme/q/t" "acme/r" "zed" "zed/p"))))
 
+(ert-deftest mayhem-core-test-target-types ()
+  (let ((types (mayhem--target-types
+                '(("acme" ((owner . "acme") (project_slug . "q") (slug . "t") (type . "api"))
+                   ((owner . "acme") (project_slug . "q") (slug . "u") (type . "code")))))))
+    (should (equal (gethash "acme/q/t" types) "api"))
+    (should (equal (gethash "acme/q/u" types) "code"))
+    (should-not (gethash "acme/q/v" types))))
+
 (ert-deftest mayhem-core-test-user-label ()
   (should (equal (mayhem--user-label '((username . "jd") (first_name . "Jo")
                                        (last_name . "Doe")))
@@ -172,6 +180,11 @@ RAW is as for `mayhem--api-response'."
 (ert-deftest mayhem-core-test-pick ()
   (should (equal (mayhem--pick '((a . 1) (b . 2) (c . 3)) '(c a z))
                  '((c . 3) (a . 1) (z)))))
+
+(ert-deftest mayhem-core-test-target-defect ()
+  (let ((defect (mayhem--target-defect '((defect_number . 3) (title . "t") (secret . "x")))))
+    (should (equal (alist-get 'defect_number defect) 3))
+    (should-not (assq 'secret defect))))
 
 (ert-deftest mayhem-core-test-run-summary ()
   (let ((run (mayhem--run-summary
@@ -270,6 +283,10 @@ RAW is as for `mayhem--api-response'."
                    page)))
   (should (equal (mayhem--page-url "https://h/" '(defect "o" "p" "t" 34 1))
                  "https://h/o/p/t/1?defect=34")))
+
+(ert-deftest mayhem-core-test-page-url-target-lists ()
+  (should (equal (mayhem--page-url "https://h/" '(target-runs "o" "p" "t")) "https://h/o/p/t"))
+  (should (equal (mayhem--page-url "https://h/" '(target-defects "o" "p" "t")) "https://h/o/p/t")))
 
 (ert-deftest mayhem-core-test-clean-url ()
   (should (equal (mayhem--clean-url "https://github.com:443/o/r//actions/runs/7")

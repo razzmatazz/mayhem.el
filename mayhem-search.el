@@ -29,14 +29,16 @@
 (declare-function mayhem-target-open "mayhem-target" (owner project target))
 
 (defun mayhem-search--candidates ()
-  "Return the workspaces, projects and targets in the store, as paths."
-  (let ((projects (plist-get (mayhem-sync-read '(projects)) :data)))
-    (mayhem--search-candidates
-     projects
-     (mapcar (pcase-lambda (`(,owner . ,_))
-               (cons owner (plist-get (mayhem-sync-read (list 'workspace-targets owner))
-                                      :data)))
-             (mayhem--workspaces projects)))))
+  "Return the workspaces, projects and targets in the store, as paths.
+That is (PATHS . TYPES): TYPES is `mayhem--target-types' of the targets."
+  (let* ((projects (plist-get (mayhem-sync-read '(projects)) :data))
+         (targets (mapcar (pcase-lambda (`(,owner . ,_))
+                            (cons owner (plist-get (mayhem-sync-read
+                                                    (list 'workspace-targets owner))
+                                                   :data)))
+                          (mayhem--workspaces projects))))
+    (cons (mayhem--search-candidates projects targets)
+          (mayhem--target-types targets))))
 
 (defun mayhem-search--request ()
   "Refetch in the background what is searched, unless fetched just now."
@@ -44,23 +46,28 @@
   (dolist (workspace (mayhem--workspaces (plist-get (mayhem-sync-read '(projects)) :data)))
     (mayhem-sync-request (list 'workspace-targets (car workspace)))))
 
-(defun mayhem-search--annotate (candidate)
-  "Return what kind of page CANDIDATE opens."
+(defun mayhem-search--annotate (candidate types)
+  "Return what kind of page CANDIDATE opens; a target's, with its type.
+TYPES is `mayhem--target-types' of the targets."
   (propertize (pcase (seq-count (lambda (c) (eq c ?/)) candidate)
-                (0 "  workspace") (1 "  project") (_ "  target"))
+                (0 "  workspace")
+                (1 "  project")
+                (_ (concat "  " (mayhem-target-kind (gethash candidate types)))))
               'face 'mayhem-label))
 
 (defun mayhem-search--table (candidates)
-  "Return a completion table of the list in the cons CANDIDATES.
-It reads the car on each call, so it completes on what is put there."
+  "Return a completion table of CANDIDATES, a box of (PATHS . TYPES).
+It reads the box's car on each call, so it completes on what is put
+there."
   (lambda (string pred action)
     (if (eq action 'metadata)
-        '(metadata (category . mayhem)
-                   (annotation-function . mayhem-search--annotate)
+        `(metadata (category . mayhem)
+                   (annotation-function
+                    . ,(lambda (c) (mayhem-search--annotate c (cdar candidates))))
                    ;; Keep each workspace above its projects, each above its targets.
                    (display-sort-function . identity)
                    (cycle-sort-function . identity))
-      (complete-with-action action (car candidates) string pred))))
+      (complete-with-action action (caar candidates) string pred))))
 
 (defun mayhem-search--store-key-p (key)
   "Return non-nil if KEY is of a resource searched."

@@ -185,6 +185,17 @@ error message."
   (mayhem--api-get-all (mayhem--path "/api/v2/owner/%s/target" owner)
                        'targets callback))
 
+(defun mayhem--target-types (targets)
+  "Return a table of the type of each of TARGETS, keyed by path.
+TARGETS is an alist of each owner to its targets, as from the API.  A
+path is \"owner/project/target\"; a type, \"code\" or \"api\"."
+  (let ((types (make-hash-table :test #'equal)))
+    (dolist (owner targets types)
+      (dolist (target (cdr owner))
+        (puthash (concat (alist-get 'owner target) "/" (alist-get 'project_slug target)
+                         "/" (alist-get 'slug target))
+                 (alist-get 'type target) types)))))
+
 (defun mayhem--group-targets (projects targets)
   "Return PROJECTS with their TARGETS, as from the API.
 Each element is (PROJECT-SLUG . TARGET-SLUGS); both keep the API's
@@ -256,6 +267,9 @@ Nil also when URL is on another host, or shows something no page does."
         (mayhem--path "/%s/%s/%s/-/defects/%s" o p tg (format "%s" n))))
      (`(testsuite ,o ,p ,tg ,run)
       (mayhem--path "/%s/%s/%s/%s/tests" o p tg (format "%s" run)))
+     ;; The web app lists them on the target's page.
+     (`(,(or 'target-runs 'target-defects) ,o ,p ,tg)
+      (mayhem--path "/%s/%s/%s" o p tg))
      (`(testcase ,o ,p ,tg ,run ,sha)
       (format "%s?testcase=%s" (mayhem--path "/%s/%s/%s/%s/tests" o p tg (format "%s" run))
               (url-hexify-string sha)))
@@ -371,10 +385,10 @@ its `latest' run, or an error message."
                       '((include_archived "true"))))))
      callback)))
 
-(defconst mayhem--runs-shown 20
+(defconst mayhem--runs-shown 5
   "How many of a target's latest runs its page shows.")
 
-(defconst mayhem--target-defects-shown 100
+(defconst mayhem--target-defects-shown 5
   "How many of a target's defects, most severe first, its page shows.")
 
 (defconst mayhem--target-run-fields
@@ -391,6 +405,19 @@ its `latest' run, or an error message."
 (defun mayhem--target-run (run)
   "Return RUN, as the API gives it, with only `mayhem--target-run-fields'."
   (mayhem--pick (append run (alist-get 'run_attributes run)) mayhem--target-run-fields))
+
+(defconst mayhem--target-defect-fields
+  '(defect_number title severity severity_level state cwe_number last_seen
+                  last_seen_run_number)
+  "Fields of a defect kept for its target's lists.")
+
+(defun mayhem--target-defect (defect)
+  "Return DEFECT, as the API gives it, with only `mayhem--target-defect-fields'."
+  (mayhem--pick defect mayhem--target-defect-fields))
+
+(defun mayhem--target-defects-params (target)
+  "Return the query parameters listing TARGET's defects, most severe first."
+  `((target_slug ,target) (sorted_by "-severity")))
 
 (defun mayhem--fetch-target (owner project target callback)
   "Fetch TARGET of PROJECT of OWNER, with its defects and latest run list.
@@ -425,15 +452,9 @@ the page shows; the defects are the most severe ones."
        (defects . ,(lambda (cb)
                      (mayhem--api-get
                       (mayhem--path "/api/v2/owner/%s/project/%s/defect" owner project)
-                      `((target_slug ,target) (sorted_by "-severity")
+                      `(,@(mayhem--target-defects-params target)
                         (per_page ,mayhem--target-defects-shown))
-                      (funcall (funcall trim 'defects
-                                        (lambda (d)
-                                          (mayhem--pick d '(defect_number title severity
-                                                                          severity_level state
-                                                                          cwe_number last_seen
-                                                                          last_seen_run_number))))
-                               cb)))))
+                      (funcall (funcall trim 'defects #'mayhem--target-defect) cb)))))
      (lambda (ok data)
        (funcall callback ok
                 (if (not ok)
@@ -444,6 +465,27 @@ the page shows; the defects are the most severe ones."
                       (latest . ,(alist-get 'latest target))
                       (runs . ,(alist-get 'runs data))
                       (defects . ,(alist-get 'defects data))))))))))
+
+(defun mayhem--fetch-target-runs (owner project target callback)
+  "Fetch every run of TARGET of PROJECT of OWNER, newest first.
+Call CALLBACK with (OK DATA): DATA is the runs, as `mayhem--target-run'
+trims them, or an error message."
+  (mayhem--api-get-all
+   (mayhem--path "/api/v2/owner/%s/project/%s/target/%s/run" owner project target)
+   'runs
+   (lambda (ok data)
+     (funcall callback ok (if ok (mapcar #'mayhem--target-run data) data)))))
+
+(defun mayhem--fetch-target-defects (owner project target callback)
+  "Fetch every defect of TARGET of PROJECT of OWNER, most severe first.
+Call CALLBACK with (OK DATA): DATA is the defects, as
+`mayhem--target-defect' trims them, or an error message."
+  (mayhem--api-get-all
+   (mayhem--path "/api/v2/owner/%s/project/%s/defect" owner project)
+   'defects
+   (lambda (ok data)
+     (funcall callback ok (if ok (mapcar #'mayhem--target-defect data) data)))
+   (mayhem--target-defects-params target)))
 
 (defconst mayhem--trend-windows
   '((year "12 months" 31536000 604800 "%d %b")
