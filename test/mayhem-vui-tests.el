@@ -45,9 +45,12 @@
     (should (equal (mayhem-vui-tests--parts (mayhem-page-heading "target" "o" "p" "t"))
                    '((link "h.example") "/" (link "o") "/" (link "p") "/" "t" "  target"
                      "\n")))
-    (should (equal (mayhem-vui-tests--parts (mayhem-page-heading "run" "o" "p" "t" "#3"))
+    (should (equal (mayhem-vui-tests--parts (mayhem-page-heading "test case" "o" "p" "t" "#3"))
                    '((link "h.example") "/" (link "o") "/" (link "p") "/" (link "t") "/" "#3"
-                     "  run" "\n")))
+                     "  test case" "\n")))
+    (should (equal (mayhem-vui-tests--parts (mayhem-target-page-heading "run #3" "o" "p" "t"))
+                   '((link "h.example") "/" (link "o") "/" (link "p") "/" (link "t")
+                     "  target," " run #3" "\n")))
     (should (equal (mayhem-vui-tests--parts
                     (mayhem-page-heading "target" "o" "p" "stretch-20171101-6-75k-unknown-adv-3"))
                    '((link "h.example") "/" (link "o") "/" (link "p") "/"

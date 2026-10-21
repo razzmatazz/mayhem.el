@@ -253,7 +253,7 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'target-defects owner project target))))
     (vui-fragment
-     (mayhem-list-page-heading "defects" owner project target)
+     (mayhem-target-page-heading "defects" owner project target)
      (vui-newline)
      (mayhem-snapshot-view
       snapshot "defects"
@@ -276,7 +276,7 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'target-runs owner project target))))
     (vui-fragment
-     (mayhem-list-page-heading "runs" owner project target)
+     (mayhem-target-page-heading "runs" owner project target)
      (vui-newline)
      (mayhem-snapshot-view
       snapshot "runs"

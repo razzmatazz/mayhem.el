@@ -644,7 +644,7 @@ are for the header's folds, as in `mayhem-run--started-with'."
                                           (cancel-timer timer)))))
           (lambda () (cancel-timer timer)))))
     (vui-fragment
-     (mayhem-page-heading "run" owner project target (format "#%s" number))
+     (mayhem-target-page-heading (format "run #%s" number) owner project target)
      (vui-newline)
      (mayhem-snapshot-view snapshot "run" (mayhem-run--skeleton)
                            (lambda (data)

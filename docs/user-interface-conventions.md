@@ -41,22 +41,25 @@ users expect.
   A page's own name is never a button.
 - **Walk without a jump.**  A page's heading is a breadcrumb: each part
   naming an enclosing page (the server's host for the dashboard, then
-  owner, project, target, run) links to it; build it with
+  owner, project, target) links to it; build it with
   `mayhem-page-heading`.  Its last part is the page itself, followed by
-  the page's kind in grey (`host/o/p/t/#7  run`,
-  `host/o  workspace`) when that part is a bare name, number or hash.
-  When the part says it already (`host/o/p/t/#7/tests`), leave the
-  kind out (nil): the breadcrumb shows what the page is, and the label
-  would only repeat it.  A page the web app has no counterpart for,
-  such as every run of a target (the web app lists them on the target's
-  page), adds no part to the breadcrumb, which would read as a URL
-  that leads nowhere.  Its breadcrumb ends at the page it belongs to,
-  linked, and its kind says what of that page it shows
-  (`host/o/p/t  code target, runs`), with `mayhem-list-page-heading`.
-  Such a page has no heading of its own above the list either
-  (`Runs (78)`): the whole page is the list.
-  A long name in it is cut in the middle
-  (`mayhem-cut-middle`), whole on hover.
+  the page's kind in grey (`host/o  workspace`, `host/o/p/t  code
+  target`) when that part is a bare name, number or hash.  When the
+  part says it already, leave the kind out (nil): the label would only
+  repeat it.
+- **A page below a target names itself after it.**  A run, a defect, or
+  the list of every run or defect is a page of the target's: its
+  breadcrumb ends at the target, linked, then says in grey what the
+  target is and names the page in the heading's face
+  (`host/o/p/t  code target, run #7`, `host/o/p/t  code target,
+  defect !12`, `host/o/p/t  code target, runs`), with
+  `mayhem-target-page-heading`.  A list the web app has no page for
+  so adds no part that would read as a URL leading nowhere.  A list page has no heading of its own
+  above the list either (`Runs (78)`): the whole page is the list.
+  Pages below a run (its test suite, a test case) still go on as a
+  path (`host/o/p/t/#7/tests`).
+- A long name in a heading is cut in the middle (`mayhem-cut-middle`),
+  whole on hover.
   A field naming another page (`Run  run #7`) links to it, with
   `mayhem-page-link` or `mayhem-run-link`.
 - **Say what a number is.**  Runs and defects are both numbered from 1

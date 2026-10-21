@@ -346,19 +346,20 @@ NUMBER is a run of TARGET of PROJECT of OWNER.  FACE is as for
 See `mayhem--page-heading'."
   (mayhem--page-heading kind nil owner project target more))
 
-(defun mayhem-list-page-heading (what owner project target)
-  "Return the heading of the page listing every WHAT of TARGET.
-WHAT is a plural, such as \"defects\".  It names TARGET's page,
-linked, as \"code target, runs\": the page has no web counterpart to
-name in the breadcrumb.  TARGET is of PROJECT of OWNER; its type is
-read from the store, if there."
+(defun mayhem-target-page-heading (name owner project target)
+  "Return the heading of a page below TARGET, which NAME names.
+NAME is such as \"run #7\", \"defect !12\" or \"runs\".  The breadcrumb
+ends at TARGET's page, linked, and goes on with what of it the page
+shows, NAME after TARGET's kind: host/o/p/t  code target, run #7.
+TARGET is of PROJECT of OWNER; its type is read from the store, if
+there."
   (let ((type (alist-get 'type (alist-get 'target (plist-get (mayhem-sync-read
                                                               (list 'target owner project target))
                                                              :data)))))
-    (mayhem--page-heading (concat (mayhem-target-kind type) ", " what) t
-                          owner project target nil)))
+    (mayhem--page-heading (concat (mayhem-target-kind type) ",") t
+                          owner project target nil name)))
 
-(defun mayhem--page-heading (kind link-last owner project target more)
+(defun mayhem--page-heading (kind link-last owner project target more &optional name)
   "Return a page's heading: HOST/OWNER/PROJECT/TARGET/MORE KIND.
 HOST is the Mayhem server's, `mayhem--host', naming the dashboard.
 OWNER, PROJECT and TARGET may be nil, from the end.  Each part links
@@ -367,7 +368,7 @@ that is the page itself, unless LINK-LAST.  MORE are parts below
 TARGET, strings or vnodes such as a `mayhem-run-link'.  KIND, such as
 \"target\", says in `shadow' what the page shows, as the last part is
 often a bare name or number; it is nil when the last part says it,
-such as \"tests\".
+such as \"tests\".  NAME, if given, follows KIND, naming the page.
 A name longer than `mayhem-heading-part-width' is cut in the middle,
 whole on hover."
   (let* ((face 'mayhem-section-heading)
@@ -398,6 +399,7 @@ whole on hover."
                             (if (stringp part) (vui-text part :face face) part)))
                     more)
             (and kind (list (vui-text (concat "  " kind) :face (list 'shadow face))))
+            (and name (list (vui-text (concat " " name) :face face)))
             (list (vui-text "\n"))))))
 
 (defun mayhem-repo-link (repo text &optional kind ref)

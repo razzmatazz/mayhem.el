@@ -167,7 +167,7 @@ SOURCE is \"api\" or \"code\"."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'defect owner project target number run))))
     (vui-fragment
-     (mayhem-page-heading "defect" owner project target (format "!%s" number))
+     (mayhem-target-page-heading (format "defect !%s" number) owner project target)
      (vui-newline)
      (mayhem-snapshot-view snapshot "defect" (mayhem-defect--skeleton)
                            (lambda (data)
