@@ -11,9 +11,9 @@
 
 ;; A run's page, `*mayhem: owner/project/target/N*': its status, commit
 ;; and image, and its Mayhemfile, which RET shows as a file; for a code
-;; run, a chart of its progress, as the web app's run page has.  Below,
-;; in tabs: its defects; for a code run its tests (counts and failing
-;; test cases) and coverage, for an API run its endpoints; and its
+;; run, a chart of its progress, as the web app's run page has, and its
+;; coverage.  Below, in tabs: its defects; for a code run its tests
+;; (counts and failing test cases), for an API run its endpoints; and its
 ;; event log, shown first for a failed run.  What the CLI overrode,
 ;; the environment it added and the files sent are each a header line,
 ;; folded when too wide for one.  RET on a defect or test case opens
@@ -128,21 +128,25 @@ The exact time is its `help-echo' and `mayhem-ts', as for an age."
             (propertize (format "  %d of %d" covered total) 'face 'mayhem-label))))
 
 (defun mayhem-run--coverage (run)
-  "Return the vnodes of the coverage of RUN, a code run."
-  (vui-fragment
-   (mayhem-field "Lines" (mayhem-run--percent (alist-get 'n_lines_covered run)
-                                              (alist-get 'n_lines_total run)))
-   (mayhem-field "Blocks" (mayhem-run--percent (alist-get 'n_blocks_covered run)
-                                               (alist-get 'n_blocks_total run)))
-   (mayhem-field "Functions" (mayhem-run--percent (alist-get 'n_functions_covered run)
-                                                  (alist-get 'n_functions_total run)))
-   (mayhem-field "Behaviors" (format "%s edges" (or (alist-get 'edges_covered run) 0)))
-   (mayhem-field "Inputs" (concat (format "%s tested" (or (alist-get 'tests_run run) 0))
-                                  (when-let* ((rate (alist-get 'tests_per_second run)))
-                                    (propertize (format "  %s per second" rate)
-                                                'face 'mayhem-label))))
-   (when-let* ((engines (mayhem-run--engines run)))
-     (mayhem-field "Engines" engines))))
+  "Return the Coverage section of RUN, a code run, or nil with none to show."
+  (when (seq-some (lambda (key) (> (or (alist-get key run) 0) 0))
+                  '(n_lines_total n_blocks_total n_functions_total edges_covered tests_run))
+    (vui-fragment
+     (vui-newline)
+     (mayhem-heading "Coverage")
+     (mayhem-field "Lines" (mayhem-run--percent (alist-get 'n_lines_covered run)
+                                                (alist-get 'n_lines_total run)))
+     (mayhem-field "Blocks" (mayhem-run--percent (alist-get 'n_blocks_covered run)
+                                                 (alist-get 'n_blocks_total run)))
+     (mayhem-field "Functions" (mayhem-run--percent (alist-get 'n_functions_covered run)
+                                                    (alist-get 'n_functions_total run)))
+     (mayhem-field "Behaviors" (format "%s edges" (or (alist-get 'edges_covered run) 0)))
+     (mayhem-field "Inputs" (concat (format "%s tested" (or (alist-get 'tests_run run) 0))
+                                    (when-let* ((rate (alist-get 'tests_per_second run)))
+                                      (propertize (format "  %s per second" rate)
+                                                  'face 'mayhem-label))))
+     (when-let* ((engines (mayhem-run--engines run)))
+       (mayhem-field "Engines" engines)))))
 
 (defun mayhem-run--engines (run)
   "Return how many inputs each engine of RUN tested, or nil if none did."
@@ -544,7 +548,6 @@ RUN is the alist from DATA's `run'."
           (events ,(funcall count "Log" 'events)))
       `((defects ,(funcall count "Defects" 'defects))
         (tests ,(format "Tests (%d)" (or (alist-get 'n_testcase_reports run) 0)))
-        (coverage "Coverage")
         (events ,(funcall count "Log" 'events))))))
 
 (defun mayhem-run--tab (owner project target number run data tab)
@@ -555,7 +558,6 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER, from DATA."
     ('tests (vui-component 'mayhem-run-tests-tab :owner owner :project project
                            :target target :number number :run run))
     ('events (mayhem-run--events (alist-get 'events data)))
-    ('coverage (mayhem-run--coverage run))
     ('endpoints (mayhem-run--endpoints (alist-get 'endpoints data)))))
 
 (defun mayhem-run--render (owner project target number data tab on-tab)
@@ -616,7 +618,9 @@ called with the key of another one, to show it."
      (mayhem-image-field run)
      (mayhem-run--setup owner project target number run)
      (when code
-       (mayhem-run--chart run (alist-get 'progress data) now))
+       (vui-fragment
+        (mayhem-run--chart run (alist-get 'progress data) now)
+        (mayhem-run--coverage run)))
      (vui-newline)
      (mayhem-tab-row (mapcar (pcase-lambda (`(,key ,label))
                                (list label (format "RET: show %s" (downcase label))
