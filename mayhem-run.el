@@ -78,22 +78,8 @@ RUN is a run of TARGET of PROJECT of OWNER.  It lists the first
    (mayhem-heading (format "Defects (%d)" (length defects)))
    (if (null defects)
        (mayhem-notice "No defects")
-     (vui-component
-      'mayhem-unfold-list
-      :limit mayhem-run--defects-shown :what "defects"
-      :rows (seq-mapn (lambda (defect id)
-                        (let ((level (or (alist-get 'severity_level defect) ""))
-                              (number (alist-get 'defect_number defect)))
-                          (mayhem-row
-                           (list id "  "
-                                 (propertize (format "%-7s" level)
-                                             'face (mayhem-defect-severity-face level))
-                                 " "
-                                 (mayhem-fit (or (alist-get 'title defect) "")
-                                             (string-width (or (alist-get 'title defect) ""))))
-                           (lambda () (mayhem-defect-open owner project target number run))
-                           "RET: open defect")))
-                      defects (mayhem-defect-ids defects))))))
+     (mayhem-defect-table owner project target defects (current-time) run
+                          mayhem-run--defects-shown))))
 
 (defun mayhem-run--endpoints (endpoints)
   "Return the Endpoints section of an API run, listing ENDPOINTS."
@@ -318,18 +304,10 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER.  It lists the first
                                        (mayhem-run--elapsed-text (alist-get 'created_at test) start))))
                              failing)
                      '(2 4 5) mayhem-run--test-header)))
-         (vui-fragment
-          (vui-text (concat (car lines) "\n"))
-          (vui-component
-           'mayhem-unfold-list
-           :limit mayhem-run--tests-shown :what "failing tests"
-           :rows (seq-mapn (lambda (test line)
-                             (mayhem-row (concat line "\n")
-                                         (lambda ()
-                                           (mayhem-testcase-open owner project target number
-                                                                 (alist-get 'sha256 test)))
-                                         "RET: open test case"))
-                           failing (cdr lines)))))))))
+         (mayhem-table lines failing
+                       (lambda (test)
+                         (mayhem-testcase-open owner project target number (alist-get 'sha256 test)))
+                       "RET: open test case" mayhem-run--tests-shown "failing tests"))))))
 
 (vui-defcomponent mayhem-run-tests (owner project target number run)
   "The Tests section of RUN, run NUMBER of TARGET of PROJECT of OWNER.

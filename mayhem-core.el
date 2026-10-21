@@ -414,7 +414,7 @@ its `latest' run, or an error message."
 (defconst mayhem--target-defect-fields
   '(defect_number title severity severity_level state cwe_number last_seen
                   last_seen_run_number)
-  "Fields of a defect kept for its target's lists.")
+  "Fields of a defect kept for a list of defects.")
 
 (defun mayhem--target-defect (defect)
   "Return DEFECT, as the API gives it, with only `mayhem--target-defect-fields'."
@@ -707,11 +707,7 @@ to the fields its page shows, or an error message."
                                            owner project)
                              'defects
                              (lambda (ok data)
-                               (funcall cb ok (if ok (mapcar (lambda (d)
-                                                               (mayhem--pick
-                                                                d '(defect_number severity_level
-                                                                    title state)))
-                                                             data)
+                               (funcall cb ok (if ok (mapcar #'mayhem--target-defect data)
                                                 data)))
                              `((run ,(alist-get 'run_id run))))))
               (endpoints . ,(lambda (cb)
@@ -907,9 +903,7 @@ defects, frames and backtrace, trimmed to what its page shows, and the
                              (mayhem--pick report mayhem--testcase-fields)
                              (list
                               (cons 'defects
-                                    (mapcar (lambda (d)
-                                              (mayhem--pick d '(defect_number severity_level
-                                                                              title)))
+                                    (mapcar #'mayhem--target-defect
                                             (alist-get 'defects report)))
                               (cons 'frames (mayhem--backtrace-frames
                                              (alist-get 'parsed_backtrace report)))

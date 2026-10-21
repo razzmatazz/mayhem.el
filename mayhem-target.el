@@ -58,49 +58,7 @@
           (propertize (or (mayhem--format-age (alist-get 'created_at run) now) "")
                       'face 'mayhem-label))))
 
-(defconst mayhem-target--defect-header
-  '("Id" "Severity" nil "Title" "CWE" "State" "Seen" "Age")
-  "The names of the columns of `mayhem-target--defect-cells'.")
-
-(defconst mayhem-target--title-width 50
-  "Most columns a defect's title takes in a list; longer ones are cut.")
-
-(defun mayhem-target--defect-cells (defect id now)
-  "Return the cells of DEFECT's line, an alist, as of NOW, for `mayhem-columns'.
-ID is its number, as \"!N\"."
-  (let ((level (or (alist-get 'severity_level defect) ""))
-        (title (or (alist-get 'title defect) "")))
-    (list id
-          (propertize level 'face (mayhem-defect-severity-face level))
-          (propertize (format "%s" (or (alist-get 'severity defect) "")) 'face 'mayhem-label)
-          (propertize (truncate-string-to-width title mayhem-target--title-width nil nil "…")
-                      'help-echo title)
-          (propertize (if-let* ((cwe (alist-get 'cwe_number defect))) (format "CWE-%s" cwe) "")
-                      'face 'mayhem-label)
-          (propertize (let ((state (alist-get 'state defect)))
-                        (if (and state (not (equal state "open"))) state ""))
-                      'face 'mayhem-label)
-          (propertize (if-let* ((run (alist-get 'last_seen_run_number defect)))
-                          (format "run #%s" run)
-                        "")
-                      'face 'mayhem-label)
-          (propertize (or (mayhem--format-age (alist-get 'last_seen defect) now) "")
-                      'face 'mayhem-label))))
-
 ;; Each list shows its first few rows; the full one is a page of its own.
-(defun mayhem-target--defect-rows (owner project target defects now)
-  "Return a table of the defects of TARGET, as of NOW, a RET-able row each.
-TARGET is of PROJECT of OWNER; DEFECTS are the ones shown, most severe
-first."
-  (mayhem-table
-   (mayhem-columns (seq-mapn (lambda (defect id) (mayhem-target--defect-cells defect id now))
-                             defects (mayhem-defect-ids defects))
-                   '(2) mayhem-target--defect-header)
-   defects
-   (lambda (defect)
-     (mayhem-defect-open owner project target (alist-get 'defect_number defect)))
-   "RET: open defect"))
-
 (defun mayhem-target--run-rows (owner project target runs now)
   "Return a table with a RET-able row for each run of TARGET, as of NOW.
 TARGET is of PROJECT of OWNER; RUNS are the ones shown, newest first."
@@ -178,7 +136,7 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
      (mayhem-heading (format "Defects (%d)" n-defects))
      (mayhem-target--defect-tally owner project target latest)
      (if defects
-         (mayhem-target--defect-rows owner project target defects now)
+         (mayhem-defect-table owner project target defects now)
        (mayhem-notice "No defects"))
      (mayhem-target--show-more (length defects) n-defects "defects"
                                (lambda () (mayhem-target-defects-open owner project target))))))
@@ -257,7 +215,7 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
            (when defects
              (vui-fragment (vui-newline) (mayhem-list-filter-bar defects shown)))
            (vui-newline)
-           (cond (shown (mayhem-target--defect-rows owner project target shown (current-time)))
+           (cond (shown (mayhem-defect-table owner project target shown (current-time)))
                  (defects (mayhem-notice "No defects match the filter"))
                  (t (mayhem-notice "No defects"))))))))))
 

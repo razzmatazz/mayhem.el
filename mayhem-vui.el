@@ -179,6 +179,7 @@ A page with two sets it in its mode, and renders the other while
 (declare-function mayhem-workspace-open "mayhem-workspace" (owner))
 (declare-function mayhem-project-open "mayhem-project" (owner project))
 (declare-function mayhem-target-open "mayhem-target" (owner project target))
+(declare-function mayhem-defect-open "mayhem-defect" (owner project target number &optional run))
 (declare-function mayhem-run-open "mayhem-run" (owner project target number))
 
 (defvar-keymap mayhem-page-mode-map
@@ -748,15 +749,19 @@ is drawn as a heading, the others as buttons."
     ("medium" 'warning)
     (_ 'mayhem-label)))
 
-(defun mayhem-table (lines items open help-echo)
+(defun mayhem-table (lines items open help-echo &optional limit what)
   "Return LINES, from `mayhem-columns' with a header, as a table of ITEMS.
 The header is plain; each line after it is a RET-able row calling OPEN
-with its item.  HELP-ECHO is the rows'."
-  (apply #'vui-fragment
-         (vui-text (concat (car lines) "\n"))
-         (seq-mapn (lambda (item line)
-                     (mayhem-row (concat line "\n") (lambda () (funcall open item)) help-echo))
-                   items (cdr lines))))
+with its item.  HELP-ECHO is the rows'.  With LIMIT, the rows past it
+are a `mayhem-unfold-list''s, its button naming WHAT."
+  (let ((rows (seq-mapn (lambda (item line)
+                          (mayhem-row (concat line "\n") (lambda () (funcall open item)) help-echo))
+                        items (cdr lines))))
+    (vui-fragment
+     (vui-text (concat (car lines) "\n"))
+     (if limit
+         (vui-component 'mayhem-unfold-list :rows rows :limit limit :what what)
+       (apply #'vui-fragment rows)))))
 
 (defun mayhem-columns (rows &optional right header)
   "Return ROWS, each a list of strings, as lines in aligned columns.
@@ -814,6 +819,49 @@ of nil continues the one before, which then spans both columns, as
                            "  "))
                'face 'mayhem-label)
               lines)))))
+
+(defconst mayhem-defect-header
+  '("Id" "Severity" nil "Title" "CWE" "State" "Seen" "Age")
+  "The names of the columns of `mayhem-defect-cells'.")
+
+(defconst mayhem-defect-title-width 50
+  "Most columns a defect's title takes in a list; longer ones are cut.")
+
+(defun mayhem-defect-cells (defect id now)
+  "Return the cells of DEFECT's line, an alist, as of NOW, for `mayhem-columns'.
+ID is its number, as \"!N\"."
+  (let ((level (or (alist-get 'severity_level defect) ""))
+        (title (or (alist-get 'title defect) "")))
+    (list id
+          (propertize level 'face (mayhem-defect-severity-face level))
+          (propertize (format "%s" (or (alist-get 'severity defect) "")) 'face 'mayhem-label)
+          (propertize (truncate-string-to-width title mayhem-defect-title-width nil nil "…")
+                      'help-echo title)
+          (propertize (if-let* ((cwe (alist-get 'cwe_number defect))) (format "CWE-%s" cwe) "")
+                      'face 'mayhem-label)
+          (propertize (let ((state (alist-get 'state defect)))
+                        (if (and state (not (equal state "open"))) state ""))
+                      'face 'mayhem-label)
+          (propertize (if-let* ((run (alist-get 'last_seen_run_number defect)))
+                          (format "run #%s" run)
+                        "")
+                      'face 'mayhem-label)
+          (propertize (or (mayhem--format-age (alist-get 'last_seen defect) now) "")
+                      'face 'mayhem-label))))
+
+(defun mayhem-defect-table (owner project target defects now &optional run limit)
+  "Return a table of DEFECTS of TARGET, as of NOW, a RET-able row each.
+TARGET is of PROJECT of OWNER.  RET opens a defect as RUN, a run
+number, saw it, if given.  With LIMIT, the rows past it unfold on
+asking, as `mayhem-table' has it."
+  (mayhem-table
+   (mayhem-columns (seq-mapn (lambda (defect id) (mayhem-defect-cells defect id now))
+                             defects (mayhem-defect-ids defects))
+                   '(2) mayhem-defect-header)
+   defects
+   (lambda (defect)
+     (mayhem-defect-open owner project target (alist-get 'defect_number defect) run))
+   "RET: open defect" limit "defects"))
 
 (defun mayhem-defect-ids (defects)
   "Return the numbers of DEFECTS, alists, as \"!N\" padded to one width.

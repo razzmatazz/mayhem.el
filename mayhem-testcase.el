@@ -41,20 +41,7 @@ RUN is a run of TARGET of PROJECT of OWNER."
    (mayhem-heading (format "Defects (%d)" (length defects)))
    (if (null defects)
        (mayhem-notice "No defects")
-     (apply #'vui-fragment
-            (seq-mapn (lambda (defect id)
-                        (let ((level (or (alist-get 'severity_level defect) ""))
-                              (number (alist-get 'defect_number defect)))
-                          (mayhem-row
-                           (list id "  "
-                                 (propertize (format "%-7s" level)
-                                             'face (mayhem-defect-severity-face level))
-                                 " "
-                                 (mayhem-fit (or (alist-get 'title defect) "")
-                                             (string-width (or (alist-get 'title defect) ""))))
-                           (lambda () (mayhem-defect-open owner project target number run))
-                           "RET: open defect")))
-                      defects (mayhem-defect-ids defects))))))
+     (mayhem-defect-table owner project target defects (current-time) run))))
 
 (defun mayhem-testcase--render (owner project target run data)
   "Return the vnodes of a test case of RUN, showing DATA.

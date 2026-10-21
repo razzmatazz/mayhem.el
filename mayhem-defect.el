@@ -87,19 +87,11 @@ The defect is of TARGET of PROJECT of OWNER.  It lists the first
      (vui-newline)
      (if (null testcases)
          (mayhem-notice "No test cases")
-       (vui-fragment
-        (vui-text (concat (car lines) "\n"))
-        (vui-component
-         'mayhem-unfold-list
-         :limit mayhem-defect--testcases-shown :what "test cases"
-         :rows (seq-mapn (lambda (test line)
-                           (mayhem-row (concat line "\n")
-                                       (lambda ()
-                                         (mayhem-testcase-open owner project target
-                                                               (alist-get 'run_number test)
-                                                               (alist-get 'sha256 test)))
-                                       "RET: open test case"))
-                         testcases (cdr lines)))))
+       (mayhem-table lines testcases
+                     (lambda (test)
+                       (mayhem-testcase-open owner project target (alist-get 'run_number test)
+                                             (alist-get 'sha256 test)))
+                     "RET: open test case" mayhem-defect--testcases-shown "test cases"))
      (when (> count (length testcases))
        (mayhem-notice (format "%d more in the web app" (- count (length testcases))))))))
 
