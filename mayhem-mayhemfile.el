@@ -70,6 +70,15 @@ A Mayhemfile visited from disk is checked with Flymake; see
           "Invalid configuration\\|Error materializing default\\|-->\\|\\'\\)")
   "Matches the CLI's ERROR lines that only frame the errors it located.")
 
+(defun mayhem-mayhemfile--split-unexpected (message)
+  "Split MESSAGE into one message per key it names as unexpected.
+The CLI names them all in one, which then marks no key."
+  (if (string-match "\\`\\(.*(\\)\\('.+'\\) were unexpected)\\'" message)
+      (let ((head (match-string 1 message)))
+        (mapcar (lambda (key) (concat head key " was unexpected)"))
+                (split-string (match-string 2 message) ", ")))
+    (list message)))
+
 (defun mayhem-mayhemfile--parse-validate (output)
   "Return the errors in OUTPUT, of `mayhem-mayhemfile-validate-command'.
 Each is (LINE COLUMN END-COLUMN MESSAGE), LINE from 1 and the
@@ -99,7 +108,8 @@ errors leave out the unplaced ones, which only head them."
         (let ((message (string-trim (match-string 1 text))))
           (setq pending message)
           (unless (string-match-p mayhem-mayhemfile--boilerplate message)
-            (push (list nil nil nil message) unplaced))))
+            (dolist (one (mayhem-mayhemfile--split-unexpected message))
+              (push (list nil nil nil one) unplaced)))))
        ((not (string-match-p "\\`\\(?:WARNING\\|Suggestion\\| \\)" text))
         (setq pending (string-trim text)))))
     (delete-dups (nreverse (or placed unplaced)))))

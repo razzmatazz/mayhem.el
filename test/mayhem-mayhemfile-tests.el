@@ -59,6 +59,14 @@ ERROR Invalid configuration.
 ")
                  '((nil nil nil "Additional properties are not allowed ('bogus' was unexpected)")))))
 
+(ert-deftest mayhem-mayhemfile-test-parse-splits-unexpected-keys ()
+  (should (equal (mayhem-mayhemfile--parse-validate "\
+ERROR Error: Mayhemfile contains errors
+ERROR Additional properties are not allowed ('image', 'tasks' were unexpected)
+")
+                 '((nil nil nil "Additional properties are not allowed ('image' was unexpected)")
+                   (nil nil nil "Additional properties are not allowed ('tasks' was unexpected)")))))
+
 (ert-deftest mayhem-mayhemfile-test-parse-yaml-error ()
   (should (equal (mayhem-mayhemfile--parse-validate "\
 ERROR Error: YAML parsing error: while parsing a block collection
