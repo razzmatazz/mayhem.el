@@ -65,9 +65,10 @@ say because your token expired, the error shows in the header line.
   when too wide for one.  A code run also has a chart of test cases
   processed and defects found over time, as in the web app, and its
   coverage, with the inputs each engine tested.  Its defects follow,
-  the first 10 until `Show all` lists the rest.  Tabs: Tests (counts,
-  crashes, Valgrind errors, the corpus and the failing test cases) and
-  Log; an API run has Endpoints and Log.  A run that is still going refreshes itself every
+  the first 10 until `Show all` lists the rest, and its tests: counts,
+  crashes, Valgrind errors, the corpus and the failing test cases, the
+  first 10 of them likewise.  Tabs: Log; an API run has Endpoints and
+  Log.  A run that is still going refreshes itself every
   10 seconds.
 - **Defect**: severity, CWE, the commit of the run that saw it,
   description and evidence: for an API defect the request, response
@@ -76,12 +77,12 @@ say because your token expired, the error shows in the header line.
 - **Test suite**: the optimized set of a target's test cases at the end
   of a run, newest first, each with its size, source, age and first
   bytes; RET on `Test suite` on the target page, or on `Optimized` on
-  the run's Tests tab, opens it.  `w` saves the test case at point to a
+  the run page's Tests, opens it.  `w` saves the test case at point to a
   file.  A finished run's suite is downloaded once and kept.
 - **Test cases**: every test case of a run, the ones the optimized
   suite dropped too, newest first, each with its status, type, defects,
   source and execution time; filter them by status, type or source.
-  RET on `All` on the run's Tests tab, or on the run's count on its
+  RET on `All` on the run page's Tests, or on the run's count on its
   test suite page, opens it.
 - **Test case**: its defects, how to reproduce it, its bytes, the
   target's output and the backtrace.

@@ -12,8 +12,8 @@
 ;; A run's page, `*mayhem: owner/project/target/N*': its status, commit
 ;; and image, and its Mayhemfile, which RET shows as a file; for a code
 ;; run, a chart of its progress, as the web app's run page has, and its
-;; coverage; and its defects, the first 10 until asked for all.  Below,
-;; in tabs: for a code run its tests (counts and failing test cases),
+;; coverage; its defects, the first 10 until asked for all; and for a
+;; code run its tests (counts and failing test cases).  Below, in tabs:
 ;; for an API run its endpoints; and its event log, shown first for a
 ;; failed run.  What the CLI overrode,
 ;; the environment it added and the files sent are each a header line,
@@ -288,9 +288,13 @@ and counts are its `help-echo'.  Nothing before the run starts."
   '("Test case" "Type" "Defects" nil "Time" "Seen")
   "The names of the columns of a run's failing tests.")
 
+(defconst mayhem-run--tests-shown 10
+  "Most failing tests a run's page lists until asked for all of them.")
+
 (defun mayhem-run--tests (owner project target number run failing)
   "Return the vnodes listing FAILING, the failing test cases of RUN.
-RUN is run NUMBER of TARGET of PROJECT of OWNER."
+RUN is run NUMBER of TARGET of PROJECT of OWNER.  It lists the first
+`mayhem-run--tests-shown', and a button the rest."
   (let ((start (alist-get 'started_at run)))
     (vui-fragment
      (mayhem-heading (format "Failing tests (%d)" (length failing)))
@@ -311,19 +315,28 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
                                        (mayhem-run--elapsed-text (alist-get 'created_at test) start))))
                              failing)
                      '(2 4 5) mayhem-run--test-header)))
-         (mayhem-table lines failing
-                       (lambda (test)
-                         (mayhem-testcase-open owner project target number (alist-get 'sha256 test)))
-                       "RET: open test case"))))))
+         (vui-fragment
+          (vui-text (concat (car lines) "\n"))
+          (vui-component
+           'mayhem-unfold-list
+           :limit mayhem-run--tests-shown :what "failing tests"
+           :rows (seq-mapn (lambda (test line)
+                             (mayhem-row (concat line "\n")
+                                         (lambda ()
+                                           (mayhem-testcase-open owner project target number
+                                                                 (alist-get 'sha256 test)))
+                                         "RET: open test case"))
+                           failing (cdr lines)))))))))
 
-(vui-defcomponent mayhem-run-tests-tab (owner project target number run)
-  "The Tests tab of RUN, run NUMBER of TARGET of PROJECT of OWNER.
-A test case fails when it shows a defect, crash or not; it is its own
-component so a run's test case results are fetched only once it shows."
+(vui-defcomponent mayhem-run-tests (owner project target number run)
+  "The Tests section of RUN, run NUMBER of TARGET of PROJECT of OWNER.
+A test case fails when it shows a defect, crash or not."
   :render
   (let ((snapshot (mayhem-sync-use-resource
                    (list 'run-testcases owner project target number))))
     (vui-fragment
+     (vui-newline)
+     (mayhem-heading (format "Tests (%d)" (or (alist-get 'n_testcase_reports run) 0)))
      (mayhem-run--test-counts owner project target number run)
      (vui-newline)
      (mayhem-snapshot-view
@@ -556,15 +569,11 @@ RUN is the alist from DATA's `run'."
     (if (alist-get 'api_run run)
         `((endpoints ,(funcall count "Endpoints" 'endpoints))
           (events ,(funcall count "Log" 'events)))
-      `((tests ,(format "Tests (%d)" (or (alist-get 'n_testcase_reports run) 0)))
-        (events ,(funcall count "Log" 'events))))))
+      `((events ,(funcall count "Log" 'events))))))
 
-(defun mayhem-run--tab (owner project target number run data tab)
-  "Return the vnodes of TAB, a key of `mayhem-run--tabs', of RUN.
-RUN is run NUMBER of TARGET of PROJECT of OWNER, from DATA."
+(defun mayhem-run--tab (data tab)
+  "Return the vnodes of TAB, a key of `mayhem-run--tabs', showing DATA."
   (pcase tab
-    ('tests (vui-component 'mayhem-run-tests-tab :owner owner :project project
-                           :target target :number number :run run))
     ('events (mayhem-run--events (alist-get 'events data)))
     ('endpoints (mayhem-run--endpoints (alist-get 'endpoints data)))))
 
@@ -630,13 +639,16 @@ called with the key of another one, to show it."
         (mayhem-run--chart run (alist-get 'progress data) now)
         (mayhem-run--coverage run)))
      (mayhem-run--defects owner project target number (alist-get 'defects data))
+     (when code
+       (vui-component 'mayhem-run-tests :owner owner :project project
+                      :target target :number number :run run))
      (vui-newline)
      (mayhem-tab-row (mapcar (pcase-lambda (`(,key ,label))
                                (list label (format "RET: show %s" (downcase label))
                                      (unless (eq key shown)
                                        (lambda () (funcall on-tab key)))))
                              tabs))
-     (mayhem-run--tab owner project target number run data shown))))
+     (mayhem-run--tab data shown))))
 
 (defun mayhem-run--skeleton ()
   "Return grey bars shaped like a run's page, shown until its data lands."
