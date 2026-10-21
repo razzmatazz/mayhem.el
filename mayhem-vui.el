@@ -312,12 +312,15 @@ So a timestamp in a row keeps its exact time on hover."
 
 (defun mayhem-field (label &rest values)
   "Return a vnode for a LABEL: VALUES line of a page's header.
-Each of VALUES is a string, a vnode such as a `mayhem-link', or nil."
-  (apply #'vui-fragment
-         (vui-text (propertize (format "%-12s" label) 'face 'mayhem-label))
-         (append (mapcar (lambda (v) (if (stringp v) (vui-text v) v))
-                         (delq nil values))
-                 (list (vui-text "\n")))))
+Each of VALUES is a string, a vnode such as a `mayhem-link', or nil.
+With none but nil and empty strings, it shows a grey -, so the line
+reads as known to be empty."
+  (let ((values (seq-remove (lambda (v) (or (null v) (equal v ""))) values)))
+    (apply #'vui-fragment
+           (vui-text (propertize (format "%-12s" label) 'face 'mayhem-label))
+           (append (or (mapcar (lambda (v) (if (stringp v) (vui-text v) v)) values)
+                       (list (vui-text (propertize "-" 'face 'mayhem-label))))
+                   (list (vui-text "\n"))))))
 
 (defun mayhem-page-link (text help-echo on-visit &optional face)
   "Return a vnode showing TEXT, in FACE or `link', that RET follows.
@@ -451,6 +454,71 @@ label."
        (mayhem-field (concat indent "CI") (if ci-url
                               (mayhem-link (mayhem--ci-label ci-type ci-url) ci-url)
                             ci-type))))))
+
+(defun mayhem-fold (key title open on-open summary parts body)
+  "Return the fold TITLE of BODY, named KEY, unfolded when OPEN.
+Unfolded, its line goes on with SUMMARY, plain; folded, with PARTS,
+so TAB reaches their links.  Each of PARTS is a string or (TEXT
+. VNODE); those that don't fit go.  ON-OPEN is called with KEY and
+whether it is to be unfolded."
+  (let ((room (- (mayhem-page-width) 12)))
+    (vui-fragment
+     (vui-collapsible :key key
+                      :title (if open
+                                 (concat (string-pad title 10)
+                                         (truncate-string-to-width summary (max 10 room)
+                                                                   nil nil "…"))
+                               title)
+                      :title-face 'mayhem-label :indent 0
+                      :expanded open
+                      :on-toggle (lambda (open) (funcall on-open key open))
+                      body)
+     ;; Folded, its title line has no newline of its own, so the parts
+     ;; go on it, lined up with the fields' values.
+     (unless open
+       (let ((used 0) shown)
+         (catch 'full
+           (dolist (part parts)
+             (let* ((sep (if shown 2 0))
+                    (text (if (consp part) (car part) part)))
+               (when (> (+ used sep (string-width text)) room)
+                 (throw 'full nil))
+               (setq used (+ used sep (string-width text)))
+               (when shown (push (vui-text "  ") shown))
+               (push (if (consp part) (cdr part) (vui-text part)) shown))))
+         (apply #'vui-fragment (vui-text (make-string (- 10 (string-width title)) ?\s))
+                (nreverse (cons (vui-newline) shown))))))))
+
+(vui-defcomponent mayhem-source (scm)
+  "SCM's repo, branch, commit and parent, folded under one line.
+SCM is a run's alist with `mayhem--scm-fields', or a defect's.  The
+line names its branch, commit and subject; folded, the branch and
+commit link to their pages.  It keeps whether it is folded itself."
+  :state ((open nil))
+  :render
+  (let* ((repo (mayhem--repo (alist-get 'scm_remote_origin scm)))
+         (parent (alist-get 'parent_revision scm))
+         (revision (alist-get 'revision scm))
+         (branch (alist-get 'branch_name scm))
+         (short (and revision (substring revision 0 (min 7 (length revision)))))
+         (subject (alist-get 'scm_commit_subject scm)))
+    (when (or (alist-get 'scm_remote_origin scm) revision branch parent)
+      (mayhem-fold
+       'source "Source" open (lambda (_key open) (vui-set-state :open open))
+       (string-join (delq nil (list branch short subject)) "  ")
+       (delq nil (list (and branch (cons branch (mayhem-repo-link repo branch 'branch branch)))
+                       (and short (cons short (mayhem-repo-link repo short 'commit revision)))
+                       (and subject
+                            (truncate-string-to-width
+                             subject (max 10 (- (mayhem-page-width) 16
+                                                (length branch) (length short)))
+                             nil nil "…"))))
+       (vui-fragment
+        (mayhem-scm-fields scm "  ")
+        (when parent
+          (mayhem-field "  Parent"
+                        (mayhem-repo-link repo (substring parent 0 (min 7 (length parent)))
+                                          'commit parent))))))))
 
 (defun mayhem-image-field (run)
   "Return the Image field of RUN, an alist, or nil when it has no image.

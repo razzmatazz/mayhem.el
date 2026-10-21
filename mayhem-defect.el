@@ -62,31 +62,57 @@ The defect is of TARGET of PROJECT of OWNER."
                                           (mayhem-testcase-open owner project target run
                                                                 sha)))))))))
 
-(defun mayhem-defect--testcases (owner project target evidence)
-  "Return the vnodes listing the test cases in EVIDENCE of a code defect.
-The defect is of TARGET of PROJECT of OWNER."
-  (let ((testcases (alist-get 'testcases evidence))
-        (count (or (alist-get 'count evidence) 0)))
+(defconst mayhem-defect--testcases-shown 5
+  "Most test cases a defect's page lists until asked for all of them.")
+
+(vui-defcomponent mayhem-defect-testcases (owner project target evidence)
+  "The table of the test cases in EVIDENCE of a code defect.
+The defect is of TARGET of PROJECT of OWNER.  It lists the first
+`mayhem-defect--testcases-shown', and a button the rest."
+  :state ((all nil))
+  :render
+  (let* ((testcases (alist-get 'testcases evidence))
+         (count (or (alist-get 'count evidence) 0))
+         (more (> (length testcases) mayhem-defect--testcases-shown))
+         (shown (if (or all (not more))
+                    testcases
+                  (seq-take testcases mayhem-defect--testcases-shown)))
+         (lines (mayhem-columns
+                 (mapcar (lambda (test)
+                           (let ((sha (alist-get 'sha256 test)))
+                             (list (substring sha 0 (min 8 (length sha)))
+                                   (format "#%s" (alist-get 'run_number test))
+                                   (propertize
+                                    (format "%dms" (round (* 1000 (or (alist-get 'execution_time test)
+                                                                       0))))
+                                    'face 'mayhem-label))))
+                         testcases)
+                 '(2) '("Test case" "Run" "Time"))))
     (vui-fragment
+     ;; The table's header names it; a heading would only repeat it.
      (vui-newline)
-     (mayhem-heading (format "Test cases (%s)" count))
      (if (null testcases)
          (mayhem-notice "No test cases")
        (apply #'vui-fragment
-              (mapcar (lambda (test)
-                        (let ((sha (alist-get 'sha256 test))
-                              (run (alist-get 'run_number test)))
-                          (mayhem-row
-                           (concat (substring sha 0 (min 8 (length sha)))
-                                   (format "  run #%-4s" run)
-                                   (propertize
-                                    (format "%5dms" (round (* 1000 (or (alist-get 'execution_time test)
-                                                                       0))))
-                                    'face 'mayhem-label)
-                                   "\n")
-                           (lambda () (mayhem-testcase-open owner project target run sha))
-                           "RET: open test case")))
-                      testcases)))
+              (vui-text (concat (car lines) "\n"))
+              (seq-mapn (lambda (test line)
+                          (mayhem-row (concat line "\n")
+                                      (lambda ()
+                                        (mayhem-testcase-open owner project target
+                                                              (alist-get 'run_number test)
+                                                              (alist-get 'sha256 test)))
+                                      "RET: open test case"))
+                        shown (seq-take (cdr lines) (length shown)))))
+     (when more
+       (vui-fragment
+        (vui-button (if all
+                        "Show fewer"
+                      (format "Show all %d test cases" (length testcases)))
+                    :help-echo (if all
+                                   (format "RET: list the first %d" mayhem-defect--testcases-shown)
+                                 "RET: list every one")
+                    :on-click (lambda () (vui-set-state :all (not all))))
+        (vui-newline)))
      (when (> count (length testcases))
        (mayhem-notice (format "%d more in the web app" (- count (length testcases))))))))
 
@@ -133,7 +159,7 @@ SOURCE is \"api\" or \"code\"."
      (when-let* ((run (alist-get 'run data)))
        (mayhem-field "Run" (mayhem-run-link owner project target run)))
      (when-let* ((scm (alist-get 'scm data)))
-       (mayhem-scm-fields scm))
+       (vui-component 'mayhem-source :scm scm))
      (mayhem-defect--evidence-fields owner project target
                                      (alist-get 'source defect) (alist-get 'evidence data))
      (mayhem-block "Description"
@@ -141,7 +167,8 @@ SOURCE is \"api\" or \"code\"."
                                         (max 20 (min mayhem-defect--fill-width
                                                      (mayhem-page-width)))))
      (when (equal (alist-get 'source defect) "code")
-       (mayhem-defect--testcases owner project target (alist-get 'evidence data)))
+       (vui-component 'mayhem-defect-testcases :owner owner :project project
+                      :target target :evidence (alist-get 'evidence data)))
      (mayhem-defect--evidence-blocks (alist-get 'source defect) (alist-get 'evidence data)))))
 
 (defun mayhem-defect--skeleton ()
@@ -157,7 +184,7 @@ SOURCE is \"api\" or \"code\"."
    (vui-newline)
    (mayhem-skeleton '((60) (52) (64) (40)))
    (vui-newline)
-   (mayhem-heading "Test cases")
+   (mayhem-notice "TEST CASE  RUN  TIME" 'mayhem-label)
    (mayhem-skeleton '((24) (24) (24)))))
 
 (vui-defcomponent mayhem-defect-page (owner project target number run)

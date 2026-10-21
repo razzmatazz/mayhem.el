@@ -13,6 +13,7 @@ users expect.
 | A foldable block | `vui-collapsible` |
 | Parts of a page shown one at a time | `mayhem-tab-row`: the current tab a heading, the others buttons, kept in the page's state |
 | A list longer than a glance (a target's runs or defects) | its first few rows, then `[Show all 78 runs]`, which opens a page with the whole list |
+| A long list fetched whole, with no page of its own (a defect's test cases) | its first five rows, then `[Show all 65 test cases]`, which grows it in place, and `[Show fewer]` |
 | A page of a whole list | under its heading, a tally of every item (`mayhem-tally`), then the facets it filters by (`mayhem-list-filter-bar`, `F`) |
 
 - **Recent data at first glance.**  A page opens showing what changed
@@ -25,7 +26,9 @@ users expect.
   A button naming that count (`[Show all 78 runs]`,
   `[Show all 6 defects]`) opens the full list as a page of its own,
   rather than growing the list in place, so the sections below stay
-  where they are and the long list can be fetched page by page.  Keep tabs for detail that is read one part at a time,
+  where they are and the long list can be fetched page by page.  A
+  list that is fetched whole and has no page of its own, such as a
+  defect's test cases, grows in place instead.  Keep tabs for detail that is read one part at a time,
   such as a run's tests, coverage and log.
 
 - **Anything outside Mayhem links to its own page.**  A repository,
@@ -93,8 +96,8 @@ users expect.
   buffer-local, kept across refreshes.  A page sets its facets in its mode
   (`mayhem-list-facets`).  The items are all fetched, so filtering is
   done here.
-- **Name a table's columns.**  A table of runs or defects starts with
-  a grey line naming its columns (`mayhem-columns` with a HEADER), so
+- **Name a table's columns.**  Every table (runs, defects, a defect's
+  test cases) starts with a grey line naming its columns (`mayhem-columns` with a HEADER), so
   a bare `6` or `64/89` reads as what it is.  The names are in
   capitals, which reads as a header in any font, where bold may not.
   Keep them short, abbreviated where need be (`COV`, `PASS`), so they
@@ -106,6 +109,11 @@ users expect.
   score under `SEVERITY`.  A spanning name can be a whole word, as it
   has the room.  A column empty in every row is left out, its name
   with it.
+- **Show an empty field as `-`.**  A header field whose value the API
+  left out (a defect's `State`, `First seen`) shows a grey `-`, which
+  `mayhem-field` writes for you, so the line reads as known to be
+  empty rather than broken.  Leave a field out only where it can't
+  apply, such as `CI` on a run not started from CI.
 - `help-echo` reads `"RET: <imperative>"`, e.g. `"RET: open target"`.
 - Build interactive parts from vui components, not hand-made text
   properties: only vui's elements are TAB stops.
