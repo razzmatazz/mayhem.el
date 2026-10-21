@@ -120,6 +120,7 @@ Candidates are \"owner\", \"owner/project\" and \"owner/project/target\"."
     (`(project . ,args) (apply #'mayhem-project-open args))
     (`(target . ,args) (apply #'mayhem-target-open args))
     (`(run . ,args) (apply #'mayhem-run-open args))
+    (`(run-log . ,args) (apply #'mayhem-run-log-open args))
     (`(defect . ,args) (apply #'mayhem-defect-open args))
     (`(testcase . ,args) (apply #'mayhem-testcase-open args))
     (`(testsuite . ,args) (apply #'mayhem-testsuite-open args))

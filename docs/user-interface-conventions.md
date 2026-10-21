@@ -28,8 +28,11 @@ users expect.
   rather than growing the list in place, so the sections below stay
   where they are and the long list can be fetched page by page.  A
   list that is fetched whole and has no page of its own, such as a
-  defect's test cases, grows in place instead.  Keep tabs for detail that is read one part at a time,
-  such as a run's tests, coverage and log.
+  defect's test cases or a run's defects, grows in place instead,
+  past its first 10 or so.  Keep tabs for views of one list read one at
+  a time, such as a project's active and archived targets.  Detail
+  read apart from the rest, such as a run's log, is a page of its own,
+  linked from a header field (`Log  24 events`).
 
 - **Anything outside Mayhem links to its own page.**  A repository,
   branch, commit, CI build, Docker image or CWE entry is shown as a

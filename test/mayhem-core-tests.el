@@ -394,7 +394,8 @@ RAW is as for `mayhem--api-response'."
 
 (ert-deftest mayhem-core-test-testsuite-page-url ()
   (should (equal (mayhem--page-url "https://h/" '(testsuite "o" "p" "t" 7)) "https://h/o/p/t/7/tests"))
-  (should (equal (mayhem--page-url "https://h/" '(testcases "o" "p" "t" 7)) "https://h/o/p/t/7/tests")))
+  (should (equal (mayhem--page-url "https://h/" '(testcases "o" "p" "t" 7)) "https://h/o/p/t/7/tests"))
+  (should (equal (mayhem--page-url "https://h/" '(run-log "o" "p" "t" 7)) "https://h/o/p/t/7")))
 
 (provide 'mayhem-core-tests)
 ;; A long command wraps between words, never inside a quote.

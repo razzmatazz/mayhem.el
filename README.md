@@ -67,9 +67,10 @@ say because your token expired, the error shows in the header line.
   coverage, with the inputs each engine tested.  Its defects follow,
   the first 10 until `Show all` lists the rest, and its tests: counts,
   crashes, Valgrind errors, the corpus and the failing test cases, the
-  first 10 of them likewise.  Tabs: Log; an API run has Endpoints and
-  Log.  A run that is still going refreshes itself every
-  10 seconds.
+  first 10 of them likewise; an API run has its endpoints instead.
+  RET on `Log` opens the run's event log, a page of its own; the field
+  counts its errors and warnings.  A run that is still going, and its
+  log, refresh themselves every 10 seconds.
 - **Defect**: severity, CWE, the commit of the run that saw it,
   description and evidence: for an API defect the request, response
   and stack trace, for a crash the test cases that hit it (RET opens

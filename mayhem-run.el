@@ -13,9 +13,9 @@
 ;; and image, and its Mayhemfile, which RET shows as a file; for a code
 ;; run, a chart of its progress, as the web app's run page has, and its
 ;; coverage; its defects, the first 10 until asked for all; and for a
-;; code run its tests (counts and failing test cases).  Below, in tabs:
-;; for an API run its endpoints; and its event log, shown first for a
-;; failed run.  What the CLI overrode,
+;; code run its tests (counts and failing test cases), for an API run
+;; its endpoints.  Its event log is a page of its own, `.../N/log', which
+;; the Log field links to, counting its errors.  What the CLI overrode,
 ;; the environment it added and the files sent are each a header line,
 ;; folded when too wide for one.  RET on a defect or test case opens
 ;; its page.  While the run is going, the page refetches every
@@ -96,26 +96,29 @@ RUN is a run of TARGET of PROJECT of OWNER.  It lists the first
                       defects (mayhem-defect-ids defects))))))
 
 (defun mayhem-run--endpoints (endpoints)
-  "Return the vnodes listing ENDPOINTS of an API run."
-  (if (null endpoints)
-      (mayhem-notice "No endpoints")
-    (let ((path-width (apply #'max 1 (mapcar (lambda (endpoint)
-                                                (string-width (or (alist-get 'path endpoint) "")))
-                                              endpoints))))
-      (apply #'vui-fragment
-             (mapcar (lambda (endpoint)
-                       (let ((passing (alist-get 'passing endpoint))
-                             (n (or (alist-get 'defects_total endpoint) 0)))
-                         (mayhem-line
-                          (list (format "%-7s" (or (alist-get 'method endpoint) ""))
-                                (mayhem-fit (or (alist-get 'path endpoint) "") path-width t)
-                                (propertize (if passing "  passing" "  failing")
-                                            'face (if passing 'success 'error))
-                                (propertize (format "  %d defect%s" n (if (= n 1) "" "s"))
-                                            'face 'mayhem-label)
-                                (if (alist-get 'covered endpoint) ""
-                                  (propertize "  not covered" 'face 'mayhem-label))))))
-                     endpoints)))))
+  "Return the Endpoints section of an API run, listing ENDPOINTS."
+  (vui-fragment
+   (vui-newline)
+   (mayhem-heading (format "Endpoints (%d)" (length endpoints)))
+   (if (null endpoints)
+       (mayhem-notice "No endpoints")
+     (let ((path-width (apply #'max 1 (mapcar (lambda (endpoint)
+                                                 (string-width (or (alist-get 'path endpoint) "")))
+                                               endpoints))))
+       (apply #'vui-fragment
+              (mapcar (lambda (endpoint)
+                        (let ((passing (alist-get 'passing endpoint))
+                              (n (or (alist-get 'defects_total endpoint) 0)))
+                          (mayhem-line
+                           (list (format "%-7s" (or (alist-get 'method endpoint) ""))
+                                 (mayhem-fit (or (alist-get 'path endpoint) "") path-width t)
+                                 (propertize (if passing "  passing" "  failing")
+                                             'face (if passing 'success 'error))
+                                 (propertize (format "  %d defect%s" n (if (= n 1) "" "s"))
+                                             'face 'mayhem-label)
+                                 (if (alist-get 'covered endpoint) ""
+                                   (propertize "  not covered" 'face 'mayhem-label))))))
+                      endpoints))))))
 
 (defun mayhem-run--live-p (run)
   "Return non-nil if RUN, an alist, is still pending or running."
@@ -561,36 +564,13 @@ the CLI added.  RUN is run NUMBER of TARGET of PROJECT of OWNER."
         (list (when cli
                 (mayhem-field "  CLI" cli))))))))
 
-(defun mayhem-run--tabs (run data)
-  "Return the tabs of the page of RUN, showing DATA, as (KEY LABEL).
-RUN is the alist from DATA's `run'."
-  (let ((count (lambda (label key)
-                 (format "%s (%d)" label (length (alist-get key data))))))
-    (if (alist-get 'api_run run)
-        `((endpoints ,(funcall count "Endpoints" 'endpoints))
-          (events ,(funcall count "Log" 'events)))
-      `((events ,(funcall count "Log" 'events))))))
-
-(defun mayhem-run--tab (data tab)
-  "Return the vnodes of TAB, a key of `mayhem-run--tabs', showing DATA."
-  (pcase tab
-    ('events (mayhem-run--events (alist-get 'events data)))
-    ('endpoints (mayhem-run--endpoints (alist-get 'endpoints data)))))
-
-(defun mayhem-run--render (owner project target number data tab on-tab)
-  "Return the vnodes of run NUMBER of TARGET of PROJECT of OWNER, showing DATA.
-TAB is the key of the tab shown; when nil or not the run's, the
-log for a failed run, which says why, else the first.  ON-TAB is
-called with the key of another one, to show it."
+(defun mayhem-run--render (owner project target number data)
+  "Return the vnodes of run NUMBER of TARGET of PROJECT of OWNER, showing DATA."
   (let* ((run (alist-get 'run data))
          (code (not (alist-get 'api_run run)))
          (start (alist-get 'started_at run))
          (queued (alist-get 'created_at run))
          (cpu (alist-get 'cputime run))
-         (tabs (mayhem-run--tabs run data))
-         (shown (car (or (assq tab tabs)
-                         (and (alist-get 'failed run) (assq 'events tabs))
-                         (car tabs))))
          (now (current-time)))
     (vui-fragment
      (mayhem-field "Status" (concat (mayhem-run-status run)
@@ -631,6 +611,7 @@ called with the key of another one, to show it."
                                  'face 'mayhem-label)))
      (when (alist-get 'phases run)
        (mayhem-field "Tasks" (mayhem-run--tasks run)))
+     (mayhem-run--log-field owner project target number (alist-get 'events data))
      (mayhem-source-fold run)
      (mayhem-image-field run)
      (mayhem-run--setup owner project target number run)
@@ -639,16 +620,31 @@ called with the key of another one, to show it."
         (mayhem-run--chart run (alist-get 'progress data) now)
         (mayhem-run--coverage run)))
      (mayhem-run--defects owner project target number (alist-get 'defects data))
-     (when code
-       (vui-component 'mayhem-run-tests :owner owner :project project
-                      :target target :number number :run run))
-     (vui-newline)
-     (mayhem-tab-row (mapcar (pcase-lambda (`(,key ,label))
-                               (list label (format "RET: show %s" (downcase label))
-                                     (unless (eq key shown)
-                                       (lambda () (funcall on-tab key)))))
-                             tabs))
-     (mayhem-run--tab data shown))))
+     (if code
+         (vui-component 'mayhem-run-tests :owner owner :project project
+                        :target target :number number :run run)
+       (mayhem-run--endpoints (alist-get 'endpoints data))))))
+
+(defun mayhem-run--log-field (owner project target number events)
+  "Return the Log field of run NUMBER of TARGET of PROJECT of OWNER.
+It links to the run's log of EVENTS, counting its errors and warnings,
+which say why a run failed."
+  (let* ((n (length events))
+         (count (lambda (test)
+                  (seq-count (lambda (e) (funcall test (or (alist-get 'event_level e) 1)))
+                             events)))
+         (errors (funcall count (lambda (level) (>= level 3))))
+         (warnings (funcall count (lambda (level) (= level 2)))))
+    (mayhem-field "Log"
+                  (mayhem-page-link (format "%d event%s" n (if (= n 1) "" "s"))
+                                    "RET: open the run's log"
+                                    (lambda () (mayhem-run-log-open owner project target number)))
+                  (when (> errors 0)
+                    (propertize (format "  %d error%s" errors (if (= errors 1) "" "s"))
+                                'face 'error))
+                  (when (> warnings 0)
+                    (propertize (format "  %d warning%s" warnings (if (= warnings 1) "" "s"))
+                                'face 'warning)))))
 
 (defun mayhem-run--skeleton ()
   "Return grey bars shaped like a run's page, shown until its data lands."
@@ -662,10 +658,11 @@ called with the key of another one, to show it."
    (mayhem-heading "Defects")
    (mayhem-skeleton '((6 " " 28) (6 " " 36) (6 " " 22) (6 " " 30)))))
 
-(vui-defcomponent mayhem-run-page (owner project target number)
-  "The page of run NUMBER of TARGET of PROJECT of OWNER."
-  :state ((tab nil))
-  :render
+(defun mayhem-run--use-run (owner project target number)
+  "Return the snapshot of run NUMBER of TARGET of PROJECT of OWNER.
+While the run is going, it is refetched every
+`mayhem-run-refresh-interval' seconds.  Call it during render, as any
+hook."
   (let* ((spec (list 'run owner project target number))
          (snapshot (mayhem-sync-use-resource spec))
          (live (mayhem-run--live-p (alist-get 'run (plist-get snapshot :data)))))
@@ -679,13 +676,18 @@ called with the key of another one, to show it."
                                             (mayhem-sync-request spec t)
                                           (cancel-timer timer)))))
           (lambda () (cancel-timer timer)))))
+    snapshot))
+
+(vui-defcomponent mayhem-run-page (owner project target number)
+  "The page of run NUMBER of TARGET of PROJECT of OWNER."
+  :render
+  (let ((snapshot (mayhem-run--use-run owner project target number)))
     (vui-fragment
      (mayhem-target-page-heading (format "run #%s" number) owner project target)
      (vui-newline)
      (mayhem-snapshot-view snapshot "run" (mayhem-run--skeleton)
                            (lambda (data)
-                             (mayhem-run--render owner project target number data tab
-                                                 (lambda (key) (vui-set-state :tab key))))))))
+                             (mayhem-run--render owner project target number data))))))
 
 (defun mayhem-run-open (owner project target number)
   "Open the page of run NUMBER of TARGET of PROJECT of OWNER."
@@ -695,6 +697,32 @@ called with the key of another one, to show it."
                                               :owner owner :project project
                                               :target target :number number))
                     (list 'run owner project target number)))
+
+(define-derived-mode mayhem-run-log-mode mayhem-page-mode "Mayhem Run Log"
+  "Major mode for a Mayhem run's event log.")
+
+(vui-defcomponent mayhem-run-log-page (owner project target number)
+  "The page of the event log of run NUMBER of TARGET of PROJECT of OWNER."
+  :render
+  (let ((snapshot (mayhem-run--use-run owner project target number)))
+    (vui-fragment
+     (mayhem-target-page-heading
+      (list (mayhem-run-link owner project target number nil '(link mayhem-section-heading))
+            ", log")
+      owner project target)
+     (vui-newline)
+     (mayhem-snapshot-view snapshot "run"
+                           (mayhem-skeleton (make-list 8 '(8 "  " 14 "  " 40)))
+                           (lambda (data) (mayhem-run--events (alist-get 'events data)))))))
+
+(defun mayhem-run-log-open (owner project target number)
+  "Open the event log of run NUMBER of TARGET of PROJECT of OWNER."
+  (mayhem-open-page (format "*mayhem: %s/%s/%s/%s/log*" owner project target number)
+                    #'mayhem-run-log-mode
+                    (lambda () (vui-component 'mayhem-run-log-page
+                                              :owner owner :project project
+                                              :target target :number number))
+                    (list 'run-log owner project target number)))
 
 (provide 'mayhem-run)
 ;;; mayhem-run.el ends here
