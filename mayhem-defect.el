@@ -115,8 +115,7 @@ SOURCE is \"api\" or \"code\"."
          (level (alist-get 'severity_level defect))
          (now (current-time)))
     (vui-fragment
-     (mayhem-heading (or (alist-get 'title defect) ""))
-     (vui-newline)
+     (mayhem-field "Title" (alist-get 'title defect))
      (mayhem-field "Severity" (concat (propertize (or level "") 'face
                                                   (mayhem-defect-severity-face level))
                                       (when-let* ((score (alist-get 'severity defect)))
@@ -148,8 +147,7 @@ SOURCE is \"api\" or \"code\"."
 (defun mayhem-defect--skeleton ()
   "Return grey bars shaped like a defect's page, shown until its data lands."
   (vui-fragment
-   (mayhem-skeleton '((30)))
-   (vui-newline)
+   (mayhem-field "Title" (mayhem-skeleton-bar 30))
    (mayhem-field "Severity" (mayhem-skeleton-bar 10))
    (mayhem-field "State" (mayhem-skeleton-bar 6))
    (mayhem-field "CWE" (mayhem-skeleton-bar 40))
