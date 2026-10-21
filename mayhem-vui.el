@@ -351,7 +351,8 @@ See `mayhem--page-heading'."
 
 (defun mayhem-target-page-heading (name owner project target)
   "Return the heading of a page below TARGET, which NAME names.
-NAME is such as \"run #7\", \"defect !12\" or \"runs\".  The breadcrumb
+NAME is such as \"run #7\", \"defect !12\" or \"runs\", or a list as
+`mayhem--page-heading' takes.  The breadcrumb
 ends at TARGET's page, linked, and goes on with what of it the page
 shows, NAME after TARGET's kind: host/o/p/t  code target, run #7.
 TARGET is of PROJECT of OWNER; its type is read from the store, if
@@ -364,20 +365,21 @@ there."
 
 (defun mayhem--page-heading (kind link-last owner project target more &optional name)
   "Return a page's heading: HOST/OWNER/PROJECT/TARGET/MORE KIND.
-HOST is the Mayhem server's, `mayhem--host', naming the dashboard.
-OWNER, PROJECT and TARGET may be nil, from the end.  Each part links
-to its page, the dashboard first, so one can walk up, except the last:
-that is the page itself, unless LINK-LAST.  MORE are parts below
-TARGET, strings or vnodes such as a `mayhem-run-link'.  KIND, such as
-\"target\", says in `shadow' what the page shows, as the last part is
-often a bare name or number; it is nil when the last part says it,
-such as \"tests\".  NAME, if given, follows KIND, naming the page.
-A name longer than `mayhem-heading-part-width' is cut in the middle,
-whole on hover."
+HOST is the Mayhem server's, `mayhem--host', naming the dashboard; it
+is plain text, as one rarely walks up that far.  OWNER, PROJECT and
+TARGET may be nil, from the end.  Each links to its page, so one can
+walk up, except the last: that is the page itself, unless LINK-LAST.
+MORE are parts below TARGET, strings or vnodes such as a
+`mayhem-run-link'.  KIND, such as \"target\", says in `shadow' what the
+page shows, as the last part is often a bare name or number; it is nil
+when the last part says it, such as \"tests\".  NAME, if given, follows
+KIND, naming the page: a string, or a list of strings and vnodes, such
+as a `mayhem-run-link'.  A name longer than `mayhem-heading-part-width'
+is cut in the middle, whole on hover."
   (let* ((face 'mayhem-section-heading)
          (parts (seq-filter
                  #'car
-                 (list (list (or (mayhem--host) "Mayhem") "RET: open dashboard" #'mayhem)
+                 (list (list (or (mayhem--host) "Mayhem") nil nil)
                        (list owner "RET: open workspace"
                              (lambda () (mayhem-workspace-open owner)))
                        (list project "RET: open project"
@@ -391,7 +393,8 @@ whole on hover."
                            (let* ((shown (mayhem-cut-middle name mayhem-heading-part-width))
                                   (cut (not (eq shown name))))
                              (list (vui-text "/" :face face)
-                                   (if (and (eq name (car last)) (null more) (not link-last))
+                                   (if (or (null open)
+                                           (and (eq name (car last)) (null more) (not link-last)))
                                        (vui-text (if cut (propertize shown 'help-echo name) shown)
                                                  :face face)
                                      (mayhem-page-link shown (if cut (concat help " " name) help)
@@ -402,7 +405,11 @@ whole on hover."
                             (if (stringp part) (vui-text part :face face) part)))
                     more)
             (and kind (list (vui-text (concat "  " kind) :face (list 'shadow face))))
-            (and name (list (vui-text (concat " " name) :face face)))
+            (cond ((stringp name) (list (vui-text (concat " " name) :face face)))
+                  (name (cons (vui-text " " :face face)
+                              (mapcar (lambda (part)
+                                        (if (stringp part) (vui-text part :face face) part))
+                                      name))))
             (list (vui-text "\n"))))))
 
 (defun mayhem-repo-link (repo text &optional kind ref)
@@ -423,7 +430,7 @@ string, goes before its label."
                              url)))))
 
 (defun mayhem-scm-fields (scm &optional indent)
-  "Return the Repo, Branch, Commit and CI fields of SCM.
+  "Return a list of the Repo, Branch, Commit and CI fields of SCM, nil for none.
 SCM is a run's alist with `mayhem--scm-fields'.  On GitHub, each
 links to its page on its host.  INDENT, a string, goes before each
 label."
@@ -433,7 +440,7 @@ label."
          (revision (alist-get 'revision scm))
          (ci-url (mayhem--clean-url (alist-get 'ci_url scm)))
          (ci-type (alist-get 'ci_type scm)))
-    (vui-fragment
+    (list
      (mayhem-repo-field (alist-get 'scm_remote_origin scm) indent)
      (when branch
        (mayhem-field (concat indent "Branch") (mayhem-repo-link repo branch 'branch branch)
@@ -455,27 +462,88 @@ label."
                               (mayhem-link (mayhem--ci-label ci-type ci-url) ci-url)
                             ci-type))))))
 
-(defun mayhem-fold (key title open on-open summary parts body)
-  "Return the fold TITLE of BODY, named KEY, unfolded when OPEN.
-Unfolded, its line goes on with SUMMARY, plain; folded, with PARTS,
-so TAB reaches their links.  Each of PARTS is a string or (TEXT
-. VNODE); those that don't fit go.  ON-OPEN is called with KEY and
-whether it is to be unfolded."
-  (let ((room (- (mayhem-page-width) 12)))
+(defmacro mayhem-use-timer (deps interval active &rest body)
+  "Run BODY every INTERVAL seconds while ACTIVE, tied to the component.
+The timer starts when the component renders with ACTIVE true, and
+restarts when DEPS, a list of variables as `vui-use-effect' takes,
+change; ACTIVE should depend only on them.  It is cancelled when DEPS
+change, when the component unmounts, when BODY returns nil (done), and
+when BODY signals, so a broken frame is reported once, not every tick.
+BODY runs in the component's context, so it may call `vui-set-state'.
+From octocat.el's `octocat-vui-use-timer'."
+  (declare (indent 3))
+  (let ((timer (make-symbol "timer")))
+    `(vui-use-effect ,deps
+       (when ,active
+         (let ((,timer nil))
+           (setq ,timer
+                 (run-with-timer
+                  ,interval ,interval
+                  (vui-with-async-context
+                    (condition-case err
+                        (unless (progn ,@body)
+                          (cancel-timer ,timer))
+                      (error (cancel-timer ,timer)
+                             (signal (car err) (cdr err)))))))
+           (lambda () (cancel-timer ,timer)))))))
+
+(defconst mayhem-unfold-growth 0.5
+  "How much of the distance still to go each frame of an unfolding moves.
+It eases out onto its end; each frame moves at least one line.")
+
+(defconst mayhem-unfold-peak 0.2
+  "Most of an unfolding's whole distance one frame may move.
+It caps the speed at the start, so an unfolding begins at full speed
+rather than jumping most of the way in its first frame.")
+
+(defconst mayhem-unfold-interval 0.025
+  "Seconds between the frames of an unfolding.")
+
+(defun mayhem-unfold-step (now from to)
+  "Return the position after NOW of an unfolding going FROM to TO.
+It starts fast and eases out, see `mayhem-unfold-growth'."
+  (let* ((span (abs (- to from)))
+         (step (max 1 (min (ceiling (* mayhem-unfold-peak span))
+                           (ceiling (* mayhem-unfold-growth (abs (- to now))))))))
+    (if (< from to) (min to (+ now step)) (max to (- now step)))))
+
+(defun mayhem-use-unfold (shown to from)
+  "Step the calling component's :shown state, SHOWN, from FROM to TO.
+Return how many lines to show now.  Call it during render, as any
+hook; the component's :shown starts at the end it is at rest on."
+  (let* ((now (max (min shown (max to from)) (min to from)))
+         (moving (/= now to)))
+    (mayhem-use-timer (moving to) mayhem-unfold-interval moving
+      (setq now (mayhem-unfold-step now from to))
+      (vui-set-state :shown now)
+      ;; Setting an unchanged value doesn't re-render, so stop at TO.
+      (/= now to))
+    now))
+
+(vui-defcomponent mayhem-fold (title summary parts lines)
+  "A header line TITLE that unfolds LINES under it, animated.
+LINES are vnodes of a line each, nil ones left out.  Unfolded, the
+line goes on with SUMMARY, plain; folded, with PARTS, so TAB reaches
+their links.  Each of PARTS is a string or (TEXT . VNODE); those that
+don't fit go.  Unfolding and folding start fast and ease out, a line
+a frame at the end, as octocat.el's folds do.  It keeps whether it is
+open itself."
+  :state ((open nil) (shown 0))
+  :render
+  (let* ((lines (delq nil lines))
+         (now (mayhem-use-unfold shown (if open (length lines) 0)
+                                 (if open 0 (length lines))))
+         (room (- (mayhem-page-width) 12)))
     (vui-fragment
-     (vui-collapsible :key key
-                      :title (if open
-                                 (concat (string-pad title 10)
-                                         (truncate-string-to-width summary (max 10 room)
-                                                                   nil nil "…"))
-                               title)
-                      :title-face 'mayhem-label :indent 0
-                      :expanded open
-                      :on-toggle (lambda (open) (funcall on-open key open))
-                      body)
-     ;; Folded, its title line has no newline of its own, so the parts
-     ;; go on it, lined up with the fields' values.
-     (unless open
+     ;; The arrow and its space stand in for two of a field label's columns.
+     (vui-button (concat (if open "▼ " "▶ ") title)
+                 :no-decoration t :face 'mayhem-label :key 'fold-toggle
+                 :help-echo (if open "RET: fold" "RET: unfold")
+                 :on-click (lambda () (vui-set-state :open (not open))))
+     (vui-text (make-string (max 1 (- 10 (string-width title))) ?\s))
+     (if open
+         (vui-text (propertize (truncate-string-to-width summary (max 10 room) nil nil "…")
+                               'face 'mayhem-label))
        (let ((used 0) shown)
          (catch 'full
            (dolist (part parts)
@@ -486,16 +554,15 @@ whether it is to be unfolded."
                (setq used (+ used sep (string-width text)))
                (when shown (push (vui-text "  ") shown))
                (push (if (consp part) (cdr part) (vui-text part)) shown))))
-         (apply #'vui-fragment (vui-text (make-string (- 10 (string-width title)) ?\s))
-                (nreverse (cons (vui-newline) shown))))))))
+         (apply #'vui-fragment (nreverse shown))))
+     (vui-newline)
+     (apply #'vui-fragment (seq-take lines now)))))
 
-(vui-defcomponent mayhem-source (scm)
-  "SCM's repo, branch, commit and parent, folded under one line.
+(defun mayhem-source-fold (scm)
+  "Return SCM's repo, branch, commit and parent, a `mayhem-fold'.
 SCM is a run's alist with `mayhem--scm-fields', or a defect's.  The
 line names its branch, commit and subject; folded, the branch and
-commit link to their pages.  It keeps whether it is folded itself."
-  :state ((open nil))
-  :render
+commit link to their pages.  Nil when SCM names none of them."
   (let* ((repo (mayhem--repo (alist-get 'scm_remote_origin scm)))
          (parent (alist-get 'parent_revision scm))
          (revision (alist-get 'revision scm))
@@ -503,37 +570,36 @@ commit link to their pages.  It keeps whether it is folded itself."
          (short (and revision (substring revision 0 (min 7 (length revision)))))
          (subject (alist-get 'scm_commit_subject scm)))
     (when (or (alist-get 'scm_remote_origin scm) revision branch parent)
-      (mayhem-fold
-       'source "Source" open (lambda (_key open) (vui-set-state :open open))
-       (string-join (delq nil (list branch short subject)) "  ")
-       (delq nil (list (and branch (cons branch (mayhem-repo-link repo branch 'branch branch)))
-                       (and short (cons short (mayhem-repo-link repo short 'commit revision)))
-                       (and subject
-                            (truncate-string-to-width
-                             subject (max 10 (- (mayhem-page-width) 16
-                                                (length branch) (length short)))
-                             nil nil "…"))))
-       (vui-fragment
-        (mayhem-scm-fields scm "  ")
-        (when parent
-          (mayhem-field "  Parent"
-                        (mayhem-repo-link repo (substring parent 0 (min 7 (length parent)))
-                                          'commit parent))))))))
+      (vui-component
+       'mayhem-fold
+       :title "Source"
+       :summary (string-join (delq nil (list branch short subject)) "  ")
+       :parts (delq nil (list (and branch (cons branch (mayhem-repo-link repo branch 'branch branch)))
+                              (and short (cons short (mayhem-repo-link repo short 'commit revision)))
+                              (and subject
+                                   (truncate-string-to-width
+                                    subject (max 10 (- (mayhem-page-width) 16
+                                                       (length branch) (length short)))
+                                    nil nil "…"))))
+       :lines (append (mayhem-scm-fields scm "  ")
+                      (list (when parent
+                              (mayhem-field "  Parent"
+                                            (mayhem-repo-link repo (substring parent 0 (min 7 (length parent)))
+                                                              'commit parent)))))))))
+
+(defun mayhem-image-link (image &optional digest)
+  "Return IMAGE linking to its page when it has one, else plain.
+DIGEST, if known, goes in its `help-echo'."
+  (if-let* ((url (mayhem--image-url image)))
+      (mayhem-page-link image (concat "RET: open " url (and digest (concat "\n" digest)))
+                        (lambda () (browse-url url)))
+    (propertize image 'help-echo digest)))
 
 (defun mayhem-image-field (run)
   "Return the Image field of RUN, an alist, or nil when it has no image.
-It links to the image's page when it has one; its digest is the
-`help-echo'."
+It links as `mayhem-image-link' does, with its digest."
   (when-let* ((image (alist-get 'docker_pullable run)))
-    (mayhem-field "Image"
-                  (let ((url (mayhem--image-url image))
-                        (digest (alist-get 'fetched_docker_image_digest run)))
-                    (if url
-                        (mayhem-page-link image
-                                          (concat "RET: open " url
-                                                  (and digest (concat "\n" digest)))
-                                          (lambda () (browse-url url)))
-                      (propertize image 'help-echo digest))))))
+    (mayhem-field "Image" (mayhem-image-link image (alist-get 'fetched_docker_image_digest run)))))
 
 (defun mayhem-hardening-field (run &optional indent)
   "Return the Hardening field of RUN, an alist, or nil without one.

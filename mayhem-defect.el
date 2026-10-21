@@ -68,15 +68,17 @@ The defect is of TARGET of PROJECT of OWNER."
 (vui-defcomponent mayhem-defect-testcases (owner project target evidence)
   "The table of the test cases in EVIDENCE of a code defect.
 The defect is of TARGET of PROJECT of OWNER.  It lists the first
-`mayhem-defect--testcases-shown', and a button the rest."
-  :state ((all nil))
+`mayhem-defect--testcases-shown', and a button the rest, which
+unfold and fold back as a `mayhem-fold' does."
+  :state ((all nil) (shown mayhem-defect--testcases-shown))
   :render
   (let* ((testcases (alist-get 'testcases evidence))
          (count (or (alist-get 'count evidence) 0))
-         (more (> (length testcases) mayhem-defect--testcases-shown))
-         (shown (if (or all (not more))
-                    testcases
-                  (seq-take testcases mayhem-defect--testcases-shown)))
+         (limit (min mayhem-defect--testcases-shown (length testcases)))
+         (more (> (length testcases) limit))
+         (now (mayhem-use-unfold (or shown limit) (if all (length testcases) limit)
+                                 (if all limit (length testcases))))
+         (rows (seq-take testcases now))
          (lines (mayhem-columns
                  (mapcar (lambda (test)
                            (let ((sha (alist-get 'sha256 test)))
@@ -102,7 +104,7 @@ The defect is of TARGET of PROJECT of OWNER.  It lists the first
                                                               (alist-get 'run_number test)
                                                               (alist-get 'sha256 test)))
                                       "RET: open test case"))
-                        shown (seq-take (cdr lines) (length shown)))))
+                        rows (seq-take (cdr lines) now))))
      (when more
        (vui-fragment
         (vui-button (if all
@@ -159,7 +161,7 @@ SOURCE is \"api\" or \"code\"."
      (when-let* ((run (alist-get 'run data)))
        (mayhem-field "Run" (mayhem-run-link owner project target run)))
      (when-let* ((scm (alist-get 'scm data)))
-       (vui-component 'mayhem-source :scm scm))
+       (mayhem-source-fold scm))
      (mayhem-defect--evidence-fields owner project target
                                      (alist-get 'source defect) (alist-get 'evidence data))
      (mayhem-block "Description"

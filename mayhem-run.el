@@ -445,18 +445,18 @@ and start are its `help-echo'."
      phases "  ")))
 
 (defun mayhem-run--lines (label lines)
-  "Return the field LABEL showing LINES, strings, each on a line of its own."
-  (apply #'vui-fragment (mayhem-field label (car lines))
-         (mapcar (lambda (line) (mayhem-field "" line)) (cdr lines))))
+  "Return fields showing LINES, the first labelled LABEL.
+Each of LINES is a string or a list of the values of a field."
+  (seq-map-indexed (lambda (line i)
+                     (apply #'mayhem-field (if (= i 0) label "") (ensure-list line)))
+                   lines))
 
-(defun mayhem-run--setup (owner project target number run open on-open)
-  "Return what RUN was set up with, folded under one line.
+(defun mayhem-run--setup (owner project target number run)
+  "Return what RUN was set up with, a `mayhem-fold'.
 Its build, hardening, Mayhemfile, what the CLI overrode in
 it, the environment it added, the files it sent, and the CLI's
 version.  Folded, the line links to the Mayhemfile and counts what
-the CLI added.  RUN is run NUMBER of TARGET of PROJECT of OWNER;
-OPEN lists the keys of the header's folds unfolded; ON-OPEN is as for
-`mayhem-fold'."
+the CLI added.  RUN is run NUMBER of TARGET of PROJECT of OWNER."
   (let* ((build (alist-get 'build_id run))
          (factors (alist-get 'n_exploitability_factors_total run))
          (hardening (and factors (> factors 0)
@@ -481,29 +481,41 @@ OPEN lists the keys of the header's folds unfolded; ON-OPEN is as for
                                  (funcall count files "file")
                                  hardening))))
     (when (or build hardening mayhemfile overrides env files cli)
-      (mayhem-fold
-       'setup "Setup" (memq 'setup open) on-open
-       (string-join (delq nil (cons (and mayhemfile "Mayhemfile") counts)) "  ")
-       (append (and mayhemfile (list (cons "Mayhemfile" (funcall link "Mayhemfile"))))
-               (mapcar grey counts))
-       (vui-fragment
-        (when build
-          (mayhem-field "  Build" (format "%s" build)))
-        (mayhem-hardening-field run "  ")
-        (when mayhemfile
-          (let ((lines (length (split-string (string-trim-right mayhemfile) "\n"))))
-            ;; "Mayhemfile", indented, leaves no room after the label.
-            (mayhem-field "  Config" (funcall link "Mayhemfile")
-                          (funcall grey (format "  %d line%s" lines (if (= lines 1) "" "s"))))))
+      (vui-component
+       'mayhem-fold
+       :title "Setup"
+       :summary (string-join (delq nil (cons (and mayhemfile "Mayhemfile") counts)) "  ")
+       :parts (append (and mayhemfile (list (cons "Mayhemfile" (funcall link "Mayhemfile"))))
+                      (mapcar grey counts))
+       :lines
+       (append
+        (list (when build
+                (mayhem-field "  Build" (format "%s" build)))
+              (mayhem-hardening-field run "  ")
+              (when mayhemfile
+                (let ((lines (length (split-string (string-trim-right mayhemfile) "\n"))))
+                  ;; "Mayhemfile", indented, leaves no room after the label.
+                  (mayhem-field "  Config" (funcall link "Mayhemfile")
+                                (funcall grey (format "  %d line%s" lines
+                                                      (if (= lines 1) "" "s")))))))
         (when overrides
           (let ((width (apply #'max (mapcar (lambda (o) (length (symbol-name (car o))))
                                             overrides))))
+            ;; A list, such as the tasks or test suites, goes an item a line.
             (mayhem-run--lines "  Overrides"
-                               (mapcar (pcase-lambda (`(,key . ,value))
-                                         (concat (string-pad (symbol-name key) (+ width 2))
-                                                 (if value
-                                                     (mayhem--format-value value)
-                                                   (funcall grey "null"))))
+                               (mapcan (pcase-lambda (`(,key . ,value))
+                                         (let ((items (cond ((null value) (list (funcall grey "null")))
+                                                            ((and (listp value)
+                                                                  (not (mayhem--object-p value)))
+                                                             (mapcar #'mayhem--format-value value))
+                                                            (t (list (mayhem--format-value value))))))
+                                           (cons (list (string-pad (symbol-name key) (+ width 2))
+                                                       (if (and (eq key 'image) (stringp value))
+                                                           (mayhem-image-link value)
+                                                         (car items)))
+                                                 (mapcar (lambda (item)
+                                                           (concat (make-string (+ width 2) ?\s) item))
+                                                         (cdr items)))))
                                        overrides))))
         (when env
           (mayhem-run--lines "  Env"
@@ -518,8 +530,8 @@ OPEN lists the keys of the header's folds unfolded; ON-OPEN is as for
                                                  (propertize (substring sha 0 (min 8 (length sha)))
                                                              'face 'mayhem-label 'help-echo sha))))
                                      files)))
-        (when cli
-          (mayhem-field "  CLI" cli)))))))
+        (list (when cli
+                (mayhem-field "  CLI" cli))))))))
 
 (defun mayhem-run--tabs (run data)
   "Return the tabs of the page of RUN, showing DATA, as (KEY LABEL).
@@ -546,12 +558,11 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER, from DATA."
     ('coverage (mayhem-run--coverage run))
     ('endpoints (mayhem-run--endpoints (alist-get 'endpoints data)))))
 
-(defun mayhem-run--render (owner project target number data tab on-tab open on-open)
+(defun mayhem-run--render (owner project target number data tab on-tab)
   "Return the vnodes of run NUMBER of TARGET of PROJECT of OWNER, showing DATA.
 TAB is the key of the tab shown; when nil or not the run's, the
 log for a failed run, which says why, else the first.  ON-TAB is
-called with the key of another one, to show it.  OPEN and ON-OPEN
-are for the header's folds, as in `mayhem-run--setup'."
+called with the key of another one, to show it."
   (let* ((run (alist-get 'run data))
          (code (not (alist-get 'api_run run)))
          (start (alist-get 'started_at run))
@@ -601,9 +612,9 @@ are for the header's folds, as in `mayhem-run--setup'."
                                  'face 'mayhem-label)))
      (when (alist-get 'phases run)
        (mayhem-field "Tasks" (mayhem-run--tasks run)))
-     (vui-component 'mayhem-source :scm run)
+     (mayhem-source-fold run)
      (mayhem-image-field run)
-     (mayhem-run--setup owner project target number run open on-open)
+     (mayhem-run--setup owner project target number run)
      (when code
        (mayhem-run--chart run (alist-get 'progress data) now))
      (vui-newline)
@@ -628,7 +639,7 @@ are for the header's folds, as in `mayhem-run--setup'."
 
 (vui-defcomponent mayhem-run-page (owner project target number)
   "The page of run NUMBER of TARGET of PROJECT of OWNER."
-  :state ((tab nil) (open nil))
+  :state ((tab nil))
   :render
   (let* ((spec (list 'run owner project target number))
          (snapshot (mayhem-sync-use-resource spec))
@@ -649,12 +660,7 @@ are for the header's folds, as in `mayhem-run--setup'."
      (mayhem-snapshot-view snapshot "run" (mayhem-run--skeleton)
                            (lambda (data)
                              (mayhem-run--render owner project target number data tab
-                                                 (lambda (key) (vui-set-state :tab key))
-                                                 open
-                                                 (lambda (key unfold)
-                                                   (vui-set-state :open (if unfold
-                                                                            (cons key open)
-                                                                          (remq key open))))))))))
+                                                 (lambda (key) (vui-set-state :tab key))))))))
 
 (defun mayhem-run-open (owner project target number)
   "Open the page of run NUMBER of TARGET of PROJECT of OWNER."

@@ -639,17 +639,28 @@ its phases and files are trimmed too."
 
 (defun mayhem--format-value (value)
   "Return VALUE, parsed from JSON, as one line of text.
-A list of strings or numbers is joined with commas; an object, or
-anything else, is written as JSON."
+A list is joined with commas; an object is written as JSON, but one
+with a name is written as it, the rest of it after in JSON, so a
+Mayhemfile's tasks read as their names."
   (cond ((stringp value) value)
         ((numberp value) (number-to-string value))
         ((eq value t) "true")
         ((null value) "")
-        ((and (listp value) (seq-every-p (lambda (v) (or (stringp v) (numberp v))) value))
+        ((mayhem--object-p value)
+         (let ((name (alist-get 'name value))
+               (rest (seq-remove (lambda (pair) (eq (car pair) 'name)) value)))
+           (if (stringp name)
+               (concat name (and rest (concat " " (mayhem--format-value rest))))
+             (condition-case nil
+                 (json-serialize value :null-object nil)
+               (error (format "%S" value))))))
+        ((or (listp value) (vectorp value))
          (mapconcat #'mayhem--format-value value ", "))
-        (t (condition-case nil
-               (json-serialize value :null-object nil)
-             (error (format "%S" value))))))
+        (t (format "%S" value))))
+
+(defun mayhem--object-p (value)
+  "Return non-nil if VALUE is a JSON object parsed as an alist."
+  (and (consp value) (consp (car value)) (symbolp (caar value))))
 
 (defun mayhem--counts (data)
   "Return the `stats' of DATA, a count over time, as (TIMESTAMP . COUNT)."

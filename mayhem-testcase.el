@@ -115,10 +115,10 @@ RUN is a run of TARGET of PROJECT of OWNER."
   (let ((snapshot (mayhem-sync-use-resource
                    (list 'testcase owner project target run sha256))))
     (vui-fragment
-     (mayhem-page-heading "test case" owner project target
-                          (mayhem-run-link owner project target run (format "#%s" run)
-                                           '(link mayhem-section-heading))
-                          (substring sha256 0 (min 8 (length sha256))))
+     (mayhem-target-page-heading
+      (list (mayhem-run-link owner project target run nil '(link mayhem-section-heading))
+            (format ", test case %s" (substring sha256 0 (min 8 (length sha256)))))
+      owner project target)
      (vui-newline)
      (mayhem-snapshot-view snapshot "test case" (mayhem-testcase--skeleton)
                            (lambda (data)

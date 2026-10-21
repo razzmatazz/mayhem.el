@@ -152,10 +152,10 @@ as `run-testcases' has them, or nil before they land."
   (let ((suite (mayhem-sync-use-resource (list 'testsuite owner project target run)))
         (testcases (mayhem-sync-use-resource (list 'run-testcases owner project target run))))
     (vui-fragment
-     (mayhem-page-heading nil owner project target
-                          (mayhem-run-link owner project target run (format "#%s" run)
-                                           '(link mayhem-section-heading))
-                          "tests")
+     (mayhem-target-page-heading
+      (list (mayhem-run-link owner project target run nil '(link mayhem-section-heading))
+            ", tests")
+      owner project target)
      (vui-newline)
      (mayhem-snapshot-view suite "test suite" (mayhem-testsuite--skeleton)
                            (lambda (data)

@@ -43,9 +43,10 @@ users expect.
 - Brackets mean an action (`[Stop]`, `[Load more]`); plain text is content.
   A page's own name is never a button.
 - **Walk without a jump.**  A page's heading is a breadcrumb: each part
-  naming an enclosing page (the server's host for the dashboard, then
-  owner, project, target) links to it; build it with
-  `mayhem-page-heading`.  Its last part is the page itself, followed by
+  naming an enclosing page (owner, project, target) links to it; build
+  it with `mayhem-page-heading`.  It starts with the server's host,
+  plain: one rarely walks up to the dashboard, and a link there would
+  only be one more TAB stop.  Its last part is the page itself, followed by
   the page's kind in grey (`host/o  workspace`, `host/o/p/t  code
   target`) when that part is a bare name, number or hash.  When the
   part says it already, leave the kind out (nil): the label would only
@@ -59,8 +60,9 @@ users expect.
   `mayhem-target-page-heading`.  A list the web app has no page for
   so adds no part that would read as a URL leading nowhere.  A list page has no heading of its own
   above the list either (`Runs (78)`): the whole page is the list.
-  Pages below a run (its test suite, a test case) still go on as a
-  path (`host/o/p/t/#7/tests`).
+  Pages below a run (its test suite, a test case) name the run too,
+  linked: `host/o/p/t  code target, run #7, test case abcd1234`,
+  `host/o/p/t  code target, run #7, tests`.
 - A long name in a heading is cut in the middle (`mayhem-cut-middle`),
   whole on hover.
   A field naming another page (`Run  run #7`) links to it, with
@@ -71,11 +73,9 @@ users expect.
   in front too: `run #7`, `defect !12`.  This holds even where the
   label beside it says the same (`Run  run #7`): the link reads right
   on its own, and is the same text wherever it appears.
-  `mayhem-run-link` writes `run #N` for you.  A page heading, where
-  each part is short, drops the kind word before a number
-  (`o/p/t/#7/abcd1234  test case`), and so does a table column of numbers
-  under a heading that already names them, such as a target's run
-  list (`#7`).
+  `mayhem-run-link` writes `run #N` for you.  A table column of numbers
+  under a heading that already names them, such as a target's run list,
+  drops the kind word (`#7`).
 - **Say what a target tests.**  A code target and an API target show
   different things (tests and coverage, or endpoints), so a target's
   type is shown wherever the target is: its page's kind (`host/o/p/t

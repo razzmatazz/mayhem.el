@@ -206,7 +206,11 @@ RAW is as for `mayhem--api-response'."
   (should (equal (mayhem--format-value 2) "2"))
   (should (equal (mayhem--format-value '("a" "b")) "a, b"))
   (should (equal (mayhem--format-value '((url . "tcp://x") (timeout . 2)))
-                 "{\"url\":\"tcp://x\",\"timeout\":2}")))
+                 "{\"url\":\"tcp://x\",\"timeout\":2}"))
+  ;; A Mayhemfile's tasks read as their names.
+  (should (equal (mayhem--format-value '(((name . "regression_testing"))
+                                         ((name . "behavior_testing") (duration . 60))))
+                 "regression_testing, behavior_testing {\"duration\":60}")))
 
 (ert-deftest mayhem-core-test-decode-base64 ()
   (should (equal (mayhem--decode-base64 (base64-encode-string "GET / HTTP/1.1")) "GET / HTTP/1.1"))
