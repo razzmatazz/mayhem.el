@@ -29,6 +29,7 @@
 (require 'mayhem-sync)
 (require 'mayhem-vui)
 (require 'mayhem-defect)
+(require 'mayhem-mayhemfile)
 
 (declare-function mayhem-testcase-open "mayhem-testcase" (owner project target run sha256))
 (declare-function mayhem-testsuite-open "mayhem-testsuite" (owner project target run))
@@ -392,25 +393,17 @@ A test case fails when it shows a defect, crash or not."
             (when limit
               (propertize (concat (if real "  " "") "limit " limit) 'face 'mayhem-label)))))
 
-(defun mayhem-run--yaml-mode ()
-  "Return the major mode the user gives YAML files, or nil."
-  (let ((mode (assoc-default "Mayhemfile.yaml" auto-mode-alist #'string-match)))
-    (when (consp mode) (setq mode (car mode)))
-    (and (functionp mode) mode)))
-
 (defun mayhem-run-show-mayhemfile (owner project target number text)
   "Show TEXT, the Mayhemfile of run NUMBER of TARGET of PROJECT of OWNER.
-It is read-only, in the mode YAML files get; `q' goes back."
+It is read-only, in `mayhem-mayhemfile-mode'; `q' goes back."
   (let ((buffer (get-buffer-create (format "*mayhem: %s/%s/%s/%s Mayhemfile*"
                                            owner project target number))))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
         (insert text))
-      (let ((mode (mayhem-run--yaml-mode)))
-        (if (and mode (not (eq major-mode mode)))
-            (funcall mode)
-          (unless mode (fundamental-mode))))
+      (unless (eq major-mode 'mayhem-mayhemfile-mode)
+        (mayhem-mayhemfile-mode))
       (goto-char (point-min))
       (set-buffer-modified-p nil)
       (view-mode 1))

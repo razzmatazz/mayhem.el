@@ -39,6 +39,7 @@
 (require 'mayhem-core)
 (require 'mayhem-sync)
 (require 'mayhem-vui)
+(require 'mayhem-mayhemfile)
 (require 'mayhem-workspace)
 (require 'mayhem-project)
 (require 'mayhem-target)

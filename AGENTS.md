@@ -37,7 +37,7 @@ redrawn):
 
 ```elisp
 (let (results)
-  (dolist (f (list "mayhem-core.el" "mayhem-sync.el" "mayhem-vui.el"
+  (dolist (f (list "mayhem-core.el" "mayhem-sync.el" "mayhem-vui.el" "mayhem-mayhemfile.el"
                   "mayhem-workspace.el" "mayhem-project.el" "mayhem-target.el"
                   "mayhem-defect.el" "mayhem-run.el" "mayhem-testcase.el"
                   "mayhem-testsuite.el" "mayhem-search.el"
@@ -61,7 +61,7 @@ redrawn):
 ```
 
 - Load `mayhem-core.el` first, then `mayhem-sync.el`, `mayhem-vui.el`,
-  the page files, and `mayhem.el` last.
+  `mayhem-mayhemfile.el`, the page files, and `mayhem.el` last.
 - `vui-rerender` draws a page with the reloaded functions and keeps its
   state (folds, tab, filters).  `g` (`mayhem-refresh`) won't: it
   refetches, and data that hasn't changed doesn't redraw.  Reopening

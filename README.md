@@ -60,8 +60,10 @@ say because your token expired, the error shows in the header line.
   ID that started it, its image, and each task (regression,
   exploitability, behavior, coverage), coloured by how it went with
   how long it took.  RET on `Mayhemfile` shows the Mayhemfile it was
-  started with, read-only, in your YAML mode.  What the CLI overrode,
-  the environment it added and the files sent are each a line, folded
+  started with, read-only, in `mayhem-mayhemfile-mode`, which also
+  opens files named `Mayhemfile` or `*.Mayhemfile`, derives from your
+  YAML mode, and checks them with Flymake through `mayhem validate`.  What the CLI overrode, the environment it added
+  and the files sent are each a line, folded
   when too wide for one.  A code run also has a chart of test cases
   processed and defects found over time, as in the web app (once the
   run is done, folded in the header as `▶ Progress`), and its
