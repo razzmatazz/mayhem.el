@@ -11,7 +11,8 @@
 
 ;; A run's page, `*mayhem: owner/project/target/N*': its status, commit
 ;; and image, and its Mayhemfile, which RET shows as a file; for a code
-;; run, a chart of its progress, as the web app's run page has, and its
+;; run, a chart of its progress, as the web app's run page has (folded
+;; in the header once the run is done), and its
 ;; coverage; its defects, the first 10 until asked for all; and for a
 ;; code run its tests (counts and failing test cases), for an API run
 ;; its endpoints.  Its event log is a page of its own, `.../N/log', which
@@ -215,7 +216,9 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
   "Return the vnodes charting PROGRESS of RUN, a code run, as of NOW.
 Like the web app's chart: test cases processed over the time since the
 run started, a dot where more defects were found.  Each column's time
-and counts are its `help-echo'.  Nothing before the run starts."
+and counts are its `help-echo'.  Nothing before the run starts.  While
+the run goes, it is a section; once done, a `mayhem-fold' of the
+header, as it no longer changes."
   (when-let* ((start (alist-get 'started_at run))
               ((alist-get 'testcases progress)))
     (let* ((most (apply #'max 0 (mapcar #'cdr (alist-get 'testcases progress))))
@@ -248,30 +251,37 @@ and counts are its `help-echo'.  Nothing before the run starts."
            (rows (mayhem--bar-rows tests mayhem-run--chart-height))
            (dots (apply #'string (seq-mapn (lambda (d prev) (if (> d prev) ?● ?\s))
                                            defects (cons 0 defects))))
-           (end (mayhem--format-elapsed span)))
-      (vui-fragment
-       (vui-newline)
-       (mayhem-heading "Progress")
-       (vui-text
-        (concat
-         pad (propertize (concat (propertize "▆" 'face 'mayhem-target)
-                                 (format " %d test case%s processed  " top (if (= top 1) "" "s"))
-                                 (propertize "●" 'face 'error)
-                                 (let ((found (apply #'max 0 defects)))
-                                   (format " %d defect%s found" found (if (= found 1) "" "s"))))
-                         'face 'mayhem-label)
-         "\n"
-         (mapconcat (lambda (row)
-                      (concat (propertize (format (format "%%%ds " margin)
-                                                  (if (eq row (car rows)) top ""))
-                                          'face 'mayhem-label)
-                              (propertize (funcall tip row) 'face 'mayhem-target)
-                              "\n"))
-                    rows "")
-         pad (propertize (funcall tip dots) 'face 'error) "\n"
-         pad (propertize (concat "0:00" (make-string (max 1 (- width 4 (length end))) ?\s) end)
-                         'face 'mayhem-label)
-         "\n"))))))
+           (end (mayhem--format-elapsed span))
+           (found (apply #'max 0 defects))
+           (processed (format "%d test case%s processed" top (if (= top 1) "" "s")))
+           (found-text (format "%d defect%s found" found (if (= found 1) "" "s")))
+           (legend (propertize (concat (propertize "▆" 'face 'mayhem-target) " " processed "  "
+                                       (propertize "●" 'face 'error) " " found-text)
+                               'face 'mayhem-label))
+           (lines (append
+                   (mapcar (lambda (row)
+                             (concat (propertize (format (format "%%%ds " margin)
+                                                         (if (eq row (car rows)) top ""))
+                                                 'face 'mayhem-label)
+                                     (propertize (funcall tip row) 'face 'mayhem-target)))
+                           rows)
+                   (list (concat pad (propertize (funcall tip dots) 'face 'error))
+                         (concat pad (propertize (concat "0:00"
+                                                         (make-string (max 1 (- width 4 (length end)))
+                                                                      ?\s)
+                                                         end)
+                                                 'face 'mayhem-label))))))
+      (if (mayhem-run--live-p run)
+          (vui-fragment
+           (vui-newline)
+           (mayhem-heading "Progress")
+           (vui-text (concat pad legend "\n" (mapconcat (lambda (l) (concat l "\n")) lines ""))))
+        (vui-component 'mayhem-fold
+                       :title "Progress"
+                       :summary (concat processed "  " found-text)
+                       :parts (list (propertize (concat processed "  " found-text)
+                                                'face 'mayhem-label))
+                       :lines (mapcar (lambda (l) (vui-text (concat l "\n"))) lines))))))
 
 (defconst mayhem-run--test-header
   '("Test case" "Type" "Defects" nil "Time" "Seen")
@@ -549,7 +559,9 @@ the CLI added.  RUN is run NUMBER of TARGET of PROJECT of OWNER."
          (start (alist-get 'started_at run))
          (queued (alist-get 'created_at run))
          (cpu (alist-get 'cputime run))
-         (now (current-time)))
+         (live (mayhem-run--live-p run))
+         (now (current-time))
+         (chart (when code (mayhem-run--chart run (alist-get 'progress data) now))))
     (vui-fragment
      (mayhem-field "Status" (concat (mayhem-run-status run)
                                     (when-let* ((d (alist-get 'description run)))
@@ -589,14 +601,15 @@ the CLI added.  RUN is run NUMBER of TARGET of PROJECT of OWNER."
                                  'face 'mayhem-label)))
      (when (alist-get 'phases run)
        (mayhem-field "Tasks" (mayhem-run--tasks run)))
-     (mayhem-run--log-field owner project target number (alist-get 'events data))
      (mayhem-source-fold run)
      (mayhem-image-field run)
      (mayhem-run--setup owner project target number run)
+     ;; A done run's chart is a fold of the header, a going run's a section.
+     (unless live chart)
+     (mayhem-run--log-field owner project target number (alist-get 'events data))
+     (when live chart)
      (when code
-       (vui-fragment
-        (mayhem-run--chart run (alist-get 'progress data) now)
-        (mayhem-run--coverage run)))
+       (mayhem-run--coverage run))
      (mayhem-run--defects owner project target number (alist-get 'defects data))
      (if code
          (vui-component 'mayhem-run-tests :owner owner :project project

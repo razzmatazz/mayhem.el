@@ -63,7 +63,8 @@ say because your token expired, the error shows in the header line.
   started with, read-only, in your YAML mode.  What the CLI overrode,
   the environment it added and the files sent are each a line, folded
   when too wide for one.  A code run also has a chart of test cases
-  processed and defects found over time, as in the web app, and its
+  processed and defects found over time, as in the web app (once the
+  run is done, folded in the header as `▶ Progress`), and its
   coverage, with the inputs each engine tested.  Its defects follow,
   the first 10 until `Show all` lists the rest, and its tests: counts,
   crashes, Valgrind errors, the corpus and the failing test cases, the
