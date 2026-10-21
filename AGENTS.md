@@ -62,14 +62,38 @@ redrawn):
 
 - Load `mayhem-core.el` first, then `mayhem-sync.el`, `mayhem-vui.el`,
   the page files, and `mayhem.el` last.
-- `vui-rerender` draws a page with the reloaded code and keeps its
+- `vui-rerender` draws a page with the reloaded functions and keeps its
   state (folds, tab, filters).  `g` (`mayhem-refresh`) won't: it
   refetches, and data that hasn't changed doesn't redraw.  Reopening
   doesn't either: `mayhem-open-page` reuses a mounted page.
-- Don't kill the user's buffers.  Kill only when a keymap changed (and
-  `makunbound` the map first, as `defvar` won't rebind it), a
-  component's `:state` gained a key, or a stale `.elc` shadows the
-  source.  Say if you did.
+- A mounted component keeps its old `vui-defcomponent` render and
+  props, so after changing one, remount the pages that show it: this
+  reopens each, back in its windows at its point, losing its folds.
+
+  ```elisp
+  (delq nil
+    (mapcar (lambda (buf)
+              (when-let* (((string-prefix-p "*mayhem" (buffer-name buf)))
+                          ((vui-get-instance buf))
+                          (page (buffer-local-value 'mayhem-page buf)))
+                (let ((name (buffer-name buf))
+                      (windows (get-buffer-window-list buf nil t))
+                      (pt (with-current-buffer buf (point))))
+                  (condition-case err
+                      (progn
+                        (kill-buffer buf)
+                        (save-window-excursion (mayhem-open page))
+                        (when-let* ((new (get-buffer name)))
+                          (dolist (w windows) (set-window-buffer w new))
+                          (with-current-buffer new (goto-char (min pt (point-max)))))
+                        name)
+                    (error (format "%s: %s" name (error-message-string err)))))))
+            (buffer-list)))
+  ```
+
+- Otherwise don't kill the user's buffers.  Kill only when a keymap
+  changed (and `makunbound` the map first, as `defvar` won't rebind
+  it) or a stale `.elc` shadows the source.  Say if you did.
 - Never use `unload-feature`: it cascades into dependent features.
 
 ## Checking a page in Emacs
@@ -84,7 +108,13 @@ through keys: under evil, `g` is a prefix, not `mayhem-refresh`.
 
 - Press a button or fold by its text: `(search-forward "▶ Source")`,
   then `(push-button (match-beginning 0))`.  vui redraws after the
-  handler returns, so read the result in a second call.
+  handler returns, so read the result in a second call; folds unfold
+  over a few frames, so a fold read at once may be half open.
+- Bind `case-fold-search` to nil when searching a page: `Overrides`
+  otherwise matches `3 overrides` on the line above, and the press
+  lands on the wrong button.
+- The user may be using the page: read it before pressing, so a fold
+  they opened isn't closed.
 - Leave a page as you found it: close folds you opened.
 - If a call is refused as blocked, the user may not have approved it
   yet: ask, then retry.
