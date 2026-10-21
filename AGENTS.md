@@ -31,8 +31,9 @@ NEXT FORM`.  To locate the break: `--trace DEFUN`, `--trace-line N`,
 
 ## Reloading into Emacs
 
-After edits, reload with one `eval-elisp` call (any value but `ok` is an
-error):
+After edits, reload and redraw every open page with one `eval-elisp`
+call (any value but `ok` is an error; the second list names the pages
+redrawn):
 
 ```elisp
 (let (results)
@@ -48,15 +49,45 @@ error):
           (eval-buffer)
           (push (cons f 'ok) results))
       (error (push (cons f (error-message-string err)) results))))
-  (nreverse results))
+  (list (nreverse results)
+        (delq nil (mapcar (lambda (b)
+                            (when-let* (((string-prefix-p "*mayhem" (buffer-name b)))
+                                        (instance (vui-get-instance b)))
+                              (condition-case err
+                                  (progn (vui-rerender instance) (buffer-name b))
+                                (error (format "%s: %s" (buffer-name b)
+                                               (error-message-string err))))))
+                          (buffer-list)))))
 ```
 
 - Load `mayhem-core.el` first, then `mayhem-sync.el`, `mayhem-vui.el`,
   the page files, and `mayhem.el` last.
-- Don't kill the user's buffers; tell them to press `g`.  Kill only when a
-  keymap changed (and `makunbound` the map first, as `defvar` won't
-  rebind it) or a stale `.elc` shadows the source.  Say if you did.
+- `vui-rerender` draws a page with the reloaded code and keeps its
+  state (folds, tab, filters).  `g` (`mayhem-refresh`) won't: it
+  refetches, and data that hasn't changed doesn't redraw.  Reopening
+  doesn't either: `mayhem-open-page` reuses a mounted page.
+- Don't kill the user's buffers.  Kill only when a keymap changed (and
+  `makunbound` the map first, as `defvar` won't rebind it), a
+  component's `:state` gained a key, or a stale `.elc` shadows the
+  source.  Say if you did.
 - Never use `unload-feature`: it cascades into dependent features.
+
+## Checking a page in Emacs
+
+Read what a page shows, and drive it, through its buffer, never
+through keys: under evil, `g` is a prefix, not `mayhem-refresh`.
+
+```elisp
+(with-current-buffer "*mayhem: OWNER/PROJECT/TARGET/RUN*"
+  (buffer-substring-no-properties (point-min) (min (point-max) 2000)))
+```
+
+- Press a button or fold by its text: `(search-forward "▶ Source")`,
+  then `(push-button (match-beginning 0))`.  vui redraws after the
+  handler returns, so read the result in a second call.
+- Leave a page as you found it: close folds you opened.
+- If a call is refused as blocked, the user may not have approved it
+  yet: ask, then retry.
 
 ## "Function not known to be defined" warnings
 
