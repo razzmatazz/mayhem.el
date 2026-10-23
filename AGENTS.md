@@ -17,6 +17,23 @@ and [docs/using-vui.md](docs/using-vui.md) first.
 - **Never edit source files through Emacs** (`eval-elisp`, buffer edits);
   the buffer and the file drift apart.  Use file tools or the shell.
 
+## Screenshots
+
+[docs/screenshots](docs/screenshots/README.md) shows every page,
+drawn from the made-up data in `test/screenshots/fixtures.el`.
+
+- **After changing what a page shows, or adding one, run `make
+  screenshots`** and check the diff of the `.txt` files it rewrites:
+  they should change as you meant, and nothing else.  Read the PNGs of
+  the pages you changed too.
+- A new page or view gets a shot: add a marker to
+  `docs/screenshots/README.md`, with a line on what it shows.
+- If it fails naming a resource with no fixture, add one to
+  `fixtures.el` in the shape its fetch gives.  When a resource's shape
+  changes, update its fixture likewise.
+- Keep fixtures made up: never real workspaces, people, hashes or
+  anything from the user's cache.
+
 ## Checking parens
 
 Before reloading or `make ci`, check every edited file:

@@ -1,0 +1,35 @@
+app.mayhem.security/acme/libpng/fuzz-png  code target
+
+Updated     2 hours ago
+Crashes     37
+Coverage    64.93% of lines
+Hardening   3 of 4 exploitability factors
+Repo        github.com/acme/libpng
+Image       ghcr.io/acme/libpng-fuzz:main
+Test suite  96 test cases
+▼ Trend     4 active: 2 high, 2 medium  -3 in 30 days
+   7 ████████████████████████████████████████████████████████████
+     ████████████████████████████████████████████████████████████▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂
+     █████████████████████████████████████████████████████████████████████████████████████████████
+     █████████████████████████████████████████████████████████████████████████████████████████████
+     23 Sep                                                                                 23 Oct
+     █ high  █ medium  █ low
+
+RUN  STATUS     COV  DEFECTS                 PASS  BRANCH           AGE
+#42  completed  65%  4  2 high, 2 medium  177/214  main             2 hours ago
+#41  completed  65%  4  2 high, 2 medium  177/214  png-text-chunks  1 day ago
+#40  completed  63%  5  3 high, 2 medium  177/214  main             2 days ago
+#39  failed          0                        0/0  main             3 days ago
+#38  completed  61%  3  1 high, 2 medium  177/214  apng-frames      5 days ago
+[Show all 42 runs]
+
+Defects (6)
+2 high, 2 medium active in the latest run #42
+
+ID   SEVERITY     TITLE                              CWE      STATE  SEEN     AGE
+!12  high    8.2  Out-of-bounds Read                 CWE-125         run #42  2 hours ago
+!13  high    7.5  Integer Overflow or Wraparound     CWE-190         run #42  2 hours ago
+!10  medium  6.5  Uncontrolled Resource Consumption  CWE-400         run #42  2 hours ago
+!9   medium  5.9  NULL Pointer Dereference           CWE-476         run #42  2 hours ago
+!8   medium  5.5  Divide By Zero                     CWE-369  fixed  run #37  8 days ago
+[Show all 6 defects]

@@ -11,7 +11,7 @@ DOCKER_RUN = $(DOCKER) run --rm \
                -w $(SRC) \
                $(LOCAL_IMAGE)
 
-.PHONY: image deps compile lint test ci clean
+.PHONY: image deps compile lint test ci clean screenshots
 
 image:
 	$(DOCKER) build -t $(LOCAL_IMAGE) .
@@ -26,9 +26,11 @@ clean:
 	find . -maxdepth 1 -name '*.elc' -delete
 
 # Compile a copy, so the .elc files do not land next to the sources while
-# lint and test run alongside.
+# lint and test run alongside.  The screenshot driver is compiled too,
+# but not run: that is `make screenshots'.
 compile: deps
-	$(DOCKER_RUN) sh -c "cp -a /src /tmp/build && cd /tmp/build && eask compile --strict"
+	$(DOCKER_RUN) sh -c "cp -a /src /tmp/build && cd /tmp/build && eask compile --strict \
+	  && eask compile --strict test/screenshots/fixtures.el test/screenshots/screenshots.el"
 
 # checkdoc only prints its findings, so fail on any FILE:LINE: message.
 lint: deps
@@ -40,3 +42,12 @@ test: deps
 # compile, lint and test are independent, so run them in parallel.
 ci: clean
 	$(MAKE) -j3 compile lint test
+
+SCREENSHOTS_IMAGE := mayhem-el-screenshots
+
+# Rewrite docs/screenshots/, from made-up data, in a GUI Emacs
+# under a virtual X display.
+screenshots: deps
+	$(DOCKER) build -q -t $(SCREENSHOTS_IMAGE) -f test/screenshots/Dockerfile test/screenshots
+	$(DOCKER) run --rm --init -v "$(CURDIR)":$(SRC) -w $(SRC) $(SCREENSHOTS_IMAGE) \
+	  test/screenshots/run.sh

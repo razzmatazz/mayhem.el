@@ -1,0 +1,36 @@
+app.mayhem.security/acme/libpng/fuzz-png  code target, defect !12
+
+Title       Out-of-bounds Read
+Severity    high  8.2
+State       open
+CWE         CWE-125  Out-of-bounds Read
+Class       improper-memory-access
+First seen  5 days ago
+Last seen   2 hours ago
+Run         run #42
+▶ Source    main  8bf175b  Check chunk length before reading IDAT
+Crash       heap-buffer-overflow, signal 6
+Example     run #42, test case 5f2c9e0a
+
+Description
+The product reads data past the end, or before the beginning, of the
+intended buffer.
+
+TEST CASE  RUN  TIME
+5f2c9e0a   #42  41ms
+0e53d920   #40  37ms
+27d35c5c   #38  52ms
+
+Reproduce
+MAYHEM_TRIAGING=1 /out/png_read_fuzzer /testsuite/5f2c9e0a
+
+Backtrace
+#0  png_read_IDAT_data
+      pngrutil.c:4182:17
+#1  png_read_row
+      pngread.c:528:4
+#2  png_read_image
+      pngread.c:742:10
+#3  LLVMFuzzerTestOneInput
+      contrib/oss-fuzz/libpng_read_fuzzer.cc:182:3
+#4  fuzzer::Fuzzer::ExecuteCallback

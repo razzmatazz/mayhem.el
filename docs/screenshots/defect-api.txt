@@ -1,0 +1,34 @@
+app.mayhem.security/acme/billing-api/api  target, defect !3
+
+Title       Internal Server Error
+Severity    high  7.5
+State       open
+CWE         CWE-755  Improper Handling of Exceptional Conditions
+Class       internal-server-error
+First seen  3 days ago
+Last seen   3 days ago
+Run         run #7
+▶ Source    main  7f8edb4  Validate invoice amounts on update
+Endpoint    PUT /invoices/{id}  update_invoice
+
+Description
+The server answered 500 to a request it should have refused.
+
+Request
+PUT /invoices/1042 HTTP/1.1
+Host: localhost:8080
+Content-Type: application/json
+
+{"amount": "1e309", "currency": "USD"}
+
+Response
+HTTP/1.1 500 Internal Server Error
+Content-Type: application/json
+
+{"error": "internal", "detail": "OverflowError: cannot convert float infinity to integer"}
+
+Stack trace
+app/invoices.py:88 in update_invoice
+    amount = int(float(body["amount"]) * 100)
+app/server.py:41 in dispatch
+    return handler(request)

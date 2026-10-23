@@ -1,0 +1,45 @@
+app.mayhem.security/acme/libpng/fuzz-png  code target, run #42
+
+Status      completed  Run Completed  latest run
+Started     2 hours ago  by srivera  after 6s queued
+Duration    1h 1m  limit 1h 0m  8h 10m CPU
+Tasks       regression 57s  behavior 1h 0m  exploitability 27s  coverage 21s
+▶ Source    main  8bf175b  Check chunk length before reading IDAT
+Image       ghcr.io/acme/libpng-fuzz:main
+▶ Setup     Mayhemfile  1 override  1 variable  1 file  hardening 3/4
+▶ Progress  214 test cases processed  4 defects found
+Log         15 events  1 warning
+
+Coverage
+Lines       64.93%  6412 of 9875
+Blocks      63.57%  11208 of 17630
+Functions   74.42%  512 of 688
+Behaviors   14822 edges
+Inputs      18734211 tested  5203.9 per second
+Engines     Mayhem fuzzer 6120455, libFuzzer 11890231, symbolic execution 723525
+
+Defects (4)
+ID   SEVERITY     TITLE                              CWE      SEEN     AGE
+!12  high    8.2  Out-of-bounds Read                 CWE-125  run #42  2 hours ago
+!13  high    7.5  Integer Overflow or Wraparound     CWE-190  run #42  2 hours ago
+!10  medium  6.5  Uncontrolled Resource Consumption  CWE-400  run #42  2 hours ago
+!9   medium  5.9  NULL Pointer Dereference           CWE-476  run #42  2 hours ago
+
+Tests (214)
+All         214 test cases
+Regression  86 of 88 passing
+New         126 discovered
+Starting    88 test cases  coverage of 88 of 88 measured
+Crashes     37  35 new, 2 regression
+Memory      3 Valgrind errors  3 new, 0 regression
+Corpus      214 test cases  96 after optimizing
+Optimized   96 test cases in the suite
+
+Failing tests (6)
+TEST CASE  TYPE        DEFECTS        TIME   SEEN
+5f2c9e0a   new         1  1 high      41ms  15:12
+e9585a5a   new         1  1 high     118ms  30:07
+71d3b49c   new         1  1 medium  2304ms  49:10
+b3fd2dab   new         1  1 medium    64ms  10:40
+2b448dc3   regression  1  1 high      38ms   0:30
+8ee5c809   regression  1  1 medium    52ms   0:22

@@ -1,0 +1,40 @@
+app.mayhem.security/acme/libpng/fuzz-png  code target, run #42, test case 5f2c9e0a
+
+Status      failing
+Type        new
+Source      libfuzzer
+Run         run #42
+Seen        15:12 into the run
+Errors      0 at runtime
+Execution   41ms
+Crash       heap-buffer-overflow, signal 6, at 0x6020000000f1
+
+Defects (1)
+ID   SEVERITY   TITLE               CWE      SEEN     AGE
+!12  high  8.2  Out-of-bounds Read  CWE-125  run #42  2 hours ago
+
+Reproduce
+MAYHEM_TRIAGING=1 /out/png_read_fuzzer /testsuite/5f2c9e0a
+
+Test case
+00000000: 8950 4e47 0d0a 1a0a 0000 000d 4948 4452  .PNG........IHDR
+00000010: 0000 0010 0000 0010 0806 0000 001f f3ff  ................
+00000020: 6100 0000 ff49 4441 5478 9c63 6000 0200  a....IDATx.c`...
+00000030: 0005 0001                                ....
+
+Output
+Standard Out: (empty)
+
+Standard Error:
+==17==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x6020000000f1
+
+Backtrace
+#0  png_read_IDAT_data
+      pngrutil.c:4182:17
+#1  png_read_row
+      pngread.c:528:4
+#2  png_read_image
+      pngread.c:742:10
+#3  LLVMFuzzerTestOneInput
+      contrib/oss-fuzz/libpng_read_fuzzer.cc:182:3
+#4  fuzzer::Fuzzer::ExecuteCallback

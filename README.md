@@ -46,6 +46,8 @@ say because your token expired, the error shows in the header line.
 
 ## Pages
 
+[docs/screenshots](docs/screenshots/README.md) shows each of them.
+
 - **Workspace**: its projects and their targets.
 - **Project**: its repository, remaining and fixed defects, how many
   targets pass their tests, a defect trend chart, and its targets
@@ -135,7 +137,9 @@ Links mayhem.el has no page for still go to the browser.
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).  `make
-ci` compiles, lints and tests in a container.
+ci` compiles, lints and tests in a container; `make screenshots`
+redraws [docs/screenshots](docs/screenshots/README.md) from made-up
+data.
 
 The API's own spec is in
 [docs/mayhem-openapi.json](docs/mayhem-openapi.json); check it first for

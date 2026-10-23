@@ -1,0 +1,22 @@
+app.mayhem.security/acme/libpng  project
+
+Repo        github.com/acme/libpng
+Branch      main
+Defects     4  2 high, 2 medium  remaining
+Fixed       10  3 high, 5 medium, 2 low
+Passing     1 of 3 targets passing their tests
+Runs        97
+Updated     2 hours ago
+
+Defect trend
+[12 months]  [3 months]  30 days  [7 days]  [24 hours]
+   8 ██████████▄▄▄▄▄▄▄▄▄▄
+     ████████████████████
+     ███████████████████████████████
+     ███████████████████████████████
+     23 Sep                   23 Oct
+     █ high  █ medium  █ low
+
+Targets (2)  [Archived (1)]
+code fuzz-png   4  2 high, 2 medium   177/214  tests  2 hours ago
+code fuzz-apng  0                     120/120  tests  6 hours ago

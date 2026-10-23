@@ -1,0 +1,20 @@
+app.mayhem.security/acme/libpng/fuzz-png  code target, run #42, test cases
+
+6 failing, 7 passing
+
+Filter  [Status]  [Type]  [Source]
+
+TEST CASE  STATUS   TYPE        DEFECTS      SOURCE        TIME  AGE
+71d3b49c   failing  new         1  1 medium  libfuzzer   2304ms  1 hour ago
+a21b1da4   passing  new         0            libfuzzer     12ms  1 hour ago
+51cf2f5f   passing  new         0            mayhem        87ms  1 hour ago
+e9585a5a   failing  new         1  1 high    mayhem       118ms  1 hour ago
+b8f203c8   passing  new         0            symexec      233ms  1 hour ago
+91faa83f   passing  new         0            libfuzzer      9ms  1 hour ago
+5f2c9e0a   failing  new         1  1 high    libfuzzer     41ms  1 hour ago
+b3fd2dab   failing  new         1  1 medium  mayhem        64ms  1 hour ago
+7742aa50   passing  new         0            libfuzzer     15ms  1 hour ago
+2b448dc3   failing  regression  1  1 high    regression    38ms  1 hour ago
+8ee5c809   failing  regression  1  1 medium  regression    52ms  1 hour ago
+38a1b486   passing  regression  0            regression     7ms  1 hour ago
+fe0c39cf   passing  regression  0            regression    11ms  1 hour ago

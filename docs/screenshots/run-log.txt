@@ -1,0 +1,17 @@
+app.mayhem.security/acme/libpng/fuzz-png  code target, run #42, log
+
+11:01:52                  Run completed.
+11:01:45  coverage        Coverage collected: 6412 of 9875 lines.
+11:01:31  coverage        Coverage analysis started.
+11:01:28  exploitability  Exploitability: 3 of 4 factors passing.
+11:01:03  exploitability  Exploitability analysis started.
+11:01:02  behavior        Behavior testing finished: 18734211 tests.
+10:49:10  behavior        Test case took longer than 5s to run; it was skipped.
+10:30:07  behavior        New defect: Integer Overflow or Wraparound (CWE-190).
+10:15:12  behavior        New defect: Out-of-bounds Read (CWE-125).
+10:04:00  behavior        Mayhem-fuzz process launched.
+10:01:03  behavior        libFuzzer process launched.
+10:01:02  behavior        Behavior testing started.
+10:01:01  regression      Regression testing finished: 88 test cases, 2 defects.
+10:00:04  regression      Regression testing started.
+10:00:00                  Image pulled: ghcr.io/acme/libpng-fuzz:main.

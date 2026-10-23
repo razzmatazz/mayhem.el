@@ -1,0 +1,6 @@
+app.mayhem.security  dashboard
+User        Jane Doe (jdoe)
+
+Workspaces (2)
+acme   3 projects
+jdoe   1 project

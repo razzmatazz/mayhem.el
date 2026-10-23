@@ -1,0 +1,23 @@
+app.mayhem.security/acme/billing-api/api  target, run #7
+
+Status      completed  Run Completed  latest run
+Started     2 hours ago  by mchen  after 6s queued
+Duration    30m 41s  limit 30m 0s  1h 0m CPU
+▶ Source    main  7f8edb4  Validate invoice amounts on update
+Image       ghcr.io/acme/billing-api:main
+▶ Setup     Mayhemfile  1 file
+Log         3 events
+
+Defects (3)
+ID  SEVERITY     TITLE                   CWE      SEEN    AGE
+!3  high    7.5  Internal Server Error   CWE-755  run #7  3 days ago
+!4  medium  6.5  Authentication Bypass   CWE-287  run #7  3 days ago
+!2  medium  5.3  Verbose Error Messages  CWE-209  run #7  3 days ago
+
+Endpoints (6)
+GET    /invoices       passing  0 defects
+POST   /invoices       passing  0 defects
+GET    /invoices/{id}  failing  1 defect
+PUT    /invoices/{id}  failing  2 defects
+DELETE /invoices/{id}  passing  0 defects
+GET    /health         passing  0 defects  not covered
