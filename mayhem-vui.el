@@ -1075,24 +1075,21 @@ with none are left out; nil when there are none."
                              mayhem-severities))))
     (and parts (string-join parts ", "))))
 
-(defun mayhem-trend--chart (points window width)
-  "Return the vnodes charting POINTS of a defect trend over WINDOW.
+(defun mayhem-trend--lines (points window width)
+  "Return the lines charting POINTS of a defect trend over WINDOW.
 POINTS are as `mayhem--fetch-defect-trend' gives them; WINDOW is a key
 of `mayhem--trend-windows'.  The chart is at most WIDTH columns, its
 scale aside.  Active defects are stacked by severity; each column's
-time and counts are its `help-echo'."
+time and counts are its `help-echo'.  Each line is a vnode."
   (cond
    ((eq points 'members-only)
-    (mayhem-notice "Only members of the workspace see its defect trend"))
+    (list (mayhem-notice "Only members of the workspace see its defect trend")))
    ((null points)
-    (mayhem-notice "No data"))
+    (list (mayhem-notice "No data")))
    (t
     (let* ((time-format (nth 4 (assq window mayhem--trend-windows)))
            (colw (max 1 (/ width (length points))))
-           (count (lambda (p level) (or (alist-get (intern (concat "active_" level)) p) 0)))
-           (stacks (mapcar (lambda (p) (mapcar (lambda (l) (funcall count p l))
-                                               mayhem-severities))
-                           points))
+           (stacks (mapcar #'mayhem-trend--stack points))
            (time (lambda (p) (format-time-string
                               time-format (encode-time (iso8601-parse (alist-get 'timestamp p))))))
            (tips (seq-mapn (lambda (p stack)
@@ -1111,9 +1108,10 @@ time and counts are its `help-echo'."
            (width (* colw (length points)))
            (first (funcall time (car points)))
            (last (funcall time (car (last points)))))
-      (vui-text
-       (concat
-        (mapconcat
+      (mapcar
+       (lambda (line) (vui-text (concat line "\n")))
+       (append
+        (mapcar
          (lambda (row)
            (concat (propertize (format (format "%%%ds " margin) (if (eq row (car rows)) top ""))
                                'face 'mayhem-label)
@@ -1125,19 +1123,44 @@ time and counts are its `help-echo'."
                                                              (nth layer mayhem-severities))
                                                           'mayhem-label)
                                                   'help-echo tip 'mayhem-ts tip))
-                                    row tips))
-                   "\n"))
-         rows "")
-        pad (propertize (concat first (make-string (max 1 (- width (length first) (length last)))
-                                                   ?\s)
-                                last)
-                        'face 'mayhem-label)
-        "\n"
-        pad (mapconcat (lambda (level)
-                         (concat (propertize "█" 'face (mayhem-defect-severity-face level))
-                                 (propertize (concat " " level) 'face 'mayhem-label)))
-                       mayhem-severities "  ")
-        "\n"))))))
+                                    row tips))))
+         rows)
+        (list
+         (concat pad (propertize (concat first (make-string (max 1 (- width (length first) (length last)))
+                                                            ?\s)
+                                         last)
+                                 'face 'mayhem-label))
+         (concat pad (mapconcat (lambda (level)
+                                  (concat (propertize "█" 'face (mayhem-defect-severity-face level))
+                                          (propertize (concat " " level) 'face 'mayhem-label)))
+                                mayhem-severities "  ")))))))))
+
+(defun mayhem-trend--stack (point)
+  "Return POINT's active defects by severity, as in `mayhem-severities'."
+  (mapcar (lambda (level) (or (alist-get (intern (concat "active_" level)) point) 0))
+          mayhem-severities))
+
+(defun mayhem-trend--summary (points window)
+  "Return how many defects the last of POINTS has, and the change over WINDOW.
+As \"9 active: 3 high, 6 medium  +2 in 30 days\".  Nil without POINTS."
+  (when (consp points)
+    (let* ((stack (mayhem-trend--stack (car (last points))))
+           (total (apply #'+ stack))
+           (change (- total (apply #'+ (mayhem-trend--stack (car points)))))
+           (label (nth 1 (assq window mayhem--trend-windows))))
+      (concat (format "%d active" total)
+              (when (> total 0)
+                (concat ": " (string-join
+                              (delq nil (seq-mapn (lambda (n level)
+                                                    (when (> n 0)
+                                                      (propertize (format "%d %s" n level)
+                                                                  'face (mayhem-defect-severity-face level))))
+                                                  stack mayhem-severities))
+                              ", ")))
+              (propertize (if (= change 0)
+                              (format "  no change in %s" label)
+                            (format "  %+d in %s" change label))
+                          'face 'mayhem-label)))))
 
 (defun mayhem-trend-skeleton ()
   "Return grey bars shaped like a defect trend, and the blank line after."
@@ -1168,11 +1191,37 @@ show it through `mayhem-trend-view'."
                            (mayhem-skeleton (make-list mayhem-trend--height
                                                        (list (make-string mayhem-trend--margin ?\s)
                                                              width)))
-                           (lambda (points) (mayhem-trend--chart points window width)))
+                           (lambda (points)
+                             (apply #'vui-fragment (mayhem-trend--lines points window width))))
      (vui-newline))))
 
-(defun mayhem-trend-view (owner project target)
+(vui-defcomponent mayhem-trend-fold (owner project target)
+  "The defect trend of TARGET of PROJECT of OWNER, a `mayhem-fold'.
+Over the last 30 days, as wide as the page.  Folded, the line says how
+many defects are active and how that changed.  Pages show it through
+`mayhem-trend-view'."
+  :render
+  (let* ((snapshot (mayhem-sync-use-resource (list 'defect-trend owner project target 'month)))
+         (width (max 10 (- (mayhem-page-width) mayhem-trend--margin)))
+         (points (plist-get snapshot :data))
+         (summary (and (plist-get snapshot :fetched-at) (mayhem-trend--summary points 'month))))
+    (vui-component
+     'mayhem-fold
+     :title "Trend"
+     :summary (or summary "")
+     :parts (list (or summary (mayhem-skeleton-bar 24)))
+     :lines (cond ((plist-get snapshot :fetched-at) (mayhem-trend--lines points 'month width))
+                  ((and (plist-get snapshot :error) (not (plist-get snapshot :loading)))
+                   (list (vui-text (concat (propertize "Fetching defect trend failed: " 'face 'error)
+                                           (plist-get snapshot :error) "\n"))))
+                  (t (mapcar (lambda (_)
+                               (mayhem-skeleton (list (list (make-string mayhem-trend--margin ?\s)
+                                                            width))))
+                             (number-sequence 1 mayhem-trend--height)))))))
+
+(defun mayhem-trend-view (owner project target &optional folded)
   "Return the `mayhem-trend' of TARGET of PROJECT of OWNER, for a page.
+FOLDED, the `mayhem-trend-fold' instead, for a page's header.
 Nil for one who may not see it, so not a member of the workspace: the
 page leaves it out.  The page decides, not the component, as vui wipes
 the buffer when a component that rendered nothing re-renders alone."
@@ -1180,7 +1229,8 @@ the buffer when a component that rendered nothing re-renders alone."
                           (list 'defect-trend owner project target 'month))
                          :data)
               'members-only)
-    (vui-component 'mayhem-trend :owner owner :project project :target target)))
+    (vui-component (if folded 'mayhem-trend-fold 'mayhem-trend)
+                   :owner owner :project project :target target)))
 
 (provide 'mayhem-vui)
 ;;; mayhem-vui.el ends here

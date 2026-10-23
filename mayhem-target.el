@@ -125,8 +125,8 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
                                             (mayhem-testsuite-open owner project target
                                                                    (alist-get 'run_number
                                                                               latest))))))))
+     (mayhem-trend-view owner project target t)
      (vui-newline)
-     (mayhem-trend-view owner project target)
      (if runs
          (mayhem-target--run-rows owner project target runs now)
        (mayhem-notice "No runs"))
@@ -146,8 +146,8 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
   (vui-fragment
    (mayhem-field "Updated" (mayhem-skeleton-bar 12))
    (mayhem-field "Crashes" (mayhem-skeleton-bar 3))
+   (mayhem-field "▶ Trend" (mayhem-skeleton-bar 24))
    (vui-newline)
-   (mayhem-trend-skeleton)
    (mayhem-skeleton (make-list 5 '(4 "  " 9 "  " 3 "  " 9 "  " 9 "  " 12)))
    (vui-newline)
    (mayhem-heading "Defects")

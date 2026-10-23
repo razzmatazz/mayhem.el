@@ -51,7 +51,8 @@ say because your token expired, the error shows in the header line.
   targets pass their tests, a defect trend chart, and its targets
   (active and archived tabs), each with what its latest run found.
 - **Target**: its latest run, with what it found, its line coverage,
-  hardening, repository and image; its defect trend; and its latest
+  hardening, repository and image; its defect trend over 30 days,
+  folded in the header as `▶ Trend`; and its latest
   runs and most severe defects, a few of each, with `[Show all 78 runs]`
   opening a page of every one, tallied and filterable.
 - **Run**: status, when it started and how long it waited in the
@@ -96,8 +97,8 @@ the repository's host (`github.com/owner/name`); RET follows them with
 `browse-url`.  Branches and commits link on GitHub, GitLab and
 Bitbucket.
 
-Defect trends cover the last 12 months, 3 months, 30 days, 7 days or
-24 hours; pick one with RET.  Only members of a workspace can see its
+A project's defect trend covers the last 12 months, 3 months, 30 days,
+7 days or 24 hours; pick one with RET.  A target's covers 30 days.  Only members of a workspace can see its
 trends; others' pages leave the trend out.  Hover over a chart, or leave point on it, to see its numbers;
 timestamps show the exact time the same way.
 
