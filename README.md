@@ -7,6 +7,15 @@ An Emacs client for [Mayhem](https://mayhem.security/) ([app.mayhem.security](ht
 Early work in progress.  You can browse your workspaces, projects,
 targets, runs, defects and test cases, read-only.
 
+A target, and one of its runs:
+
+![A target](docs/screenshots/target.png)
+
+![A run](docs/screenshots/run.png)
+
+[docs/screenshots](docs/screenshots/README.md) shows every page, drawn
+from made-up data.
+
 ## Requirements
 
 - Emacs 29.1 or later, built with SQLite (`(sqlite-available-p)`)

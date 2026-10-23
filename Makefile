@@ -46,8 +46,9 @@ ci: clean
 SCREENSHOTS_IMAGE := mayhem-el-screenshots
 
 # Rewrite docs/screenshots/, from made-up data, in a GUI Emacs
-# under a virtual X display.
-screenshots: deps
+# under a virtual X display.  After compile, which checks the driver: a GUI
+# Emacs failing to load it would wait for good.
+screenshots: compile
 	$(DOCKER) build -q -t $(SCREENSHOTS_IMAGE) -f test/screenshots/Dockerfile test/screenshots
 	$(DOCKER) run --rm --init -v "$(CURDIR)":$(SRC) -w $(SRC) $(SCREENSHOTS_IMAGE) \
 	  test/screenshots/run.sh

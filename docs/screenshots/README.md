@@ -149,7 +149,7 @@ output and the backtrace.
 
 `make screenshots` opens each page in a GUI Emacs under a virtual X
 display, in a container, and rewrites every shot here: its PNG and its
-text, beside this file.  It takes a few seconds.
+text, beside this file.  It compiles first, and takes a few seconds.
 
 - **A shot** is a `<!-- screenshot: PAGE ... -->` marker, followed by
   what `make screenshots` writes, up to `<!-- /screenshot -->`.  PAGE

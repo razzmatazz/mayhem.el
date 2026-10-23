@@ -11,7 +11,8 @@
 ;;   <!-- /screenshot -->
 ;;
 ;; The page is (KIND ARGS...), opened by `mayhem-KIND-open', or
-;; (dashboard).  :press lists buttons to press first, by their text.
+;; (dashboard).  :press lists buttons to press first, by their text, or
+;; rows to press RET on, by a text on them.
 ;; :name names its files, NAME.png and NAME.txt; it defaults to KIND.  To add a shot, add a
 ;; marker; to show other data, edit fixtures.el.  A resource
 ;; fixtures.el lacks fails the run, naming it.
@@ -107,9 +108,11 @@
           inhibit-message t)))
 
 (defun mayhem-screenshots--settle (buffer)
-  "Wait until BUFFER has fetched everything and stopped changing."
+  "Wait until BUFFER has fetched everything and stopped changing.
+That is, unchanged for 0.3s: a fold starts unfolding a moment after
+it is pressed."
   (let ((last nil) (still 0) (tries 0))
-    (while (and (< still 5) (< (cl-incf tries) 400))
+    (while (and (< still 15) (< (cl-incf tries) 400))
       (accept-process-output nil 0.02)
       (let ((text (with-current-buffer buffer (buffer-string))))
         (if (and (equal text last) (zerop (hash-table-count mayhem-sync--loading)))
@@ -117,12 +120,17 @@
           (setq still 0 last text))))))
 
 (defun mayhem-screenshots--press (buffer label)
-  "Press the button whose text is LABEL in BUFFER."
+  "Press the button whose text is LABEL in BUFFER, or RET on its row."
   (with-current-buffer buffer
     (goto-char (point-min))
     (let ((case-fold-search nil))
       (if (search-forward label nil t)
-          (push-button (match-beginning 0))
+          (let ((pos (match-beginning 0)))
+            (if (button-at pos)
+                (push-button pos)
+              ;; A RET-able row: see docs/user-interface-conventions.md.
+              (goto-char pos)
+              (call-interactively (key-binding (kbd "RET")))))
         (push (format "No button %S on %s" label (buffer-name))
               mayhem-screenshots--problems)))))
 
@@ -150,12 +158,18 @@
             (write-region (x-export-frames frame 'png) nil file nil 0)))
       (delete-frame frame t))))
 
+(defun mayhem-screenshots--clock ()
+  "Return the seconds since the epoch, of the real clock, not the frozen one.
+`format-time-string' reads it in C, past the advice."
+  (string-to-number (format-time-string "%s.%N")))
+
 (defun mayhem-screenshots-shoot (page &optional press png)
   "Return the text of PAGE, (KIND ARGS...), after pressing PRESS.
 KIND names the command `mayhem-KIND-open' that opens it; (dashboard)
 is `mayhem'.  PRESS is a list of the labels of buttons to press, in
 turn.  With PNG, a file name, save the page there too, when graphic."
   (save-window-excursion
+   (let ((start (mayhem-screenshots--clock)))
     (if (equal page '(dashboard))
         (mayhem)
       (apply (intern (format "mayhem-%s-open" (car page))) (cdr page)))
@@ -166,8 +180,11 @@ turn.  With PNG, a file name, save the page there too, when graphic."
         (mayhem-screenshots--settle buffer))
       (when (and png (display-graphic-p))
         (mayhem-screenshots--png buffer png))
+      ;; So a slow page shows.
+      (princ (format "%5.2fs %S\n" (- (mayhem-screenshots--clock) start) page)
+             #'external-debugging-output)
       (prog1 (mayhem-screenshots--text buffer)
-        (kill-buffer buffer)))))
+        (kill-buffer buffer))))))
 
 (defconst mayhem-screenshots--marker "^<!-- screenshot: \\(.*\\) -->\n"
   "A shot's marker.")
