@@ -679,14 +679,25 @@ an indent or a field label."
 It keeps within `mayhem-command-width' and the page's width."
   (mayhem--split-command cmd (max 20 (min mayhem-command-width (mayhem-page-width)))))
 
-(defun mayhem-block (title text)
+(defconst mayhem-block-lines 12
+  "Most lines a long block, such as a test case's output, shows at first.")
+
+(defun mayhem-block (title text &optional long)
   "Return a section TITLE with TEXT below it from column 0, for copying.
-Nothing when TEXT is empty."
+Nothing when TEXT is empty.  With LONG, TEXT may be long: it shows its
+first `mayhem-block-lines' lines, then a button growing it in place."
   (when (and text (not (string-empty-p (string-trim text))))
-    (vui-fragment
-     (vui-newline)
-     (mayhem-heading title)
-     (vui-text (concat (string-trim-right text) "\n")))))
+    (let ((text (string-trim-right text)))
+      (vui-fragment
+       (vui-newline)
+       (mayhem-heading title)
+       (if long
+           (vui-component 'mayhem-unfold-list
+             :rows (mapcar (lambda (line) (vui-text (concat line "\n")))
+                           (split-string text "\n"))
+             :limit mayhem-block-lines
+             :what "lines")
+         (vui-text (concat text "\n")))))))
 
 (defun mayhem-backtrace (frames)
   "Return FRAMES, as `mayhem--backtrace-frames' gives them, as text.

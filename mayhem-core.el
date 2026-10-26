@@ -940,6 +940,38 @@ defects, frames and backtrace, trimmed to what its page shows, and the
                                                      run)))))))
      callback)))
 
+(defun mayhem--output-streams (output)
+  "Return OUTPUT, a test case's, as (STDOUT . STDERR), or nil.
+Mayhem writes it as a \"Standard Out:\" section then a \"Standard
+Error:\" one, each followed by \" (empty)\" or by its lines; each of
+STDOUT and STDERR is those lines, or nil when empty.  Nil when OUTPUT
+is not in that shape, to show as it is."
+  (let ((header "^Standard \\(Out\\|Error\\):\\( (empty)\\)?[ \t]*$")
+        (text (string-trim (or output "") "[\n\r]+"))
+        sections)
+    (with-temp-buffer
+      (insert text)
+      (goto-char (point-min))
+      (while (re-search-forward header nil t)
+        (push (list (match-string 1) (match-beginning 0) (match-end 0) (match-beginning 2))
+              sections)))
+    (setq sections (nreverse sections))
+    (when (and (equal (mapcar #'car sections) '("Out" "Error"))
+               (= (nth 1 (car sections)) 1))
+      (let ((body (lambda (section end)
+                    (let ((lines (string-trim (substring text (1- (nth 2 section)) end)
+                                              "[\n\r]+" "[ \t\n\r]+")))
+                      ;; An (empty) section with text after it is not this shape.
+                      (cond ((nth 3 section) (if (string-empty-p lines) nil 'bad))
+                            ((string-empty-p lines) nil)
+                            (t lines)))))
+            (out (car sections))
+            (err (cadr sections)))
+        (let ((stdout (funcall body out (1- (nth 1 err))))
+              (stderr (funcall body err nil)))
+          (unless (or (eq stdout 'bad) (eq stderr 'bad))
+            (cons stdout stderr)))))))
+
 (defun mayhem--split-command (cmd &optional width)
   "Return shell command CMD with each of its commands on its own line.
 Lines end in a backslash, so the text still pastes into a shell whole.

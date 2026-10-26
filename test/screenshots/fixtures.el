@@ -464,10 +464,25 @@ Content-Type: application/json
 00000010: 0000 0010 0000 0010 0806 0000 001f f3ff  ................
 00000020: 6100 0000 ff49 4441 5478 9c63 6000 0200  a....IDATx.c`...
 00000030: 0005 0001                                ....")
-                    (output . "Standard Out: (empty)
+                    (output . "Standard Out:
+png: IHDR 16x16, 8-bit RGBA, non-interlaced
+png: reading 1 IDAT chunk, 64 bytes
 
 Standard Error:
-==17==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x6020000000f1")
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1840397521
+INFO: Loaded 1 modules   (5121 inline 8-bit counters): 5121 [0x55d1e0a0, 0x55d1f4a1),
+/out/png_read_fuzzer: Running 1 inputs 1 time(s) each.
+Running: /testsuite/5f2c9e0a
+=================================================================
+==17==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x6020000000f1
+READ of size 1 at 0x6020000000f1 thread T0
+    #0 0x55d1c3a2 in png_read_IDAT_data pngrutil.c:4182:17
+    #1 0x55d1b0f4 in png_read_row pngread.c:528:4
+    #2 0x55d1a8e1 in png_read_image pngread.c:742:10
+    #3 0x55d0f5c3 in LLVMFuzzerTestOneInput libpng_read_fuzzer.cc:182:3
+SUMMARY: AddressSanitizer: heap-buffer-overflow pngrutil.c:4182:17 in png_read_IDAT_data
+==17==ABORTING")
                     (testcase_source . "libfuzzer")
                     (defects ,oob)
                     (frames . ,mayhem-screenshots--frames)

@@ -12,7 +12,8 @@
 
 ;; A test case's page, `*mayhem: owner/project/target/N/testcase-SHA*',
 ;; as a run saw it: whether it failed, the defects it shows, how to
-;; reproduce it, its bytes, the target's output and its backtrace.
+;; reproduce it, its bytes, the target's standard output and error
+;; (libFuzzer's own lines in grey) and its backtrace.
 ;; RET on a defect opens its page; C-c C-v shows the bytes as text
 ;; rather than in hex.
 
@@ -43,6 +44,36 @@ RUN is a run of TARGET of PROJECT of OWNER."
    (if (null defects)
        (mayhem-notice "No defects")
      (mayhem-defect-table owner project target defects (current-time) run))))
+
+;; The lines libFuzzer prints about itself on every run, not the target's.
+(defconst mayhem-testcase--fuzzer-line
+  (concat "^\\(?:INFO: \\|\\*\\*\\*\\|Running: \\|Executed \\|MS: \\|artifact_prefix=\\|"
+          "[^ \n]+: Running [0-9]+ inputs \\).*$")
+  "Matches a line of a test case's output that libFuzzer wrote.")
+
+(defun mayhem-testcase--stream (title text)
+  "Return the section TITLE showing TEXT, a stream of a test case's output.
+libFuzzer's lines are grey, so the target's stand out."
+  (let ((text (copy-sequence text))
+        (start 0))
+    (while (string-match mayhem-testcase--fuzzer-line text start)
+      (put-text-property (match-beginning 0) (match-end 0) 'face 'mayhem-label text)
+      (setq start (1+ (match-end 0))))
+    (mayhem-block title text t)))
+
+(defun mayhem-testcase--output (output)
+  "Return the sections showing OUTPUT, a test case's.
+Its standard output and error each have their own, the empty one left
+out; output not split into the two is shown as it is."
+  (pcase (mayhem--output-streams output)
+    ('nil (mayhem-block "Output" output t))
+    (`(nil . nil) (vui-fragment (vui-newline)
+                                (mayhem-heading "Output")
+                                (mayhem-notice "No output")))
+    (`(,stdout . ,stderr)
+     (vui-fragment
+      (when stdout (mayhem-testcase--stream "Standard output" stdout))
+      (when stderr (mayhem-testcase--stream "Standard error" stderr))))))
 
 (defun mayhem-testcase--render (owner project target run data)
   "Return the vnodes of a test case of RUN, showing DATA.
@@ -77,8 +108,9 @@ RUN is a run of TARGET of PROJECT of OWNER."
      (mayhem-block "Test case" (if mayhem-other-view
                                    (mayhem--bytes-text
                                     (mayhem--hexdump-bytes (alist-get 'hexdump test)))
-                                 (alist-get 'hexdump test)))
-     (mayhem-block "Output" (alist-get 'output test))
+                                 (alist-get 'hexdump test))
+                   t)
+     (mayhem-testcase--output (alist-get 'output test))
      (mayhem-block "Backtrace" (if-let* ((frames (alist-get 'frames test)))
                                    (mayhem-backtrace frames)
                                  (alist-get 'backtrace test))))))

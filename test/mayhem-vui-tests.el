@@ -118,5 +118,25 @@
     (should (eq (get-text-property 5 'mouse-face) 'highlight))
     (should-not (get-text-property 8 'mouse-face))))
 
+(defun mayhem-vui-tests--text (vnode)
+  "Return the text VNODE renders, without its properties."
+  (with-temp-buffer
+    (vui-render vnode)
+    (buffer-substring-no-properties (point-min) (point-max))))
+
+(ert-deftest mayhem-vui-test-block-long ()
+  (let ((text (mapconcat (lambda (n) (format "line %d" n)) (number-sequence 1 20) "\n")))
+    ;; A long block shows its first lines, and a button the rest...
+    (should (equal (mayhem-vui-tests--text (mayhem-block "Out" text t))
+                   (concat "\nOut\n"
+                           (mapconcat (lambda (n) (format "line %d\n" n))
+                                      (number-sequence 1 mayhem-block-lines) "")
+                           "[Show all 20 lines]\n")))
+    ;; ...but not unless asked to.
+    (should (equal (mayhem-vui-tests--text (mayhem-block "Out" text))
+                   (concat "\nOut\n" text "\n"))))
+  ;; A short one shows whole, with no button.
+  (should (equal (mayhem-vui-tests--text (mayhem-block "Out" "a\nb\n" t)) "\nOut\na\nb\n")))
+
 (provide 'mayhem-vui-tests)
 ;;; mayhem-vui-tests.el ends here

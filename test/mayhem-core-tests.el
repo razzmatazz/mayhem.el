@@ -192,6 +192,22 @@ RAW is as for `mayhem--api-response'."
   (should (equal (mayhem--format-count 999600) "1.0M"))
   (should (equal (mayhem--format-count 1400000) "1.4M")))
 
+(ert-deftest mayhem-core-test-output-streams ()
+  (should (equal (mayhem--output-streams
+                  "Standard Out: (empty)\n\nStandard Error:\nsrc/a.c:19:21: runtime error\n\n")
+                 '(nil . "src/a.c:19:21: runtime error")))
+  (should (equal (mayhem--output-streams "Standard Out: (empty)\n\nStandard Error: (empty)\n\n")
+                 '(nil)))
+  (should (equal (mayhem--output-streams
+                  "Standard Out:\n  hello\nworld\n\nStandard Error:\nINFO: x\n***\n")
+                 '("  hello\nworld" . "INFO: x\n***")))
+  ;; Anything else is shown as it is.
+  (should-not (mayhem--output-streams "Segmentation fault"))
+  (should-not (mayhem--output-streams nil))
+  (should-not (mayhem--output-streams "Standard Error:\nx\n\nStandard Out: (empty)"))
+  (should-not (mayhem--output-streams "note\nStandard Out: (empty)\nStandard Error:\nx"))
+  (should-not (mayhem--output-streams "Standard Out: (empty)\nx\nStandard Error:\ny")))
+
 (ert-deftest mayhem-core-test-pick ()
   (should (equal (mayhem--pick '((a . 1) (b . 2) (c . 3)) '(c a z))
                  '((c . 3) (a . 1) (z)))))
