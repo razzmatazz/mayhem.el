@@ -170,6 +170,9 @@ One SQLite file per Mayhem host:
 `mayhem-sync-directory/sync-HOST.sqlite` (by default
 `~/.emacs.d/mayhem/sync-app.mayhem.security.sqlite`), opened on first
 use in WAL mode with a 2 s busy timeout, so two Emacsen can share it.
+The WAL is cut back to 4 MB after each checkpoint
+(`journal_size_limit`), else it keeps the size of the largest burst of
+writes.
 
 ### Schema
 
@@ -191,7 +194,9 @@ CREATE TABLE file (
 - A row with an `error` but no `body` is a resource whose every fetch
   failed.
 - Rows are never deleted: a resource no page reads any more just stays.
-  Deleting the store's SQLite file is the way to clear it.
+  Deleting the store's SQLite file is the way to clear it.  Rewriting
+  a row frees its old pages, which SQLite reuses but keeps in the file;
+  `M-x mayhem-doctor` shows how much is free.
 - `file` holds files by the sha256 of their bytes, so a row never
   goes stale, and runs and targets share it.  A resource that brings
   files stores them there (`mayhem-sync-put-files`) and keeps only
@@ -207,7 +212,8 @@ CREATE TABLE file (
 The schema version is SQLite's `user_version`, compared with
 `mayhem-sync--schema` on opening:
 
-- **Older**: the tables are dropped and created afresh.  The store is a
+- **Older**: the tables are dropped and created afresh, then `VACUUM`
+  gives the dropped data's pages back to the disk.  The store is a
   cache, so there are no migrations.
 - **Newer**: a `user-error`, since an older mayhem.el must not read data
   shaped for a newer one; restart Emacs.

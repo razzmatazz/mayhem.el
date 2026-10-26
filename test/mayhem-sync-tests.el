@@ -89,6 +89,15 @@
     (sqlite-execute db (format "PRAGMA user_version = %d" (1+ mayhem-sync--schema)))
     (should-error (mayhem-sync--create db) :type 'user-error)))
 
+(ert-deftest mayhem-sync-test-older-schema-compacts ()
+  (let ((db (mayhem-sync--create (sqlite-open nil))))
+    (dotimes (i 200)
+      (mayhem-sync--write db (format "k%d" i) (make-string 2000 ?x) 10.0))
+    (sqlite-execute db (format "PRAGMA user_version = %d" (1- mayhem-sync--schema)))
+    (mayhem-sync--create db)
+    (should (equal (caar (sqlite-select db "SELECT count(*) FROM resource")) 0))
+    (should (equal (caar (sqlite-select db "PRAGMA freelist_count")) 0))))
+
 (ert-deftest mayhem-sync-test-request-stores-and-notifies ()
   (mayhem-sync-tests--with-db
     (let ((fetches 0) changed done)

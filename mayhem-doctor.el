@@ -171,6 +171,10 @@ from `mayhem-doctor--time'."
      "Store\n"
      (format "  File        %s  %s, WAL %s\n" file (mayhem-doctor--file-size file)
              (mayhem-doctor--file-size (concat file "-wal")))
+     (format "  Free        %s, which VACUUM gives back\n"
+             (file-size-human-readable
+              (* (caar (sqlite-select db "PRAGMA freelist_count"))
+                 (caar (sqlite-select db "PRAGMA page_size")))))
      (format "  Schema      %s (this code's: %d)\n"
              (caar (sqlite-select db "PRAGMA user_version")) mayhem-sync--schema)
      (format "  Resources   %d, %s of data, %d failed\n"

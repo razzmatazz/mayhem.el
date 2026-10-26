@@ -92,7 +92,12 @@ Signal a `user-error' when DB was made by a newer mayhem.el."
   key TEXT PRIMARY KEY, body TEXT, hash TEXT, fetched_at REAL, error TEXT)")
       ;; Files by the sha256 of their bytes, so never stale and shared.
       (sqlite-execute db "CREATE TABLE file (sha256 TEXT PRIMARY KEY, bytes BLOB NOT NULL)")
-      (sqlite-execute db (format "PRAGMA user_version = %d" mayhem-sync--schema))))
+      (sqlite-execute db (format "PRAGMA user_version = %d" mayhem-sync--schema))
+      ;; Dropping frees the old tables' pages but keeps them in the file.
+      (condition-case err
+          (sqlite-execute db "VACUUM")
+        (error (message "Mayhem: Compacting the sync store failed: %s"
+                        (error-message-string err))))))
     db))
 
 (defun mayhem-sync--host ()
@@ -113,6 +118,8 @@ Signal a `user-error' when DB was made by a newer mayhem.el."
         (let ((db (sqlite-open (mayhem-sync--file))))
           (sqlite-pragma db "journal_mode=WAL")
           (sqlite-pragma db "busy_timeout=2000")
+          ;; Else the WAL keeps the size of the largest burst of writes.
+          (sqlite-pragma db "journal_size_limit=4194304")
           (setq mayhem-sync--db (mayhem-sync--create db))))))
 
 (defun mayhem-sync--print (data)
