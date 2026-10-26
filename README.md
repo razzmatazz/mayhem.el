@@ -14,7 +14,8 @@ A target, and one of its runs:
 ![A run](docs/screenshots/run.png)
 
 [docs/screenshots](docs/screenshots/README.md) shows every page, drawn
-from made-up data.
+from made-up data.  `make bench` times `mayhem-jump`'s search on a
+large made-up cache (`make bench BENCH_TARGETS=8000` for another size).
 
 ## Requirements
 
@@ -142,6 +143,11 @@ Links mayhem.el has no page for still go to the browser.
 | `mayhem-sync-directory` | `~/.emacs.d/mayhem/` | where the cache is kept; deleting it is safe |
 
 `g` always refetches, however fresh the data is.
+
+`M-x mayhem-doctor` reports, as text to paste into a bug report, which
+files are loaded (and whether a compiled one is stale), the cache's size
+and largest entries, and how long `mayhem-jump` takes to open.  It names
+your workspaces, projects and targets, but not your token.
 
 ## Development
 

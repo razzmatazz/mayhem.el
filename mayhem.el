@@ -48,6 +48,7 @@
 (require 'mayhem-testcase)
 (require 'mayhem-testsuite)
 (require 'mayhem-search)
+(require 'mayhem-doctor)
 
 (mayhem-sync-define-resource me ()
   :fetch #'mayhem--fetch-me)
@@ -106,6 +107,13 @@ Its heading is the Mayhem server's host."
 Candidates are \"owner\", \"owner/project\" and \"owner/project/target\"."
   (interactive)
   (mayhem-search-open (mayhem-search-read "Mayhem: Jump to: ")))
+
+;;;###autoload
+(defun mayhem-doctor ()
+  "Show a report on mayhem.el's loaded code, its store and search.
+It is plain text, to paste into a bug report; `g' runs it again."
+  (interactive)
+  (mayhem-doctor-show))
 
 ;;;; Web links
 

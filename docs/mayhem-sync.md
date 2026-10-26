@@ -60,6 +60,7 @@ A resource is defined beside the page that shows it:
 | Data | `:max-age` | Why |
 |---|---|---|
 | Most | `mayhem-sync-fresh-for` (30 s) | it changes as runs come and go |
+| A workspace's targets | 5 minutes | they come and go rarely, and every `mayhem-jump` asks for each workspace's |
 | A finished run (ended, failed or stopped) | `mayhem-sync-settled-for` (a day) | it no longer changes |
 | A running run | 30 s, and the page refetches every `mayhem-run-refresh-interval` (10 s) | it is changing |
 | A defect, a test case | a day | they change rarely, if ever |
@@ -114,6 +115,10 @@ what is stale.
 
 `mayhem-jump` reads `projects` and `workspace-targets` straight from
 the store (`mayhem-sync-read`) and requests them behind its prompt.
+Targets are stored with only the fields read (`mayhem--target-summary`),
+as projects are, so the prompt opens without reading every target's
+whole API alist.  `M-x mayhem-doctor` times these reads on your store,
+and `make bench` on a large made-up one.
 
 A resource that needs several requests makes them in one `:fetch`,
 at once, with `mayhem--fetch-each`, and stores one alist: `run` holds

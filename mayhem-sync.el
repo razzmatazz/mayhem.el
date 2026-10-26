@@ -99,6 +99,10 @@ Signal a `user-error' when DB was made by a newer mayhem.el."
   "Return the host of the configured Mayhem server, or \"default\"."
   (or (mayhem--host) "default"))
 
+(defun mayhem-sync--file ()
+  "Return the file of the store of the configured host."
+  (expand-file-name (concat "sync-" (mayhem-sync--host) ".sqlite") mayhem-sync-directory))
+
 (defun mayhem-sync--db ()
   "Return the store, opening it on first use."
   (or mayhem-sync--db
@@ -106,9 +110,7 @@ Signal a `user-error' when DB was made by a newer mayhem.el."
         (unless (and (fboundp 'sqlite-available-p) (sqlite-available-p))
           (user-error "Mayhem: Needs an Emacs built with SQLite"))
         (make-directory mayhem-sync-directory t)
-        (let ((db (sqlite-open (expand-file-name
-                                (concat "sync-" (mayhem-sync--host) ".sqlite")
-                                mayhem-sync-directory))))
+        (let ((db (sqlite-open (mayhem-sync--file))))
           (sqlite-pragma db "journal_mode=WAL")
           (sqlite-pragma db "busy_timeout=2000")
           (setq mayhem-sync--db (mayhem-sync--create db))))))

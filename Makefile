@@ -25,7 +25,7 @@ RUN_ONLINE = $(DOCKER) run $(ISOLATED) -e CI \
 RUN = $(DOCKER) run $(ISOLATED) --network=none \
   -v "$(CURDIR)":/src:ro -v "$(CURDIR)/.eldev":/src/.eldev -w /src $(IMAGE)
 
-.PHONY: ci ci-all image deps clean compile lint test melpazoid screenshots
+.PHONY: ci ci-all image deps clean compile lint test melpazoid screenshots bench
 
 # What ci runs at once.  ci-all runs melpazoid, which is the same on every
 # release, with 31.1's only.
@@ -128,6 +128,17 @@ melpazoid:
 	@$(MELPAZOID_MAKE) test > .ci/melpazoid-test.txt 2>&1; cat .ci/melpazoid-test.txt; \
 	  if grep -q '^━ ' .ci/melpazoid-test.txt; then \
 	    echo "melpazoid: found something, see above"; exit 1; fi
+
+# Time mayhem-jump's search on a large made-up store, see tools/bench.el.
+# BENCH_WORKSPACES, BENCH_PROJECTS, BENCH_TARGETS and BENCH_RUNS set its
+# sizes, e.g. `make bench BENCH_TARGETS=8000'.
+bench:
+	$(MAKE) image
+	$(MAKE) deps
+	$(DOCKER) run $(ISOLATED) --network=none \
+	  -e BENCH_WORKSPACES -e BENCH_PROJECTS -e BENCH_TARGETS -e BENCH_RUNS \
+	  -v "$(CURDIR)":/src:ro -v "$(CURDIR)/.eldev":/src/.eldev -w /src $(IMAGE) \
+	  eldev exec -R --file tools/bench.el
 
 SCREENSHOTS_IMAGE := mayhem-el-screenshots
 

@@ -32,8 +32,14 @@
 (mayhem-sync-define-resource projects ()
   :fetch #'mayhem--fetch-projects)
 
+(defconst mayhem-workspace--targets-max-age 300
+  "Seconds a workspace's targets are reused.
+Targets come and go rarely, and every `mayhem-jump' asks for each
+workspace's, every page of them.")
+
 (mayhem-sync-define-resource workspace-targets (owner)
-  :fetch (lambda (done) (mayhem--fetch-workspace-targets owner done)))
+  :fetch (lambda (done) (mayhem--fetch-workspace-targets owner done))
+  :max-age mayhem-workspace--targets-max-age)
 
 (define-derived-mode mayhem-workspace-mode mayhem-page-mode "Mayhem Workspace"
   "Major mode for a Mayhem workspace's page.")
