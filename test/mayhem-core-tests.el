@@ -88,6 +88,13 @@ RAW is as for `mayhem--api-response'."
     (should (equal (gethash "acme/q/u" types) "code"))
     (should-not (gethash "acme/q/v" types))))
 
+(ert-deftest mayhem-core-test-target-summary ()
+  (let ((target (mayhem--target-summary '((owner . "acme") (project_slug . "p") (slug . "t")
+                                          (type . "code") (latest_run . big)))))
+    (should (equal (alist-get 'slug target) "t"))
+    (should (equal (alist-get 'type target) "code"))
+    (should-not (assq 'latest_run target))))
+
 (ert-deftest mayhem-core-test-user-label ()
   (should (equal (mayhem--user-label '((username . "jd") (first_name . "Jo")
                                        (last_name . "Doe")))

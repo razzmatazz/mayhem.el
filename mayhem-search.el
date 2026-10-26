@@ -29,22 +29,22 @@
 (declare-function mayhem-project-open "mayhem-project" (owner project))
 (declare-function mayhem-target-open "mayhem-target" (owner project target))
 
-(defun mayhem-search--candidates ()
-  "Return the workspaces, projects and targets in the store, as paths.
-That is (PATHS . TYPES): TYPES is `mayhem--target-types' of the targets."
-  (let* ((projects (plist-get (mayhem-sync-read '(projects)) :data))
-         (targets (mapcar (pcase-lambda (`(,owner . ,_))
-                            (cons owner (plist-get (mayhem-sync-read
-                                                    (list 'workspace-targets owner))
-                                                   :data)))
-                          (mayhem--workspaces projects))))
-    (cons (mayhem--search-candidates projects targets)
-          (mayhem--target-types targets))))
+(defun mayhem-search--targets (owner)
+  "Return the stored targets of the workspace OWNER."
+  (plist-get (mayhem-sync-read (list 'workspace-targets owner)) :data))
 
-(defun mayhem-search--request ()
-  "Refetch in the background what is searched, unless fetched just now."
+(defun mayhem-search--candidates (projects targets)
+  "Return PROJECTS and TARGETS as paths to search, with the targets' types.
+That is (PATHS . TYPES).  TARGETS is an alist of each owner to its
+targets; TYPES is `mayhem--target-types' of them."
+  (cons (mayhem--search-candidates projects targets)
+        (mayhem--target-types targets)))
+
+(defun mayhem-search--request (projects)
+  "Refetch in the background what is searched, unless fetched just now.
+That is, every project and the targets of the workspaces of PROJECTS."
   (mayhem-sync-request '(projects))
-  (dolist (workspace (mayhem--workspaces (plist-get (mayhem-sync-read '(projects)) :data)))
+  (dolist (workspace (mayhem--workspaces projects))
     (mayhem-sync-request (list 'workspace-targets (car workspace)))))
 
 (defun mayhem-search--annotate (candidate types)
@@ -70,25 +70,38 @@ there."
                    (cycle-sort-function . identity))
       (complete-with-action action (caar candidates) string pred))))
 
-(defun mayhem-search--store-key-p (key)
-  "Return non-nil if KEY is of a resource searched."
-  (or (equal key (mayhem-sync-spec-key '(projects)))
-      (string-prefix-p "(workspace-targets " key)))
-
 (defun mayhem-search-read (prompt)
   "Read with PROMPT a workspace, project or target, as its path.
 That is \"owner\", \"owner/project\" or \"owner/project/target\".
 It offers at once what the store has, and what fetches bring after."
-  (let* ((candidates (list (mayhem-search--candidates)))
-         (on-change (lambda (keys)
-                      (when (seq-some #'mayhem-search--store-key-p keys)
-                        (setcar candidates (mayhem-search--candidates))
-                        ;; New projects may bring workspaces, whose targets to fetch.
-                        (mayhem-search--request)))))
+  ;; Kept here, so a fetch landing re-reads from the store only what it changed.
+  (let* ((projects (plist-get (mayhem-sync-read '(projects)) :data))
+         (targets (mapcar (pcase-lambda (`(,owner . ,_))
+                            (cons owner (mayhem-search--targets owner)))
+                          (mayhem--workspaces projects)))
+         (candidates (list (mayhem-search--candidates projects targets)))
+         (on-change
+          (lambda (keys)
+            (let (changed)
+              (when (member (mayhem-sync-spec-key '(projects)) keys)
+                (setq projects (plist-get (mayhem-sync-read '(projects)) :data)
+                      targets (mapcar (pcase-lambda (`(,owner . ,_))
+                                        (or (assoc owner targets)
+                                            (cons owner (mayhem-search--targets owner))))
+                                      (mayhem--workspaces projects))
+                      changed t)
+                ;; New projects may bring workspaces, whose targets to fetch.
+                (mayhem-search--request projects))
+              (dolist (cell targets)
+                (when (member (mayhem-sync-spec-key (list 'workspace-targets (car cell))) keys)
+                  (setcdr cell (mayhem-search--targets (car cell)))
+                  (setq changed t)))
+              (when changed
+                (setcar candidates (mayhem-search--candidates projects targets)))))))
     (unwind-protect
         (progn
           (add-hook 'mayhem-sync-change-functions on-change)
-          (mayhem-search--request)
+          (mayhem-search--request projects)
           (completing-read prompt (mayhem-search--table candidates) nil t))
       (remove-hook 'mayhem-sync-change-functions on-change))))
 

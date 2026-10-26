@@ -180,12 +180,23 @@ Call CALLBACK with (OK DATA): DATA is a list of project alists, as
           (push (cons owner 1) counts))))
     (sort counts (lambda (a b) (string< (car a) (car b))))))
 
+(defconst mayhem--target-fields
+  '(owner project_slug slug target_name type is_archived)
+  "Fields of a target kept in the list of a workspace's targets.")
+
+(defun mayhem--target-summary (target)
+  "Return TARGET, an alist, with only `mayhem--target-fields'."
+  (mayhem--pick target mayhem--target-fields))
+
 (defun mayhem--fetch-workspace-targets (owner callback)
   "Fetch every target of the workspace OWNER.
-Call CALLBACK with (OK DATA): DATA is a list of target alists, or an
-error message."
+Call CALLBACK with (OK DATA): DATA is a list of target alists, as
+`mayhem--target-summary' trims them, or an error message."
   (mayhem--api-get-all (mayhem--path "/api/v2/owner/%s/target" owner)
-                       'targets callback))
+                       'targets
+                       (lambda (ok targets)
+                         (funcall callback ok (if ok (mapcar #'mayhem--target-summary targets)
+                                                targets)))))
 
 (defun mayhem--target-types (targets)
   "Return a table of the type of each of TARGETS, keyed by path.
@@ -202,17 +213,17 @@ path is \"owner/project/target\"; a type, \"code\" or \"api\"."
   "Return PROJECTS with their TARGETS, as from the API.
 Each element is (PROJECT-SLUG . TARGET-SLUGS); both keep the API's
 order.  Targets of other projects are dropped."
-  (mapcar (lambda (project)
-            (let ((owner (alist-get 'owner project))
-                  (slug (alist-get 'slug project)))
-              (cons slug
-                    (delq nil
-                          (mapcar (lambda (target)
-                                    (and (equal (alist-get 'owner target) owner)
-                                         (equal (alist-get 'project_slug target) slug)
-                                         (alist-get 'slug target)))
-                                  targets)))))
-          projects))
+  (let ((slugs (make-hash-table :test #'equal)))
+    ;; Pushed in reverse, so reversed back below.
+    (dolist (target targets)
+      (when-let* ((slug (alist-get 'slug target)))
+        (push slug (gethash (cons (alist-get 'owner target) (alist-get 'project_slug target))
+                            slugs))))
+    (mapcar (lambda (project)
+              (cons (alist-get 'slug project)
+                    (reverse (gethash (cons (alist-get 'owner project) (alist-get 'slug project))
+                                      slugs))))
+            projects)))
 
 ;;;; Web links
 
@@ -318,17 +329,18 @@ Without a name, just the username."
 TARGETS is an alist of each owner to its targets, as from the API.
 Each is \"owner\", \"owner/project\" or \"owner/project/target\",
 each workspace followed by its projects, each by its targets."
-  (mapcan (pcase-lambda (`(,owner . ,_))
-            (cons owner
-                  (mapcan (pcase-lambda (`(,project . ,slugs))
-                            (let ((path (concat owner "/" project)))
-                              (cons path (mapcar (lambda (slug) (concat path "/" slug))
-                                                 slugs))))
-                          (mayhem--group-targets
-                           (seq-filter (lambda (p) (equal (alist-get 'owner p) owner))
-                                       projects)
-                           (cdr (assoc owner targets))))))
-          (mayhem--workspaces projects)))
+  (let ((owned (make-hash-table :test #'equal)))
+    (dolist (project projects)
+      (push project (gethash (alist-get 'owner project) owned)))
+    (mapcan (pcase-lambda (`(,owner . ,_))
+              (cons owner
+                    (mapcan (pcase-lambda (`(,project . ,slugs))
+                              (let ((path (concat owner "/" project)))
+                                (cons path (mapcar (lambda (slug) (concat path "/" slug))
+                                                   slugs))))
+                            (mayhem--group-targets (reverse (gethash owner owned))
+                                                   (cdr (assoc owner targets))))))
+            (mayhem--workspaces projects))))
 
 (defun mayhem--path (format-string &rest segments)
   "Return FORMAT-STRING with SEGMENTS, each URL-encoded, in place of its %s."

@@ -143,6 +143,11 @@ The resource keeps its data.  Return non-nil if the error is new."
                     (list key message))
     (not (equal old message))))
 
+(defun mayhem-sync--fetched-at (db key)
+  "Return when resource KEY of DB was last fetched, or nil.
+Unlike `mayhem-sync--read', it leaves the body unread."
+  (caar (sqlite-select db "SELECT fetched_at FROM resource WHERE key = ?" (list key))))
+
 (defun mayhem-sync--read (db key)
   "Return resource KEY of DB as (DATA FETCHED-AT ERROR), or nil."
   (when-let* ((row (car (sqlite-select
@@ -215,11 +220,13 @@ the first fetch succeeds; :error is the last fetch's failure, if any."
   "Return non-nil if resource SPEC was fetched recently enough before NOW.
 That is, within its :max-age, else `mayhem-sync-fresh-for' seconds.
 With FORCE, only if its :max-age is t: its data is fixed for good."
-  (pcase-let ((`(,data ,fetched) (mayhem-sync--read (mayhem-sync--db)
-                                                    (mayhem-sync-spec-key spec))))
+  (let* ((db (mayhem-sync--db))
+         (key (mayhem-sync-spec-key spec))
+         (fetched (mayhem-sync--fetched-at db key)))
     (when fetched
       (let* ((max-age (plist-get (mayhem-sync--props spec) :max-age))
-             (max-age (cond ((functionp max-age) (funcall max-age data))
+             ;; Reading the body can take long, so only when its age needs it.
+             (max-age (cond ((functionp max-age) (funcall max-age (car (mayhem-sync--read db key))))
                             (max-age)
                             (t mayhem-sync-fresh-for))))
         (or (eq max-age t)
