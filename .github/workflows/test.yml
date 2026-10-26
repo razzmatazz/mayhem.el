@@ -9,11 +9,30 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        emacs: ["29.1", "30.2", "31.1"]
+
+    env:
+      EMACS: ${{ matrix.emacs }}
+
     steps:
       - uses: actions/checkout@v4
 
+      - uses: docker/setup-buildx-action@v3
+
+      # As `make image', but caching the layers, as Emacs is built from
+      # source and that takes minutes.
       - name: Build image
-        run: make image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          build-args: EMACS=${{ matrix.emacs }}
+          tags: mayhem-el-test:emacs-${{ matrix.emacs }}
+          load: true
+          cache-from: type=gha,scope=emacs-${{ matrix.emacs }}
+          cache-to: type=gha,mode=max,scope=emacs-${{ matrix.emacs }}
 
       # The dependencies are named by Eldev and mayhem.el's
       # Package-Requires header, not by the rest of mayhem.el.
@@ -25,7 +44,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .eldev
-          key: eldev-${{ steps.deps.outputs.hash }}
+          key: eldev-${{ matrix.emacs }}-${{ steps.deps.outputs.hash }}
 
       - name: Install dependencies
         run: make deps
@@ -39,7 +58,8 @@ jobs:
       - name: Run ERT tests
         run: make test
 
-      # melpazoid builds its own Emacs 31, as MELPA's reviewers do, see
-      # the Makefile.
+      # On one release only: melpazoid builds its own Emacs 31, as MELPA's
+      # reviewers do, whichever this job tests, see the Makefile.
       - name: Run melpazoid
+        if: matrix.emacs == '31.1'
         run: make melpazoid

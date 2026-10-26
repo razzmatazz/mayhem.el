@@ -1,4 +1,8 @@
-IMAGE := mayhem-el-test
+# The Emacs release to run, e.g. 29.1, 30.2 or 31.1, see the Dockerfile.
+EMACS ?= 31.1
+# The releases CI runs, as in .github/workflows/test.yml, for `make ci-all'.
+EMACS_ALL := 29.1 30.2 31.1
+IMAGE := mayhem-el-test:emacs-$(EMACS)
 
 DOCKER := $(shell command -v docker 2>/dev/null || command -v podman 2>/dev/null)
 ifeq ($(DOCKER),)
@@ -21,7 +25,11 @@ RUN_ONLINE = $(DOCKER) run $(ISOLATED) -e CI \
 RUN = $(DOCKER) run $(ISOLATED) --network=none \
   -v "$(CURDIR)":/src:ro -v "$(CURDIR)/.eldev":/src/.eldev -w /src $(IMAGE)
 
-.PHONY: ci image deps clean compile lint test melpazoid screenshots
+.PHONY: ci ci-all image deps clean compile lint test melpazoid screenshots
+
+# What ci runs at once.  ci-all runs melpazoid, which is the same on every
+# release, with 31.1's only.
+CI_CHECKS ?= compile lint test melpazoid
 
 # Build the image and install the dependencies, then run compile, lint,
 # test and melpazoid in parallel, as they are independent.  Each can also
@@ -29,10 +37,29 @@ RUN = $(DOCKER) run $(ISOLATED) --network=none \
 ci: clean
 	$(MAKE) image
 	$(MAKE) deps
-	$(MAKE) -j4 compile lint test melpazoid
+	$(MAKE) -j4 $(CI_CHECKS)
+
+# ci on every release CI runs, at once: each release has its own image,
+# and its own .eldev/VERSION.  Each run's output goes to .ci/VERSION.log;
+# a failed one's end is printed.
+ci-all:
+	@mkdir -p .ci
+	@for v in $(EMACS_ALL); do \
+	  checks="compile lint test"; [ $$v = 31.1 ] && checks="$$checks melpazoid"; \
+	  ( $(MAKE) ci EMACS=$$v CI_CHECKS="$$checks" > .ci/$$v.log 2>&1; \
+	    echo $$? > .ci/$$v.status ) & \
+	done; \
+	wait; \
+	failed=0; \
+	for v in $(EMACS_ALL); do \
+	  if [ "$$(cat .ci/$$v.status)" = 0 ]; then echo "Emacs $$v: ok"; \
+	  else failed=1; echo "Emacs $$v: failed, see .ci/$$v.log"; \
+	    grep -E "\.el:[0-9]+: |FAILED|Error|melpazoid: " .ci/$$v.log | tail -20; fi; \
+	done; \
+	exit $$failed
 
 image:
-	$(DOCKER) build -t $(IMAGE) .
+	$(DOCKER) build --build-arg EMACS=$(EMACS) -t $(IMAGE) .
 
 # The linter too, as lint and test run at once, against the same .eldev.
 deps:
@@ -47,11 +74,13 @@ clean:
 # fails when git rewrites its index meanwhile.  The tests are compiled
 # too, and the screenshot driver, which only `make screenshots' runs.
 compile:
-	$(RUN) sh -c "mkdir -p /tmp/build \
-	  && cp -a /src/Eldev /src/*.el /src/test /src/.eldev /tmp/build \
+	$(RUN) sh -c "mkdir -p /tmp/build/.eldev \
+	  && cp -a /src/Eldev /src/*.el /src/test /tmp/build \
+	  && cp -a /src/.eldev/$(EMACS) /tmp/build/.eldev \
 	  && cd /tmp/build && eldev compile --warnings-as-errors --set all"
 
-# checkdoc and package-lint, as the Eldev file says, then check-declare.
+# checkdoc, package-lint and elisp-lint, as the Eldev file says, then
+# check-declare.
 lint:
 	$(RUN) sh -c 'eldev lint && eldev exec -R --file tools/check-declare.el'
 

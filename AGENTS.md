@@ -7,7 +7,8 @@ and [docs/using-vui.md](docs/using-vui.md) first.
 ## Rules
 
 - **Never commit or modify git state.**  The developer handles commits.
-- **Run `make ci` after every change** and fix all errors and warnings.
+- **Run `make ci-all` after every change** and fix all errors and warnings:
+  it runs `make ci` on every Emacs release CI tests, at once.
   Run it once at a time: parallel runs clobber each other's output.
 - **Talk to Mayhem through its REST API** (`mayhem--api-get`); use the
   `mayhem` CLI only for what the API cannot do.

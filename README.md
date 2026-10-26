@@ -157,7 +157,9 @@ reviewers do, each in an isolated Docker or Podman container: your
 user, no capabilities, no network but to fetch, the tree read-only but
 `.eldev/` and `docs/screenshots/`.  melpazoid is pinned by
 `MELPAZOID_COMMIT` in the `Makefile`; any finding fails it, and its
-reports land in `.ci/`.
+reports land in `.ci/`.  `make ci` runs on Emacs 31.1 (`EMACS=29.1`
+picks another); `make ci-all` runs 29.1, 30.2 and 31.1 at once, as
+GitHub Actions does.
 
 The API's own spec is in
 [docs/mayhem-openapi.json](docs/mayhem-openapi.json); check it first for
