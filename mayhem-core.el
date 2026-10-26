@@ -409,7 +409,7 @@ its `latest' run, or an error message."
                created_at started_by n_testcase_reports n_crash_reports
                n_optimized_set_testcases n_exploitability_factors_passing
                n_exploitability_factors_total scm_remote_origin docker_pullable
-               fetched_docker_image_digest
+               fetched_docker_image_digest edges_covered tests_per_second
                ;; From its `run_attributes'.
                n_lines_covered n_lines_total n_defects_active_high
                n_defects_active_medium n_defects_active_low)
@@ -1054,6 +1054,13 @@ cell shows, nil for an empty one.  Bars scale to the tallest stack."
       (cond ((> h 0) (format "%dh %dm" h m))
             ((> m 0) (format "%dm %ds" m sec))
             (t (format "%ds" sec))))))
+
+(defun mayhem--format-count (n)
+  "Return N, a number, short: \"26\", \"5.2k\", \"137k\" or \"1.4M\"."
+  (cond ((>= n 999500) (format "%.1fM" (/ n 1e6)))
+        ((>= n 9999.5) (format "%dk" (round n 1000)))
+        ((>= n 999.5) (format "%.1fk" (/ n 1e3)))
+        (t (format "%d" (round n)))))
 
 (defun mayhem--run-status (run)
   "Return the status of RUN, an alist as the API gives it, as a string."

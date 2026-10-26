@@ -36,13 +36,15 @@
 (declare-function mayhem-defect-open "mayhem-defect" (owner project target number &optional run))
 
 (defconst mayhem-target--run-header
-  '("Run" "Status" "Cov" "Defects" nil "Pass" "Branch" "Age")
+  '("Run" "Status" "Cov" "Defects" nil "Pass" "Edges" "Inputs/s" "Branch" "Age")
   "The names of the columns of `mayhem-target--run-cells'.")
 
 (defun mayhem-target--run-cells (run now)
   "Return the cells of RUN's line, an alist, as of NOW, for `mayhem-columns'."
   (let ((all (or (alist-get 'n_testcase_reports run) 0))
-        (lines (alist-get 'n_lines_total run)))
+        (lines (alist-get 'n_lines_total run))
+        (edges (alist-get 'edges_covered run))
+        (rate (alist-get 'tests_per_second run)))
     (list (format "#%s" (or (alist-get 'run_number run) "?"))
           (mayhem-run-status run)
           (if (and lines (> lines 0))
@@ -54,6 +56,13 @@
           (or (mayhem-severity-counts run) "")
           (propertize (format "%d/%d" (- all (or (alist-get 'n_crash_reports run) 0)) all)
                       'face 'mayhem-label 'help-echo "Passing tests of all")
+          (if (and edges (> edges 0))
+              (propertize (format "%d" edges) 'help-echo "Edges covered")
+            "")
+          (if (and rate (> rate 0))
+              (propertize (mayhem--format-count rate)
+                          'help-echo (format "%.1f inputs tested per second" rate))
+            "")
           (propertize (or (alist-get 'branch_name run) (alist-get 'started_by run) "")
                       'face 'mayhem-label)
           (propertize (or (mayhem--format-age (alist-get 'created_at run) now) "")
@@ -65,7 +74,7 @@
 TARGET is of PROJECT of OWNER; RUNS are the ones shown, newest first."
   (mayhem-table
    (mayhem-columns (mapcar (lambda (run) (mayhem-target--run-cells run now)) runs)
-                   '(2 3 5) mayhem-target--run-header)
+                   '(2 3 5 6 7) mayhem-target--run-header)
    runs
    (lambda (run) (mayhem-run-open owner project target (alist-get 'run_number run)))
    "RET: open run"))
@@ -149,7 +158,7 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
    (mayhem-field "Crashes" (mayhem-skeleton-bar 3))
    (mayhem-field "▶ Trend" (mayhem-skeleton-bar 24))
    (vui-newline)
-   (mayhem-skeleton (make-list 5 '(4 "  " 9 "  " 3 "  " 9 "  " 9 "  " 12)))
+   (mayhem-skeleton (make-list 5 '(4 "  " 9 "  " 3 "  " 9 "  " 9 "  " 5 "  " 4 "  " 12)))
    (vui-newline)
    (mayhem-heading "Defects")
    (mayhem-skeleton (make-list 5 '(6 " " 10 " " 30 "  " 12)))))
@@ -230,7 +239,7 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
      (mayhem-snapshot-view
       snapshot "runs"
       (vui-fragment
-       (mayhem-skeleton (make-list 8 '(4 "  " 9 "  " 3 "  " 9 "  " 9 "  " 12))))
+       (mayhem-skeleton (make-list 8 '(4 "  " 9 "  " 3 "  " 9 "  " 9 "  " 5 "  " 4 "  " 12))))
       (lambda (runs)
         (let ((shown (mayhem-list-filtered runs)))
           (vui-fragment

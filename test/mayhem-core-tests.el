@@ -184,6 +184,14 @@ RAW is as for `mayhem--api-response'."
   (should (equal (mayhem--format-duration 3900) "1h 5m"))
   (should-not (mayhem--format-duration nil)))
 
+(ert-deftest mayhem-core-test-format-count ()
+  (should (equal (mayhem--format-count 26.2) "26"))
+  (should (equal (mayhem--format-count 5203.9) "5.2k"))
+  (should (equal (mayhem--format-count 9999.6) "10k"))
+  (should (equal (mayhem--format-count 136749.45) "137k"))
+  (should (equal (mayhem--format-count 999600) "1.0M"))
+  (should (equal (mayhem--format-count 1400000) "1.4M")))
+
 (ert-deftest mayhem-core-test-pick ()
   (should (equal (mayhem--pick '((a . 1) (b . 2) (c . 3)) '(c a z))
                  '((c . 3) (a . 1) (z)))))

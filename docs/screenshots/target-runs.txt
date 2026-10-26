@@ -4,12 +4,12 @@ app.mayhem.security/acme/libpng/fuzz-png  code target, runs
 
 Filter  [Status]  [Branch]
 
-RUN  STATUS     COV  DEFECTS                 PASS  BRANCH           AGE
-#42  completed  65%  4  2 high, 2 medium  177/214  main             2 hours ago
-#41  completed  65%  4  2 high, 2 medium  177/214  png-text-chunks  1 day ago
-#40  completed  63%  5  3 high, 2 medium  177/214  main             2 days ago
-#39  failed          0                        0/0  main             3 days ago
-#38  completed  61%  3  1 high, 2 medium  177/214  apng-frames      5 days ago
-#37  completed  59%  3  1 high, 2 medium  177/214  main             8 days ago
-#36  stopped    45%  1  1 medium          177/214  main             12 days ago
-#35  completed  58%  2  2 medium          177/214  main             15 days ago
+RUN  STATUS     COV  DEFECTS                 PASS  EDGES  INPUTS/S  BRANCH           AGE
+#42  completed  65%  4  2 high, 2 medium  177/214  14822      5.2k  main             2 hours ago
+#41  completed  65%  4  2 high, 2 medium  177/214  14790      4.9k  png-text-chunks  1 day ago
+#40  completed  63%  5  3 high, 2 medium  177/214  14315      5.2k  main             2 days ago
+#39  failed          0                        0/0                   main             3 days ago
+#38  completed  61%  3  1 high, 2 medium  177/214  13902       812  apng-frames      5 days ago
+#37  completed  59%  3  1 high, 2 medium  177/214  13540      5.2k  main             8 days ago
+#36  stopped    45%  1  1 medium          177/214   9876       13k  main             12 days ago
+#35  completed  58%  2  2 medium          177/214  12988      5.2k  main             15 days ago

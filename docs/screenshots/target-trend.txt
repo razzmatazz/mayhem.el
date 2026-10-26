@@ -15,12 +15,12 @@ Test suite  96 test cases
      23 Sep                                                                                 23 Oct
      █ high  █ medium  █ low
 
-RUN  STATUS     COV  DEFECTS                 PASS  BRANCH           AGE
-#42  completed  65%  4  2 high, 2 medium  177/214  main             2 hours ago
-#41  completed  65%  4  2 high, 2 medium  177/214  png-text-chunks  1 day ago
-#40  completed  63%  5  3 high, 2 medium  177/214  main             2 days ago
-#39  failed          0                        0/0  main             3 days ago
-#38  completed  61%  3  1 high, 2 medium  177/214  apng-frames      5 days ago
+RUN  STATUS     COV  DEFECTS                 PASS  EDGES  INPUTS/S  BRANCH           AGE
+#42  completed  65%  4  2 high, 2 medium  177/214  14822      5.2k  main             2 hours ago
+#41  completed  65%  4  2 high, 2 medium  177/214  14790      4.9k  png-text-chunks  1 day ago
+#40  completed  63%  5  3 high, 2 medium  177/214  14315      5.2k  main             2 days ago
+#39  failed          0                        0/0                   main             3 days ago
+#38  completed  61%  3  1 high, 2 medium  177/214  13902       812  apng-frames      5 days ago
 [Show all 42 runs]
 
 Defects (6)

@@ -153,6 +153,9 @@ users expect.
   `mayhem-defect-severity-face` for a defect.  Colour only the
   status word itself, never the whole row.
 - Timestamps: relative age (`3 days ago`), exact time in `help-echo`.
+- Large or fractional numbers in a table (`INPUTS/S`): short
+  (`5.2k`, `137k`, `1.4M`) with `mayhem--format-count`, exact in
+  `help-echo`.  Counts read as exact (defects, test cases) stay whole.
 - Table rows, notices and charts start at column 0; only a tree (the
   workspace's targets under their projects) indents.
 - A page keeps within `mayhem-page-width`: its window's width, at most

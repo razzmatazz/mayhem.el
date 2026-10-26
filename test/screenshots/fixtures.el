@@ -70,6 +70,7 @@ its defaults: a finished run with defects."
      (docker_pullable . ,mayhem-screenshots--image)
      (fetched_docker_image_digest
       . ,(concat "ghcr.io/acme/libpng-fuzz@sha256:" (mayhem-screenshots--sha "image")))
+     (edges_covered . 14822) (tests_per_second . 5203.9)
      (n_lines_covered . 6412) (n_lines_total . 9875) (n_defects_active_high . 2)
      (n_defects_active_medium . 2) (n_defects_active_low . 0))
    fields))
@@ -78,24 +79,28 @@ its defaults: a finished run with defects."
   (let ((h mayhem-screenshots--h) (d mayhem-screenshots--d))
     (list (mayhem-screenshots--target-run 42 (* 2 h))
           (mayhem-screenshots--target-run 41 (* 1 d) :branch_name "png-text-chunks"
-                                          :started_by "mchen" :n_lines_covered 6398)
+                                          :started_by "mchen" :n_lines_covered 6398
+                                          :edges_covered 14790 :tests_per_second 4870.2)
           (mayhem-screenshots--target-run 40 (* 2 d) :n_defects 5 :n_defects_active_high 3
-                                          :n_lines_covered 6211)
+                                          :n_lines_covered 6211 :edges_covered 14315)
           (mayhem-screenshots--target-run 39 (* 3 d) :ended nil :failed t :n_defects 0
                                           :n_testcase_reports 0 :n_crash_reports 0
                                           :n_defects_active_high 0
                                           :n_defects_active_medium 0
-                                          :n_lines_covered nil :n_lines_total nil)
+                                          :n_lines_covered nil :n_lines_total nil
+                                          :edges_covered nil :tests_per_second nil)
           (mayhem-screenshots--target-run 38 (* 5 d) :branch_name "apng-frames"
                                           :started_by "mchen" :n_defects 3
-                                          :n_defects_active_high 1 :n_lines_covered 6020)
+                                          :n_defects_active_high 1 :n_lines_covered 6020
+                                          :edges_covered 13902 :tests_per_second 812.4)
           (mayhem-screenshots--target-run 37 (* 8 d) :n_defects 3 :n_defects_active_high 1
-                                          :n_lines_covered 5874)
+                                          :n_lines_covered 5874 :edges_covered 13540)
           (mayhem-screenshots--target-run 36 (* 12 d) :ended nil :stopped t :n_defects 1
                                           :n_defects_active_high 0 :n_defects_active_medium 1
-                                          :n_lines_covered 4410)
+                                          :n_lines_covered 4410 :edges_covered 9876
+                                          :tests_per_second 12640.5)
           (mayhem-screenshots--target-run 35 (* 15 d) :n_defects 2 :n_defects_active_high 0
-                                          :n_lines_covered 5702)))
+                                          :n_lines_covered 5702 :edges_covered 12988)))
   "The runs of fuzz-png, newest first.")
 
 (defun mayhem-screenshots--defect (number title severity level cwe ago run &optional state)
