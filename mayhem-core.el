@@ -382,14 +382,7 @@ its `latest' run, or an error message."
                         (funcall cb ok
                                  (if (not ok)
                                      data
-                                   (mapcar (lambda (target)
-                                             (cons (cons 'latest
-                                                         (when-let* ((run (alist-get 'latest_active_run
-                                                                                     target)))
-                                                           (mayhem--target-run run)))
-                                                   (mayhem--pick target '(slug target_name type
-                                                                               is_archived n_runs))))
-                                           data))))
+                                   (mapcar #'mayhem--project-target data))))
                       '((include_archived "true"))))))
      callback)))
 
@@ -413,6 +406,16 @@ its `latest' run, or an error message."
 (defun mayhem--target-run (run)
   "Return RUN, as the API gives it, with only `mayhem--target-run-fields'."
   (mayhem--pick (append run (alist-get 'run_attributes run)) mayhem--target-run-fields))
+
+(defun mayhem--project-target (target)
+  "Return TARGET, of a project's target list, with what its page needs."
+  (cons (cons 'latest (when-let* ((run (alist-get 'latest_active_run target)))
+                        (mayhem--target-run run)))
+        (mayhem--pick target '(slug target_name type is_archived n_runs))))
+
+(defun mayhem--format-ms (seconds)
+  "Return SECONDS, a test case's run time or nil for none, in milliseconds."
+  (format "%dms" (round (* 1000 (or seconds 0)))))
 
 (defconst mayhem--target-defect-fields
   '(defect_number title severity severity_level state cwe_number last_seen
@@ -532,9 +535,10 @@ message."
              (t (funcall callback nil data)))))))
 
 (defconst mayhem--scm-fields
-  '(scm_remote_origin branch_name merge_base_branch_name revision
-                     scm_commit_subject scm_commit_author scm_commit_author_email
-                     ci_type ci_url)
+  '(scm_remote_origin
+    branch_name merge_base_branch_name revision
+    scm_commit_subject scm_commit_author scm_commit_author_email
+    ci_type ci_url)
   "Fields of a run naming its source and the CI build that started it.")
 
 (defun mayhem--clean-url (url)
@@ -721,8 +725,9 @@ to the fields its page shows, or an error message."
                                  (lambda (ok data)
                                    (funcall cb ok (if ok (mapcar (lambda (e)
                                                                    (mayhem--pick
-                                                                    e '(method path passing
-                                                                        covered defects_total)))
+                                                                    e '(method
+                                                                        path passing covered
+                                                                        defects_total)))
                                                                  data)
                                                     data)))))))
               (events . ,(lambda (cb)
@@ -731,8 +736,9 @@ to the fields its page shows, or an error message."
                             (lambda (ok data)
                               (funcall cb ok (if ok (mapcar (lambda (e)
                                                               (mayhem--pick
-                                                               e '(created_at event_level
-                                                                   event_phase event_desc)))
+                                                               e '(created_at
+                                                                   event_level event_phase
+                                                                   event_desc)))
                                                             data)
                                                data))))))
               ;; How many test cases were processed and defects found by
@@ -854,7 +860,8 @@ cases and the first one's crash."
                      (mayhem--api-get (concat path (format "/run/%s/api/rest/issue/%s" run number))
                                       nil
                                       (lambda (ok issue)
-                                        (funcall cb ok (if ok (mayhem--api-evidence issue) issue)))))
+                                        (funcall cb ok
+                                                 (if ok (mayhem--api-evidence issue) issue)))))
                     ((equal (alist-get 'source defect) "code")
                      (mayhem--api-get (concat path (format "/defect/%s/testcase_report" number))
                                       `((per_page ,mayhem--page-size))
@@ -952,7 +959,7 @@ A backslash keeps the character after it in its word."
     (while (< i n)
       (let ((c (aref line i)))
         (cond (quoting (cond ((eq c quoting) (setq quoting nil))
-                           ((and (eq c ?\\) (eq quoting ?\")) (setq i (1+ i)))))
+                             ((and (eq c ?\\) (eq quoting ?\")) (setq i (1+ i)))))
               ((memq c '(?\s ?\t))
                (when start (push (substring line start i) words) (setq start nil)))
               (t (unless start (setq start i))

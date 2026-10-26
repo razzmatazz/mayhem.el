@@ -150,7 +150,8 @@ screenshots` redraws [docs/screenshots](docs/screenshots/README.md)
 from made-up data.
 
 `make ci` compiles, lints (`checkdoc`, `package-lint`,
-`check-declare`) and tests with [Eldev](https://github.com/emacs-eldev/eldev),
+`check-declare`, and `elisp-lint` for indentation, whitespace and
+100-column lines) and tests with [Eldev](https://github.com/emacs-eldev/eldev),
 and runs [melpazoid](https://github.com/riscy/melpazoid) as MELPA's
 reviewers do, each in an isolated Docker or Podman container: your
 user, no capabilities, no network but to fetch, the tree read-only but

@@ -297,9 +297,9 @@ HELP-ECHO reads \"RET: <imperative>\", such as \"RET: open project\"."
     (define-key map (kbd "RET") (lambda () (interactive) (funcall on-visit)))
     (define-key map [mouse-1] (lambda () (interactive) (funcall on-visit)))
     (vui-region :keymap map
-      (if (stringp line)
-          (vui-text (funcall decorate line))
-        (mayhem-line line decorate)))))
+                (if (stringp line)
+                    (vui-text (funcall decorate line))
+                  (mayhem-line line decorate)))))
 
 (defun mayhem--default-help-echo (string help-echo)
   "Return a copy of STRING with HELP-ECHO on the parts lacking a `help-echo'.
@@ -398,7 +398,7 @@ is cut in the middle, whole on hover."
                                    (if (or (null open)
                                            (and (eq name (car last)) (null more) (not link-last)))
                                        (vui-text (if cut (propertize shown 'help-echo name) shown)
-                                                 :face face)
+                                         :face face)
                                      (mayhem-page-link shown (if cut (concat help " " name) help)
                                                        open (list 'link face))))))
                          parts))
@@ -427,9 +427,10 @@ It shows the host, so it is plain where its links lead.  INDENT, a
 string, goes before its label."
   (when url
     (let ((repo (mayhem--repo url)))
-      (mayhem-field (concat indent "Repo") (if repo
-                               (mayhem-repo-link repo (concat (car repo) "/" (cdr repo)))
-                             url)))))
+      (mayhem-field (concat indent "Repo")
+                    (if repo
+                        (mayhem-repo-link repo (concat (car repo) "/" (cdr repo)))
+                      url)))))
 
 (defun mayhem-scm-fields (scm &optional indent)
   "Return a list of the Repo, Branch, Commit and CI fields of SCM, nil for none.
@@ -460,9 +461,10 @@ label."
                        (propertize (concat "  by " author) 'face 'mayhem-label
                                    'help-echo (alist-get 'scm_commit_author_email scm)))))
      (when (or ci-url ci-type)
-       (mayhem-field (concat indent "CI") (if ci-url
-                              (mayhem-link (mayhem--ci-label ci-type ci-url) ci-url)
-                            ci-type))))))
+       (mayhem-field (concat indent "CI")
+                     (if ci-url
+                         (mayhem-link (mayhem--ci-label ci-type ci-url) ci-url)
+                       ci-type))))))
 
 (defmacro mayhem-use-timer (deps interval active &rest body)
   "Run BODY every INTERVAL seconds while ACTIVE, tied to the component.
@@ -482,11 +484,11 @@ From octocat.el's `octocat-vui-use-timer'."
                  (run-with-timer
                   ,interval ,interval
                   (vui-with-async-context
-                    (condition-case err
-                        (unless (progn ,@body)
-                          (cancel-timer ,timer))
-                      (error (cancel-timer ,timer)
-                             (signal (car err) (cdr err)))))))
+                   (condition-case err
+                       (unless (progn ,@body)
+                         (cancel-timer ,timer))
+                     (error (cancel-timer ,timer)
+                            (signal (car err) (cdr err)))))))
            (lambda () (cancel-timer ,timer)))))))
 
 (defconst mayhem-unfold-growth 0.5
@@ -539,9 +541,9 @@ open itself."
     (vui-fragment
      ;; The arrow and its space stand in for two of a field label's columns.
      (vui-button (concat (if open "▼ " "▶ ") title)
-                 :no-decoration t :face 'mayhem-label :key 'fold-toggle
-                 :help-echo (if open "RET: fold" "RET: unfold")
-                 :on-click (lambda () (vui-set-state :open (not open))))
+       :no-decoration t :face 'mayhem-label :key 'fold-toggle
+       :help-echo (if open "RET: fold" "RET: unfold")
+       :on-click (lambda () (vui-set-state :open (not open))))
      (vui-text (make-string (max 1 (- 10 (string-width title))) ?\s))
      (if open
          (vui-text (propertize (truncate-string-to-width summary (max 10 room) nil nil "…")
@@ -576,10 +578,10 @@ does.  Nil ROWS show nothing."
      (when (> count limit)
        (vui-fragment
         (vui-button (if all "Show fewer" (format "Show all %d %s" count what))
-                    :help-echo (if all
-                                   (format "RET: list the first %d" limit)
-                                 "RET: list every one")
-                    :on-click (lambda () (vui-set-state :all (not all))))
+          :help-echo (if all
+                         (format "RET: list the first %d" limit)
+                       "RET: list every one")
+          :on-click (lambda () (vui-set-state :all (not all))))
         (vui-newline))))))
 
 (defun mayhem-source-fold (scm)
@@ -594,22 +596,24 @@ commit link to their pages.  Nil when SCM names none of them."
          (short (and revision (substring revision 0 (min 7 (length revision)))))
          (subject (alist-get 'scm_commit_subject scm)))
     (when (or (alist-get 'scm_remote_origin scm) revision branch parent)
-      (vui-component
-       'mayhem-fold
-       :title "Source"
-       :summary (string-join (delq nil (list branch short subject)) "  ")
-       :parts (delq nil (list (and branch (cons branch (mayhem-repo-link repo branch 'branch branch)))
-                              (and short (cons short (mayhem-repo-link repo short 'commit revision)))
-                              (and subject
-                                   (truncate-string-to-width
-                                    subject (max 10 (- (mayhem-page-width) 16
-                                                       (length branch) (length short)))
-                                    nil nil "…"))))
-       :lines (append (mayhem-scm-fields scm "  ")
-                      (list (when parent
-                              (mayhem-field "  Parent"
-                                            (mayhem-repo-link repo (substring parent 0 (min 7 (length parent)))
-                                                              'commit parent)))))))))
+      (vui-component 'mayhem-fold
+        :title "Source"
+        :summary (string-join (delq nil (list branch short subject)) "  ")
+        :parts (delq nil (list (and branch
+                                    (cons branch (mayhem-repo-link repo branch 'branch branch)))
+                               (and short
+                                    (cons short (mayhem-repo-link repo short 'commit revision)))
+                               (and subject
+                                    (truncate-string-to-width
+                                     subject (max 10 (- (mayhem-page-width) 16
+                                                        (length branch) (length short)))
+                                     nil nil "…"))))
+        :lines (append (mayhem-scm-fields scm "  ")
+                       (list (when parent
+                               (mayhem-field "  Parent"
+                                             (mayhem-repo-link
+                                              repo (substring parent 0 (min 7 (length parent)))
+                                              'commit parent)))))))))
 
 (defun mayhem-image-link (image &optional digest)
   "Return IMAGE linking to its page when it has one, else plain.
@@ -732,7 +736,7 @@ is drawn as a heading, the others as buttons."
             (append (cdr (mapcan (lambda (n) (list (vui-text "  " :face 'underline) n))
                                  nodes))
                     (list (vui-text (make-string (max 0 (- width used)) ?\s)
-                                    :face 'underline))))
+                            :face 'underline))))
      (vui-newline))))
 
 (defun mayhem-target-type (type)
@@ -1002,17 +1006,17 @@ ITEMS are SHOWN."
            (mapcar (pcase-lambda (`(,label . ,_))
                      (let ((value (alist-get label mayhem-list-filter nil nil #'equal)))
                        (vui-button (if value (format "%s: %s" label value) label)
-                                   :key label
-                                   :face (unless value 'mayhem-label)
-                                   :help-echo (format "RET: filter by %s" (downcase label))
-                                   :on-click (lambda () (mayhem-list-filter-by label)))))
+                         :key label
+                         :face (unless value 'mayhem-label)
+                         :help-echo (format "RET: filter by %s" (downcase label))
+                         :on-click (lambda () (mayhem-list-filter-by label)))))
                    mayhem-list-facets)
            (and mayhem-list-filter
                 (list (vui-button "clear" :key 'clear :face 'mayhem-label
                                   :help-echo "RET: show the whole list"
                                   :on-click #'mayhem-list-clear-filter)
                       (vui-text (format "%d of %d" (length shown) (length items))
-                                :face 'mayhem-label)))))
+                        :face 'mayhem-label)))))
    (vui-newline)))
 
 (defun mayhem-tally (items fn &optional order face)
@@ -1067,7 +1071,8 @@ or project has.  KIND \"fixed\" counts fixed defects instead.  Levels
 with none are left out; nil when there are none."
   (let ((parts (delq nil
                      (mapcar (lambda (level)
-                               (let ((n (or (alist-get (intern (format "n_defects_%s_%s" (or kind "active") level))
+                               (let ((n (or (alist-get (intern (format "n_defects_%s_%s"
+                                                                       (or kind "active") level))
                                                        counts)
                                             0)))
                                  (when (> n 0)
@@ -1127,12 +1132,14 @@ time and counts are its `help-echo'.  Each line is a vnode."
                                     row tips))))
          rows)
         (list
-         (concat pad (propertize (concat first (make-string (max 1 (- width (length first) (length last)))
-                                                            ?\s)
+         (concat pad (propertize (concat first
+                                         (make-string
+                                          (max 1 (- width (length first) (length last))) ?\s)
                                          last)
                                  'face 'mayhem-label))
          (concat pad (mapconcat (lambda (level)
-                                  (concat (propertize "█" 'face (mayhem-defect-severity-face level))
+                                  (concat (propertize "█"
+                                                      'face (mayhem-defect-severity-face level))
                                           (propertize (concat " " level) 'face 'mayhem-label)))
                                 mayhem-severities "  ")))))))))
 
@@ -1154,8 +1161,9 @@ As \"9 active: 3 high, 6 medium  +2 in 30 days\".  Nil without POINTS."
                 (concat ": " (string-join
                               (delq nil (seq-mapn (lambda (n level)
                                                     (when (> n 0)
-                                                      (propertize (format "%d %s" n level)
-                                                                  'face (mayhem-defect-severity-face level))))
+                                                      (propertize
+                                                       (format "%d %s" n level)
+                                                       'face (mayhem-defect-severity-face level))))
                                                   stack mayhem-severities))
                               ", ")))
               (propertize (if (= change 0)
@@ -1206,19 +1214,19 @@ many defects are active and how that changed.  Pages show it through
          (width (max 10 (- (mayhem-page-width) mayhem-trend--margin)))
          (points (plist-get snapshot :data))
          (summary (and (plist-get snapshot :fetched-at) (mayhem-trend--summary points 'month))))
-    (vui-component
-     'mayhem-fold
-     :title "Trend"
-     :summary (or summary "")
-     :parts (list (or summary (mayhem-skeleton-bar 24)))
-     :lines (cond ((plist-get snapshot :fetched-at) (mayhem-trend--lines points 'month width))
-                  ((and (plist-get snapshot :error) (not (plist-get snapshot :loading)))
-                   (list (vui-text (concat (propertize "Fetching defect trend failed: " 'face 'error)
-                                           (plist-get snapshot :error) "\n"))))
-                  (t (mapcar (lambda (_)
-                               (mayhem-skeleton (list (list (make-string mayhem-trend--margin ?\s)
-                                                            width))))
-                             (number-sequence 1 mayhem-trend--height)))))))
+    (vui-component 'mayhem-fold
+      :title "Trend"
+      :summary (or summary "")
+      :parts (list (or summary (mayhem-skeleton-bar 24)))
+      :lines (cond ((plist-get snapshot :fetched-at) (mayhem-trend--lines points 'month width))
+                   ((and (plist-get snapshot :error) (not (plist-get snapshot :loading)))
+                    (list (vui-text (concat (propertize "Fetching defect trend failed: "
+                                                        'face 'error)
+                                            (plist-get snapshot :error) "\n"))))
+                   (t (mapcar (lambda (_)
+                                (mayhem-skeleton (list (list (make-string mayhem-trend--margin ?\s)
+                                                             width))))
+                              (number-sequence 1 mayhem-trend--height)))))))
 
 (defun mayhem-trend-view (owner project target &optional folded)
   "Return the `mayhem-trend' of TARGET of PROJECT of OWNER, for a page.
@@ -1231,7 +1239,7 @@ the buffer when a component that rendered nothing re-renders alone."
                          :data)
               'members-only)
     (vui-component (if folded 'mayhem-trend-fold 'mayhem-trend)
-                   :owner owner :project project :target target)))
+      :owner owner :project project :target target)))
 
 (provide 'mayhem-vui)
 ;;; mayhem-vui.el ends here

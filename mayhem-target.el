@@ -77,8 +77,8 @@ list.  Nil when it shows them all."
   (when (> count shown)
     (vui-fragment
      (vui-button (format "Show all %d %s" count what)
-                 :help-echo (format "RET: open the list of every one of the %s" what)
-                 :on-click on-click)
+       :help-echo (format "RET: open the list of every one of the %s" what)
+       :on-click on-click)
      (vui-newline))))
 
 (defun mayhem-target--defect-tally (owner project target latest)
@@ -159,8 +159,8 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'target owner project target))))
     (vui-fragment
-     (mayhem-page-heading (mayhem-target-kind (alist-get 'type (alist-get 'target
-                                                                          (plist-get snapshot :data))))
+     (mayhem-page-heading (mayhem-target-kind
+                           (alist-get 'type (alist-get 'target (plist-get snapshot :data))))
                           owner project target)
      (vui-newline)
      (mayhem-snapshot-view snapshot "target" (mayhem-target--skeleton)
@@ -171,8 +171,8 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
   (mayhem-open-page (format "*mayhem: %s/%s/%s*" owner project target)
                     #'mayhem-target-mode
                     (lambda () (vui-component 'mayhem-target-page
-                                              :owner owner :project project
-                                              :target target))
+                                 :owner owner :project project
+                                 :target target))
                     (list 'target owner project target)))
 
 ;;;; Every defect or run
@@ -249,8 +249,8 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
   (mayhem-open-page (format "*mayhem: %s/%s/%s/defects*" owner project target)
                     #'mayhem-target-defects-mode
                     (lambda () (vui-component 'mayhem-target-defects-page
-                                              :owner owner :project project
-                                              :target target))
+                                 :owner owner :project project
+                                 :target target))
                     (list 'target-defects owner project target)))
 
 (defun mayhem-target-runs-open (owner project target)
@@ -258,8 +258,8 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
   (mayhem-open-page (format "*mayhem: %s/%s/%s/runs*" owner project target)
                     #'mayhem-target-runs-mode
                     (lambda () (vui-component 'mayhem-target-runs-page
-                                              :owner owner :project project
-                                              :target target))
+                                 :owner owner :project project
+                                 :target target))
                     (list 'target-runs owner project target)))
 
 (provide 'mayhem-target)

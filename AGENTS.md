@@ -36,15 +36,9 @@ drawn from the made-up data in `test/screenshots/fixtures.el`.
 
 ## Checking parens
 
-Before reloading or `make ci`, check every edited file:
-
-```bash
-python3 tools/el-outline.py mayhem*.el
-```
-
-It exits 1 on unbalanced files and marks `← UNCLOSED` or `← SPANS INTO
-NEXT FORM`.  To locate the break: `--trace DEFUN`, `--trace-line N`,
-`--depth-at N`, `--close-map --lines A-B` (see the script's header).
+`make lint` checks every line's indentation against stock Emacs's, so
+a misplaced paren shows as the misindented lines after it.  `M-x
+check-parens` finds an unbalanced one.
 
 ## Reloading into Emacs
 

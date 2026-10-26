@@ -78,8 +78,7 @@ The defect is of TARGET of PROJECT of OWNER.  It lists the first
                              (list (substring sha 0 (min 8 (length sha)))
                                    (format "#%s" (alist-get 'run_number test))
                                    (propertize
-                                    (format "%dms" (round (* 1000 (or (alist-get 'execution_time test)
-                                                                       0))))
+                                    (mayhem--format-ms (alist-get 'execution_time test))
                                     'face 'mayhem-label))))
                          testcases)
                  '(2) '("Test case" "Run" "Time"))))
@@ -108,12 +107,12 @@ SOURCE is \"api\" or \"code\"."
     ("code"
      (vui-fragment
       (mayhem-block "Reproduce"
-                            (when-let* ((cmd (alist-get 'repro_cmdline evidence)))
-                              (mayhem-command cmd)))
+                    (when-let* ((cmd (alist-get 'repro_cmdline evidence)))
+                      (mayhem-command cmd)))
       (mayhem-block "Backtrace"
-                            (if-let* ((frames (alist-get 'frames evidence)))
-                                (mayhem-backtrace frames)
-                              (alist-get 'backtrace evidence)))))))
+                    (if-let* ((frames (alist-get 'frames evidence)))
+                        (mayhem-backtrace frames)
+                      (alist-get 'backtrace evidence)))))))
 
 (defun mayhem-defect--render (owner project target data)
   "Return the vnodes of a defect of TARGET of PROJECT of OWNER, showing DATA."
@@ -143,9 +142,9 @@ SOURCE is \"api\" or \"code\"."
      (mayhem-defect--evidence-fields owner project target
                                      (alist-get 'source defect) (alist-get 'evidence data))
      (mayhem-block "Description"
-                           (string-fill (or (alist-get 'description defect) "")
-                                        (max 20 (min mayhem-defect--fill-width
-                                                     (mayhem-page-width)))))
+                   (string-fill (or (alist-get 'description defect) "")
+                                (max 20 (min mayhem-defect--fill-width
+                                             (mayhem-page-width)))))
      (when (equal (alist-get 'source defect) "code")
        (mayhem-defect--testcases owner project target (alist-get 'evidence data)))
      (mayhem-defect--evidence-blocks (alist-get 'source defect) (alist-get 'evidence data)))))
@@ -185,8 +184,8 @@ its last run's, when the API names it."
                             (if run (format "@%s" run) ""))
                     #'mayhem-defect-mode
                     (lambda () (vui-component 'mayhem-defect-page
-                                              :owner owner :project project
-                                              :target target :number number :run run))
+                                 :owner owner :project project
+                                 :target target :number number :run run))
                     (list 'defect owner project target number run)))
 
 (provide 'mayhem-defect)

@@ -53,7 +53,8 @@ then by severity, padded to COUNTS-WIDTH."
                                      'face 'mayhem-label)
                        (concat
                         "  "
-                        (string-pad (format "%d" (or (alist-get 'n_defects run) 0)) total-width nil t)
+                        (string-pad (format "%d" (or (alist-get 'n_defects run) 0))
+                                    total-width nil t)
                         "  "
                         (string-pad (or (mayhem-severity-counts run) "") counts-width)
                         (propertize (format "  %4d/%-4d tests"
@@ -163,7 +164,7 @@ nil; ON-TAB is called with the other's key, to show it."
   (mayhem-open-page (format "*mayhem: %s/%s*" owner project)
                     #'mayhem-project-mode
                     (lambda () (vui-component 'mayhem-project-page
-                                              :owner owner :project project))
+                                 :owner owner :project project))
                     (list 'project owner project)))
 
 (provide 'mayhem-project)

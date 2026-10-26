@@ -188,13 +188,13 @@ See `mayhem-mayhemfile-validate-command'."
                                         (pcase-lambda (`(,line ,col ,end-col ,message))
                                           (let ((region (mayhem-mayhemfile--region
                                                          line col end-col message)))
-                                            (flymake-make-diagnostic source (car region) (cdr region)
-                                                                     :error message)))
+                                            (flymake-make-diagnostic
+                                             source (car region) (cdr region) :error message)))
                                         (or (mayhem-mayhemfile--parse-validate output)
                                             (list (list nil nil nil
-                                                          (string-trim
-                                                           (replace-regexp-in-string
-                                                            "^WARNING .*\n" "" output)))))))))))
+                                                        (string-trim
+                                                         (replace-regexp-in-string
+                                                          "^WARNING .*\n" "" output)))))))))))
                  (kill-buffer (process-buffer proc))
                  (delete-file file))))))))
 

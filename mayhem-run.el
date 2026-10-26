@@ -92,8 +92,8 @@ RUN is a run of TARGET of PROJECT of OWNER.  It lists the first
    (if (null endpoints)
        (mayhem-notice "No endpoints")
      (let ((path-width (apply #'max 1 (mapcar (lambda (endpoint)
-                                                 (string-width (or (alist-get 'path endpoint) "")))
-                                               endpoints))))
+                                                (string-width (or (alist-get 'path endpoint) "")))
+                                              endpoints))))
        (apply #'vui-fragment
               (mapcar (lambda (endpoint)
                         (let ((passing (alist-get 'passing endpoint))
@@ -176,10 +176,11 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
          (corpus (alist-get 'n_total_testsuite_size run))
          (queued (alist-get 'triage_queue_size run))
          (split (lambda (key)
-                  (propertize (format "  %d new, %d regression"
-                                      (or (alist-get (intern (format "n_behavior_%s" key)) run) 0)
-                                      (or (alist-get (intern (format "n_regression_%s" key)) run) 0))
-                              'face 'mayhem-label))))
+                  (let ((count (lambda (kind)
+                                 (or (alist-get (intern (format "n_%s_%s" kind key)) run) 0))))
+                    (propertize (format "  %d new, %d regression"
+                                        (funcall count "behavior") (funcall count "regression"))
+                                'face 'mayhem-label)))))
     (vui-fragment
      (mayhem-field "All" (mayhem-page-link (format "%d test case%s" all (if (= all 1) "" "s"))
                                            "RET: open every test case"
@@ -269,8 +270,8 @@ header, as it no longer changes."
                            rows)
                    (list (concat pad (propertize (funcall tip dots) 'face 'error))
                          (concat pad (propertize (concat "0:00"
-                                                         (make-string (max 1 (- width 4 (length end)))
-                                                                      ?\s)
+                                                         (make-string
+                                                          (max 1 (- width 4 (length end))) ?\s)
                                                          end)
                                                  'face 'mayhem-label))))))
       (if (mayhem-run--live-p run)
@@ -279,11 +280,11 @@ header, as it no longer changes."
            (mayhem-heading "Progress")
            (vui-text (concat pad legend "\n" (mapconcat (lambda (l) (concat l "\n")) lines ""))))
         (vui-component 'mayhem-fold
-                       :title "Progress"
-                       :summary (concat processed "  " found-text)
-                       :parts (list (propertize (concat processed "  " found-text)
-                                                'face 'mayhem-label))
-                       :lines (mapcar (lambda (l) (vui-text (concat l "\n"))) lines))))))
+          :title "Progress"
+          :summary (concat processed "  " found-text)
+          :parts (list (propertize (concat processed "  " found-text)
+                                   'face 'mayhem-label))
+          :lines (mapcar (lambda (l) (vui-text (concat l "\n"))) lines))))))
 
 (defconst mayhem-run--test-header
   '("Test case" "Type" "Defects" nil "Time" "Seen")
@@ -305,20 +306,22 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER.  It lists the first
                      (mapcar (lambda (test)
                                (let ((sha (alist-get 'sha256 test)))
                                  (list (substring sha 0 (min 8 (length sha)))
-                                       (propertize (mayhem-testcase-type (alist-get 'is_regression test))
-                                                   'face 'mayhem-label)
+                                       (propertize
+                                        (mayhem-testcase-type (alist-get 'is_regression test))
+                                        'face 'mayhem-label)
                                        (format "%d" (or (alist-get 'n_defects test) 0))
                                        (mayhem-testcase-severities test)
                                        (propertize
-                                        (format "%dms" (round (* 1000 (or (alist-get 'execution_time test)
-                                                                           0))))
+                                        (mayhem--format-ms (alist-get 'execution_time test))
                                         'face 'mayhem-label)
-                                       (mayhem-run--elapsed-text (alist-get 'created_at test) start))))
+                                       (mayhem-run--elapsed-text (alist-get 'created_at test)
+                                                                 start))))
                              failing)
                      '(2 4 5) mayhem-run--test-header)))
          (mayhem-table lines failing
                        (lambda (test)
-                         (mayhem-testcase-open owner project target number (alist-get 'sha256 test)))
+                         (mayhem-testcase-open owner project target number
+                                               (alist-get 'sha256 test)))
                        "RET: open test case" mayhem-run--tests-shown "failing tests"))))))
 
 (vui-defcomponent mayhem-run-tests (owner project target number run)
@@ -358,33 +361,33 @@ A test case fails when it shows a defect, crash or not."
 (defconst mayhem-run--event-width 70
   "Column at which an event's description is wrapped, from its start, at most.")
 
+(defun mayhem-run--event-line (event)
+  "Return the line of EVENT of a run's event log, wrapped to the page."
+  (let* ((at (encode-time (iso8601-parse (alist-get 'created_at event))))
+         (exact (format-time-string "%a %Y-%m-%d %H:%M:%S %Z" at))
+         (level (or (alist-get 'event_level event) 1))
+         (face (cond ((>= level 3) 'error) ((= level 2) 'warning)
+                     ((= level 0) 'mayhem-label))))
+    (concat (propertize (format-time-string "%H:%M:%S" at)
+                        'face 'mayhem-label 'help-echo exact 'mayhem-ts exact)
+            (propertize (format "  %-16s" (mayhem-run--phase (alist-get 'event_phase event)))
+                        'face 'mayhem-label)
+            ;; Wrapped, with the lines after the first under it.
+            (let ((desc (replace-regexp-in-string
+                         "\n" (concat "\n" (make-string mayhem-run--event-indent ?\s))
+                         (string-fill (string-trim (or (alist-get 'event_desc event) ""))
+                                      (max 20 (min mayhem-run--event-width
+                                                   (- (mayhem-page-width)
+                                                      mayhem-run--event-indent)))))))
+              (if face (propertize desc 'face face) desc))
+            "\n")))
+
 (defun mayhem-run--events (events)
   "Return the vnodes of the event log EVENTS of a run, newest first."
   (vui-fragment
    (if (null events)
        (mayhem-notice "No events")
-     (vui-text
-      (mapconcat
-       (lambda (event)
-         (let* ((at (encode-time (iso8601-parse (alist-get 'created_at event))))
-                (exact (format-time-string "%a %Y-%m-%d %H:%M:%S %Z" at))
-                (level (or (alist-get 'event_level event) 1))
-                (face (cond ((>= level 3) 'error) ((= level 2) 'warning)
-                            ((= level 0) 'mayhem-label))))
-           (concat (propertize (format-time-string "%H:%M:%S" at)
-                               'face 'mayhem-label 'help-echo exact 'mayhem-ts exact)
-                   (propertize (format "  %-16s" (mayhem-run--phase (alist-get 'event_phase event)))
-                               'face 'mayhem-label)
-                   ;; Wrapped, with the lines after the first under it.
-                   (let ((desc (replace-regexp-in-string
-                                "\n" (concat "\n" (make-string mayhem-run--event-indent ?\s))
-                                (string-fill (string-trim (or (alist-get 'event_desc event) ""))
-                                             (max 20 (min mayhem-run--event-width
-                                                          (- (mayhem-page-width)
-                                                             mayhem-run--event-indent)))))))
-                     (if face (propertize desc 'face face) desc))
-                   "\n")))
-       events "")))))
+     (vui-text (mapconcat #'mayhem-run--event-line events "")))))
 
 (defun mayhem-run--duration (run)
   "Return how long RUN went on for, with its time limit beside it."
@@ -451,7 +454,8 @@ and start are its `help-echo'."
                            (mayhem--elapsed to from)))))
               (help (concat status (when (and from start)
                                      (concat ", started at "
-                                             (mayhem--format-elapsed (mayhem--elapsed from start)))))))
+                                             (mayhem--format-elapsed
+                                              (mayhem--elapsed from start)))))))
          (concat (propertize (mayhem-run--phase (alist-get 'phase_name phase))
                              'face (mayhem-run--task-face phase) 'help-echo help)
                  (when took (propertize (concat " " took) 'face 'mayhem-label 'help-echo help)))))
@@ -494,57 +498,59 @@ the CLI added.  RUN is run NUMBER of TARGET of PROJECT of OWNER."
                                  (funcall count files "file")
                                  hardening))))
     (when (or build hardening mayhemfile overrides env files cli)
-      (vui-component
-       'mayhem-fold
-       :title "Setup"
-       :summary (string-join (delq nil (cons (and mayhemfile "Mayhemfile") counts)) "  ")
-       :parts (append (and mayhemfile (list (cons "Mayhemfile" (funcall link "Mayhemfile"))))
-                      (mapcar grey counts))
-       :lines
-       (append
-        (list (when build
-                (mayhem-field "  Build" (format "%s" build)))
-              (mayhem-hardening-field run "  ")
-              (when mayhemfile
-                (let ((lines (length (split-string (string-trim-right mayhemfile) "\n"))))
-                  ;; "Mayhemfile", indented, leaves no room after the label.
-                  (mayhem-field "  Config" (funcall link "Mayhemfile")
-                                (funcall grey (format "  %d line%s" lines
-                                                      (if (= lines 1) "" "s")))))))
-        (when overrides
-          (let ((width (apply #'max (mapcar (lambda (o) (length (symbol-name (car o))))
-                                            overrides))))
-            ;; A list, such as the tasks or test suites, goes an item a line.
-            (mayhem-run--lines "  Overrides"
-                               (mapcan (pcase-lambda (`(,key . ,value))
-                                         (let ((items (cond ((null value) (list (funcall grey "null")))
-                                                            ((and (listp value)
-                                                                  (not (mayhem--object-p value)))
-                                                             (mapcar #'mayhem--format-value value))
-                                                            (t (list (mayhem--format-value value))))))
-                                           (cons (list (string-pad (symbol-name key) (+ width 2))
-                                                       (if (and (eq key 'image) (stringp value))
-                                                           (mayhem-image-link value)
-                                                         (car items)))
-                                                 (mapcar (lambda (item)
-                                                           (concat (make-string (+ width 2) ?\s) item))
-                                                         (cdr items)))))
-                                       overrides))))
-        (when env
-          (mayhem-run--lines "  Env"
-                             (mapcar (pcase-lambda (`(,key . ,value))
-                                       (format "%s=%s" key (mayhem--format-value value)))
-                                     env)))
-        (when files
-          (mayhem-run--lines "  Files"
-                             (mapcar (lambda (f)
-                                       (let ((sha (or (alist-get 'sha256 f) "")))
-                                         (concat (alist-get 'path f) "  "
-                                                 (propertize (substring sha 0 (min 8 (length sha)))
-                                                             'face 'mayhem-label 'help-echo sha))))
-                                     files)))
-        (list (when cli
-                (mayhem-field "  CLI" cli))))))))
+      (vui-component 'mayhem-fold
+        :title "Setup"
+        :summary (string-join (delq nil (cons (and mayhemfile "Mayhemfile") counts)) "  ")
+        :parts (append (and mayhemfile (list (cons "Mayhemfile" (funcall link "Mayhemfile"))))
+                       (mapcar grey counts))
+        :lines
+        (append
+         (list (when build
+                 (mayhem-field "  Build" (format "%s" build)))
+               (mayhem-hardening-field run "  ")
+               (when mayhemfile
+                 (let ((lines (length (split-string (string-trim-right mayhemfile) "\n"))))
+                   ;; "Mayhemfile", indented, leaves no room after the label.
+                   (mayhem-field "  Config" (funcall link "Mayhemfile")
+                                 (funcall grey (format "  %d line%s" lines
+                                                       (if (= lines 1) "" "s")))))))
+         (when overrides
+           (let ((width (apply #'max (mapcar (lambda (o) (length (symbol-name (car o))))
+                                             overrides))))
+             ;; A list, such as the tasks or test suites, goes an item a line.
+             (mayhem-run--lines "  Overrides"
+                                (mapcan (pcase-lambda (`(,key . ,value))
+                                          (let ((items (cond ((null value)
+                                                              (list (funcall grey "null")))
+                                                             ((and (listp value)
+                                                                   (not (mayhem--object-p value)))
+                                                              (mapcar #'mayhem--format-value value))
+                                                             (t (list
+                                                                 (mayhem--format-value value))))))
+                                            (cons (list (string-pad (symbol-name key) (+ width 2))
+                                                        (if (and (eq key 'image) (stringp value))
+                                                            (mayhem-image-link value)
+                                                          (car items)))
+                                                  (mapcar (lambda (item)
+                                                            (concat (make-string (+ width 2) ?\s)
+                                                                    item))
+                                                          (cdr items)))))
+                                        overrides))))
+         (when env
+           (mayhem-run--lines "  Env"
+                              (mapcar (pcase-lambda (`(,key . ,value))
+                                        (format "%s=%s" key (mayhem--format-value value)))
+                                      env)))
+         (when files
+           (mayhem-run--lines "  Files"
+                              (mapcar (lambda (f)
+                                        (let ((sha (or (alist-get 'sha256 f) "")))
+                                          (concat (alist-get 'path f) "  "
+                                                  (propertize (substring sha 0 (min 8 (length sha)))
+                                                              'face 'mayhem-label 'help-echo sha))))
+                                      files)))
+         (list (when cli
+                 (mayhem-field "  CLI" cli))))))))
 
 (defun mayhem-run--render (owner project target number data)
   "Return the vnodes of run NUMBER of TARGET of PROJECT of OWNER, showing DATA."
@@ -679,8 +685,8 @@ hook."
   (mayhem-open-page (format "*mayhem: %s/%s/%s/%s*" owner project target number)
                     #'mayhem-run-mode
                     (lambda () (vui-component 'mayhem-run-page
-                                              :owner owner :project project
-                                              :target target :number number))
+                                 :owner owner :project project
+                                 :target target :number number))
                     (list 'run owner project target number)))
 
 (define-derived-mode mayhem-run-log-mode mayhem-page-mode "Mayhem Run Log"
@@ -705,8 +711,8 @@ hook."
   (mayhem-open-page (format "*mayhem: %s/%s/%s/%s/log*" owner project target number)
                     #'mayhem-run-log-mode
                     (lambda () (vui-component 'mayhem-run-log-page
-                                              :owner owner :project project
-                                              :target target :number number))
+                                 :owner owner :project project
+                                 :target target :number number))
                     (list 'run-log owner project target number)))
 
 (provide 'mayhem-run)

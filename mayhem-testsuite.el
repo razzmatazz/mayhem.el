@@ -202,8 +202,8 @@ as `run-testcases' has them, or nil before they land."
   (mayhem-open-page (format "*mayhem: %s/%s/%s/%s/testsuite*" owner project target run)
                     #'mayhem-testsuite-mode
                     (lambda () (vui-component 'mayhem-testsuite-page
-                                              :owner owner :project project
-                                              :target target :run run))
+                                 :owner owner :project project
+                                 :target target :run run))
                     (list 'testsuite owner project target run)))
 
 (defun mayhem-testsuite-save-file (sha256 file)
@@ -251,7 +251,7 @@ TC is as `run-testcases' has it."
           (format "%d" (or (alist-get 'n_defects tc) 0))
           (mayhem-testcase-severities tc)
           (propertize (or (alist-get 'source tc) "") 'face 'mayhem-label)
-          (propertize (format "%dms" (round (* 1000 (or (alist-get 'execution_time tc) 0))))
+          (propertize (mayhem--format-ms (alist-get 'execution_time tc))
                       'face 'mayhem-label)
           (propertize (or (mayhem--format-age (alist-get 'created_at tc) now) "")
                       'face 'mayhem-label))))
@@ -300,8 +300,8 @@ RUN is a run of TARGET of PROJECT of OWNER."
   (mayhem-open-page (format "*mayhem: %s/%s/%s/%s/testcases*" owner project target run)
                     #'mayhem-testcases-mode
                     (lambda () (vui-component 'mayhem-testcases-page
-                                              :owner owner :project project
-                                              :target target :run run))
+                                 :owner owner :project project
+                                 :target target :run run))
                     (list 'testcases owner project target run)))
 
 (provide 'mayhem-testsuite)

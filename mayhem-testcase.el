@@ -62,7 +62,7 @@ RUN is a run of TARGET of PROJECT of OWNER."
                                     (propertize " into the run" 'face 'mayhem-label))))
      (mayhem-field "Errors" (format "%s at runtime" (or (alist-get 'n_valgrind_errors test) 0)))
      (when-let* ((secs (alist-get 'execution_time test)))
-       (mayhem-field "Execution" (format "%dms" (round (* 1000 secs)))))
+       (mayhem-field "Execution" (mayhem--format-ms secs)))
      (when (alist-get 'crashed test)
        (mayhem-field "Crash" (string-join
                               (delq nil (list (alist-get 'crash_type test)
@@ -118,8 +118,8 @@ RUN is a run of TARGET of PROJECT of OWNER."
                             (substring sha256 0 (min 8 (length sha256))))
                     #'mayhem-testcase-mode
                     (lambda () (vui-component 'mayhem-testcase-page
-                                              :owner owner :project project
-                                              :target target :run run :sha256 sha256))
+                                 :owner owner :project project
+                                 :target target :run run :sha256 sha256))
                     (list 'testcase owner project target run sha256)))
 
 (provide 'mayhem-testcase)
