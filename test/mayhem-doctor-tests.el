@@ -27,6 +27,15 @@
     (should (string-match-p "(workspace-targets \"acme\")"
                             (mayhem-doctor--store mayhem-sync--db "/nonexistent" 20.0)))))
 
+(ert-deftest mayhem-doctor-test-hidden-targets ()
+  (should (equal (mayhem-doctor--hidden-targets
+                  '(((owner . "acme") (slug . "p")))
+                  '(("acme" ((owner . "acme") (project_slug . "p") (slug . "a"))
+                     ((owner . "acme") (project_slug . "gone") (slug . "b"))
+                     ((owner . "acme") (project_slug . "old") (slug . "c"))
+                     ((owner . "acme") (project_slug . "old") (slug . "d")))))
+                 '(("acme/old" . 2) ("acme/gone" . 1)))))
+
 (ert-deftest mayhem-doctor-test-stale-p ()
   (let* ((dir (make-temp-file "mayhem-doctor" t))
          (source (expand-file-name "x.el" dir))

@@ -59,11 +59,30 @@
   "Return non-nil if TARGET has fields `mayhem--target-summary' drops."
   (seq-some (lambda (field) (not (memq (car-safe field) mayhem--target-fields))) target))
 
+(defun mayhem-doctor--hidden-targets (projects targets)
+  "Return the projects of TARGETS missing from PROJECTS, which search hides.
+TARGETS is an alist of each owner to its targets.  Each element is
+\(PATH . COUNT), PATH \"owner/project\" and COUNT its targets, most first."
+  (let ((listed (make-hash-table :test #'equal))
+        (hidden (make-hash-table :test #'equal))
+        result)
+    (dolist (project projects)
+      (puthash (concat (alist-get 'owner project) "/" (alist-get 'slug project)) t listed))
+    (dolist (cell targets)
+      (dolist (target (cdr cell))
+        (let ((path (concat (alist-get 'owner target) "/" (alist-get 'project_slug target))))
+          (unless (gethash path listed)
+            (puthash path (1+ (gethash path hidden 0)) hidden)))))
+    (maphash (lambda (path count) (push (cons path count) result)) hidden)
+    (sort result (lambda (a b) (or (> (cdr a) (cdr b))
+                                   (and (= (cdr a) (cdr b)) (string< (car a) (car b))))))))
+
 (defun mayhem-doctor-search-timings ()
   "Time each step `mayhem-jump' takes before its prompt opens, on the store.
 Return a plist: :workspaces :projects :targets :untrimmed :candidates
-are counts; :read-projects :read-targets :fresh :build are each
-\(VALUE SECONDS GCS GC-SECONDS), as from `mayhem-doctor--time'."
+are counts; :hidden is `mayhem-doctor--hidden-targets'; :read-projects
+:read-targets :fresh :build are each (VALUE SECONDS GCS GC-SECONDS), as
+from `mayhem-doctor--time'."
   (let* ((read-projects (mayhem-doctor--time
                          (lambda () (plist-get (mayhem-sync-read '(projects)) :data))))
          (projects (car read-projects))
@@ -85,6 +104,7 @@ are counts; :read-projects :read-targets :fresh :build are each
     (list :workspaces (length owners) :projects (length projects) :targets (length all)
           :untrimmed (seq-count #'mayhem-doctor--untrimmed-p all)
           :candidates (length (car (car build)))
+          :hidden (mayhem-doctor--hidden-targets projects targets)
           :read-projects read-projects :read-targets read-targets :fresh fresh :build build)))
 
 (defun mayhem-doctor-format-timing (label timing)
@@ -102,7 +122,15 @@ are counts; :read-projects :read-targets :fresh :build are each
    (mayhem-doctor-format-timing "Read projects" (plist-get timings :read-projects))
    (mayhem-doctor-format-timing "Read targets" (plist-get timings :read-targets))
    (mayhem-doctor-format-timing "Check freshness" (plist-get timings :fresh))
-   (mayhem-doctor-format-timing "Build candidates" (plist-get timings :build))))
+   (mayhem-doctor-format-timing "Build candidates" (plist-get timings :build))
+   (let ((hidden (plist-get timings :hidden)))
+     (concat
+      (format "\nTargets of projects missing from the project list, hidden: %d, of %d projects\n"
+              (apply #'+ (mapcar #'cdr hidden)) (length hidden))
+      (mapconcat (pcase-lambda (`(,path . ,count)) (format "  %6d  %s\n" count path))
+                 (seq-take hidden 20) "")
+      (when (> (length hidden) 20)
+        (format "  and %d more projects\n" (- (length hidden) 20)))))))
 
 (defun mayhem-doctor--file-size (file)
   "Return the size of FILE, readable, or \"none\" if there is no FILE."
