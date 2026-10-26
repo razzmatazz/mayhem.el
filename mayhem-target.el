@@ -6,16 +6,17 @@
 ;; Assisted-by: Claude:claude-opus-5-5
 
 ;; This file is not part of GNU Emacs.
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;;; Commentary:
 
 ;; A target's page, `*mayhem: owner/project/target*', its type, code
-;; or API, in its heading: its details; its
-;; latest run's crashes, coverage, hardening, repository and image; and a chart of its active defects over time, as the web
-;; app's target page has.  Below, its latest runs, and its most severe
-;; defects, with the latest run's active ones tallied by severity, a
-;; few of each; `[Show all 78 runs]' opens a page of every one.  RET on a
-;; defect or run opens its page.
+;; or API, in its heading: its details; its latest run's crashes,
+;; coverage, hardening, repository and image; and a chart of its active
+;; defects over time, as the web app's target page has.  Below, its
+;; latest runs, and its most severe defects, with the latest run's
+;; active ones tallied by severity, a few of each; `[Show all 78 runs]'
+;; opens a page of every one.  RET on a defect or run opens its page.
 
 ;;; Code:
 

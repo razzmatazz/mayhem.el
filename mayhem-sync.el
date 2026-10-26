@@ -6,6 +6,7 @@
 ;; Assisted-by: Claude:claude-opus-5-5
 
 ;; This file is not part of GNU Emacs.
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;;; Commentary:
 
@@ -30,6 +31,16 @@
 (require 'vui)
 (require 'mayhem-core)
 
+;; Emacs built without SQLite lacks these; `mayhem-sync--db' checks
+;; `sqlite-available-p' first.  `sqlite-open' gained arguments in 31.
+(declare-function sqlite-open        "ext:sqlite.c" t)
+(declare-function sqlite-execute     "ext:sqlite.c" (db query &optional values))
+(declare-function sqlite-select      "ext:sqlite.c" (db query &optional values return-type))
+(declare-function sqlite-pragma      "ext:sqlite.c" (db pragma))
+(declare-function sqlite-transaction "ext:sqlite.c" (db))
+(declare-function sqlite-commit      "ext:sqlite.c" (db))
+(declare-function sqlite-rollback    "ext:sqlite.c" (db))
+
 (defcustom mayhem-sync-directory (locate-user-emacs-file "mayhem/")
   "Directory of the sync store, one SQLite file per Mayhem host."
   :type 'directory
@@ -48,10 +59,10 @@ refetches them all the same."
   :type 'number
   :group 'mayhem)
 
-(defvar mayhem-sync-change-functions nil
+(defvar mayhem-sync-change-functions (list #'mayhem-sync--on-change)
   "Functions called with the keys of resources whose snapshot changed.")
 
-(defvar mayhem-sync-loading-functions nil
+(defvar mayhem-sync-loading-functions (list #'mayhem-sync--on-loading)
   "Functions called with a resource's key and whether it is now loading.
 Loading changes no data, so pages show it in the mode line only.")
 
@@ -275,8 +286,6 @@ FORCE fetches even data fetched just now, but not data fixed for good
       (when-let* ((root (and (buffer-live-p buf) (vui-get-instance buf))))
         (vui-rerender root)))))
 
-(add-hook 'mayhem-sync-change-functions #'mayhem-sync--on-change)
-
 (defvar-local mayhem-sync--loading-keys nil
   "Keys of the resources this buffer's page reads that are being fetched.")
 
@@ -295,8 +304,6 @@ FORCE fetches even data fetched just now, but not data fixed for good
   "Show in the mode line of each page reading KEY whether it is LOADING."
   (pcase-dolist (`(,buf . ,_) (gethash key mayhem-sync--subscriptions))
     (mayhem-sync--show-loading buf key loading)))
-
-(add-hook 'mayhem-sync-loading-functions #'mayhem-sync--on-loading)
 
 (defun mayhem-sync-header-notice (snapshot)
   "Return the header line notice for SNAPSHOT, or nil.

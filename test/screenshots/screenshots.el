@@ -30,9 +30,11 @@
   (expand-file-name "../../" (file-name-directory (or load-file-name buffer-file-name)))
   "The mayhem.el checkout.")
 
-;; The dependencies `make deps' installed, as Eask would load them.
-(let ((package-user-dir (expand-file-name (format ".eask/%s/elpa" emacs-version)
-                                          mayhem-screenshots-root)))
+;; The dependencies, as Eldev would load them: the image's, else the checkout's.
+(let ((package-user-dir (expand-file-name (format ".eldev/%s.%s/packages"
+                                                  emacs-major-version emacs-minor-version)
+                                          (or (getenv "MAYHEM_DEPS")
+                                              mayhem-screenshots-root))))
   (when (file-directory-p package-user-dir)
     (package-initialize)))
 (add-to-list 'load-path mayhem-screenshots-root)

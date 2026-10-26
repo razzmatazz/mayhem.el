@@ -6,6 +6,7 @@
 ;; Assisted-by: Claude:claude-opus-5-5
 
 ;; This file is not part of GNU Emacs.
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;;; Commentary:
 
@@ -931,7 +932,7 @@ page has no filters.")
   "The page's filter, as (LABEL . VALUE) for each facet set.")
 
 (defun mayhem-list-filtered (items)
-  "Return ITEMS that match `mayhem-list-filter'."
+  "Return ITEMS that match the variable `mayhem-list-filter'."
   (seq-filter (lambda (item)
                 (seq-every-p (pcase-lambda (`(,label . ,value))
                                (equal (funcall (alist-get label mayhem-list-facets

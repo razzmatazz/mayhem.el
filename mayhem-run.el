@@ -6,6 +6,7 @@
 ;; Assisted-by: Claude:claude-opus-5-5
 
 ;; This file is not part of GNU Emacs.
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;;; Commentary:
 
@@ -402,7 +403,7 @@ It is read-only, in `mayhem-mayhemfile-mode'; `q' goes back."
       (let ((inhibit-read-only t))
         (erase-buffer)
         (insert text))
-      (unless (eq major-mode 'mayhem-mayhemfile-mode)
+      (unless (derived-mode-p 'mayhem-mayhemfile-mode)
         (mayhem-mayhemfile-mode))
       (goto-char (point-min))
       (set-buffer-modified-p nil)

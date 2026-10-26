@@ -6,6 +6,7 @@
 ;; Assisted-by: Claude:claude-opus-5-5
 
 ;; This file is not part of GNU Emacs.
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;;; Commentary:
 

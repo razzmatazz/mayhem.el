@@ -6,6 +6,7 @@
 ;; Assisted-by: Claude:claude-opus-5-5
 
 ;; This file is not part of GNU Emacs.
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;;; Commentary:
 
@@ -90,10 +91,11 @@ success is the body's bytes, as a unibyte string."
            (bytes (if (multibyte-string-p bytes) (string-to-unibyte bytes) bytes))
            (body (decode-coding-string bytes 'utf-8))
            (json (and (not (and raw (<= 200 url-http-response-status 299)))
-                      (ignore-errors
-                        (json-parse-string body :object-type 'alist
-                                           :array-type 'list
-                                           :null-object nil :false-object nil)))))
+                      (condition-case nil
+                          (json-parse-string body :object-type 'alist
+                                             :array-type 'list
+                                             :null-object nil :false-object nil)
+                        (json-error nil)))))
       (if (<= 200 url-http-response-status 299)
           (list t (if raw bytes json))
         (list nil (format "HTTP %d: %s" url-http-response-status
@@ -286,8 +288,9 @@ Nil also when URL is on another host, or shows something no page does."
 
 (defun mayhem--host ()
   "Return the host of the configured Mayhem server, or nil without a config."
-  (ignore-errors
-    (url-host (url-generic-parse-url (alist-get 'url (mayhem--read-config))))))
+  (condition-case nil
+      (url-host (url-generic-parse-url (alist-get 'url (mayhem--read-config))))
+    (user-error nil)))
 
 (defun mayhem--fetch-me (callback)
   "Fetch the user logged in.
@@ -762,7 +765,7 @@ to the fields its page shows, or an error message."
 (defun mayhem--decode-base64 (string)
   "Return STRING, base64 of UTF-8 text, decoded and cut to `mayhem--evidence-max'.
 Return nil when STRING is nil or not base64."
-  (when-let* ((raw (and string (ignore-errors (base64-decode-string string)))))
+  (when-let* ((raw (and string (condition-case nil (base64-decode-string string) (error nil)))))
     (truncate-string-to-width (decode-coding-string raw 'utf-8) mayhem--evidence-max
                               nil nil "…")))
 

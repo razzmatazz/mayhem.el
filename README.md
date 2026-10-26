@@ -146,9 +146,17 @@ Links mayhem.el has no page for still go to the browser.
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).  `make
-ci` compiles, lints and tests in a container; `make screenshots`
-redraws [docs/screenshots](docs/screenshots/README.md) from made-up
-data.
+screenshots` redraws [docs/screenshots](docs/screenshots/README.md)
+from made-up data.
+
+`make ci` compiles, lints (`checkdoc`, `package-lint`,
+`check-declare`) and tests with [Eldev](https://github.com/emacs-eldev/eldev),
+and runs [melpazoid](https://github.com/riscy/melpazoid) as MELPA's
+reviewers do, each in an isolated Docker or Podman container: your
+user, no capabilities, no network but to fetch, the tree read-only but
+`.eldev/` and `docs/screenshots/`.  melpazoid is pinned by
+`MELPAZOID_COMMIT` in the `Makefile`; any finding fails it, and its
+reports land in `.ci/`.
 
 The API's own spec is in
 [docs/mayhem-openapi.json](docs/mayhem-openapi.json); check it first for

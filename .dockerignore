@@ -1,0 +1,4 @@
+# Only what an image build reads: the Dockerfiles copy nothing else.
+*
+!Eldev
+!mayhem.el

@@ -14,8 +14,8 @@ after the `Author:` header:
 
 ## Development
 
-`make ci` compiles, lints and tests in a container (Docker or Podman).  It
-must pass before you send changes.
+`make ci` compiles, lints and tests in a container (Docker or Podman), and
+runs MELPA's review checks.  It must pass before you send changes.
 
 ## Code conventions
 
@@ -47,7 +47,7 @@ must pass before you send changes.
 - **Loading shows in the mode line** (`mode-line-process`), never by
   clearing the buffer: stale content stays until fresh data arrives.
 - **Dependencies** are exactly the `Package-Requires` of `mayhem.el`,
-  mirrored in `Eask`.
+  from which Eldev takes them too.
 
 UI conventions (RET-able rows, buttons, windows, buffer names) are in
 [docs/user-interface-conventions.md](docs/user-interface-conventions.md).

@@ -136,6 +136,15 @@ through keys: under evil, `g` is a prefix, not `mayhem-refresh`.
 - If a call is refused as blocked, the user may not have approved it
   yet: ask, then retry.
 
+## melpazoid
+
+`make ci` runs MELPA's review checks, which rule out:
+
+- top-level `define-key`, `setq` or `add-hook`: bind keys in the map's
+  `defvar`, and make a hook's function its `defvar` default, as
+  `mayhem-sync-change-functions` does;
+- `ignore-errors`: catch only the error meant (`condition-case`).
+
 ## "Function not known to be defined" warnings
 
 Files compile in parallel, so add a `declare-function` in the caller:
@@ -145,4 +154,5 @@ Files compile in parallel, so add a `declare-function` in the caller:
 ```
 
 This is safe because every entry point lives in `mayhem.el`, which
-`require`s every file.
+`require`s every file.  `make lint` checks each with `check-declare`;
+prefix the file with `ext:` for a C primitive some builds lack.

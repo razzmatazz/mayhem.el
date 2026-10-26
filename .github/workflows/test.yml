@@ -15,6 +15,21 @@ jobs:
       - name: Build image
         run: make image
 
+      # The dependencies are named by Eldev and mayhem.el's
+      # Package-Requires header, not by the rest of mayhem.el.
+      - name: Find the dependencies
+        id: deps
+        run: echo "hash=$(grep '^;; Package-Requires:' mayhem.el | cat - Eldev | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Eldev dependencies
+        uses: actions/cache@v4
+        with:
+          path: .eldev
+          key: eldev-${{ steps.deps.outputs.hash }}
+
+      - name: Install dependencies
+        run: make deps
+
       - name: Compile
         run: make compile
 
@@ -24,3 +39,7 @@ jobs:
       - name: Run ERT tests
         run: make test
 
+      # melpazoid builds its own Emacs 31, as MELPA's reviewers do, see
+      # the Makefile.
+      - name: Run melpazoid
+        run: make melpazoid
