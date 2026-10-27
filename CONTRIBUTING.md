@@ -12,10 +12,44 @@ after the `Author:` header:
 ;; Assisted-by: Claude:claude-opus-5-5
 ```
 
-## Development
+## Building and testing
 
-`make ci` compiles, lints and tests in a container (Docker or Podman), and
-runs MELPA's review checks.  It must pass before you send changes.
+Everything runs in a Docker (or Podman) container, so you need no local
+Emacs.  Dependencies come from the `Package-Requires` header of
+`mayhem.el`, via [Eldev](https://github.com/emacs-eldev/eldev).
+
+| Command | Does |
+|---------|------|
+| `make ci` | Compile, lint and test on Emacs 31.1, then run melpazoid |
+| `make ci EMACS=29.1` | The same on another release |
+| `make ci-all` | 29.1, 30.2 and 31.1 at once, as CI does |
+| `make screenshots` | Redraw [docs/screenshots](docs/screenshots/README.md) from made-up data (see [Updating](docs/screenshots/README.md#updating)) |
+| `make bench` | Time `mayhem-jump`'s search on a large made-up cache (`BENCH_TARGETS=8000` for another size) |
+
+`make ci-all` must pass before you send changes.
+
+Lint covers `checkdoc`, `package-lint`, `check-declare` and
+`elisp-lint`, which wants every line indented as stock Emacs indents
+it, no tabs or trailing whitespace, and at most 100 columns.
+[melpazoid](https://github.com/riscy/melpazoid) runs MELPA's review
+checks; any finding fails the build, and its reports land in `.ci/`.
+It is pinned by `MELPAZOID_COMMIT` in the `Makefile`.
+
+Each container runs as your user, with no capabilities, no network
+but to fetch, and the tree read-only but `.eldev/` and
+`docs/screenshots/`.
+
+GitHub Actions runs the same on all three releases, on every push and
+pull request ([test.yml](.github/workflows/test.yml)).
+
+## The Mayhem API
+
+The API's own spec is in
+[docs/mayhem-openapi.json](docs/mayhem-openapi.json); check it first for
+endpoints and fields.  It lacks many that the web app and the CLI use:
+[docs/mayhem-api-usage.md](docs/mayhem-api-usage.md) lists the ones
+mayhem.el uses, and how to find others.  How pages cache and refetch
+is in [docs/mayhem-sync.md](docs/mayhem-sync.md).
 
 ## Code conventions
 
