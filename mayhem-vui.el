@@ -239,7 +239,109 @@ A page with two sets it in its mode, and renders the other while
   "Base mode of every mayhem.el page."
   ;; So `revert-buffer', and `gr' under Evil, refresh as `g' does.
   (setq-local revert-buffer-function #'mayhem-sync-revert-buffer)
-  (mayhem--ts-eldoc-setup))
+  (mayhem--ts-eldoc-setup)
+  (add-hook 'window-scroll-functions #'mayhem--sticky-update nil t)
+  (add-hook 'window-buffer-change-functions #'mayhem--sticky-unpin))
+
+;;;; Sticky title
+;;
+;; A page's heading, its first line, is pinned in the header line of
+;; each window scrolled past it, as Info pins its breadcrumb.  It is set
+;; as the window's `header-line-format' parameter, so each window
+;; showing the page pins or not by itself; a window still showing the
+;; heading has no header line, so the copy takes the screen line the
+;; heading leaves, and nothing below it moves.  As octocat.el does,
+;; until vui's `:sticky' regions can show no header line at the top
+;; (vui.el#305).
+
+(defcustom mayhem-sticky-title t
+  "Whether a page scrolled past its heading shows it in the header line."
+  :type 'boolean
+  :group 'mayhem)
+
+(defface mayhem-sticky-title
+  '((t :inherit header-line))
+  "Face added to a heading pinned in the header line, under its own faces.
+An underline in the colour of `mayhem-label' parts it from the text
+below; an underline set here replaces it."
+  :group 'mayhem)
+
+(defconst mayhem--sticky-format '(:eval (mayhem--sticky-header-line))
+  "The `header-line-format' parameter of a window pinning its page's heading.")
+
+(defun mayhem--sticky-title-end ()
+  "Return the end of the current page's heading: its first line."
+  (save-excursion
+    (goto-char (point-min))
+    (line-end-position)))
+
+(defun mayhem--sticky-title ()
+  "Return the current page's heading, its first line, as pinned in the header line.
+Its links are plain text, as it is not in the buffer: a click on it
+goes to the top."
+  (let ((title (string-trim-right
+                (buffer-substring (point-min) (mayhem--sticky-title-end))))
+        (map (make-sparse-keymap)))
+    (define-key map [header-line mouse-1] #'mayhem-sticky-top)
+    (remove-list-of-text-properties
+     0 (length title) '(keymap local-map mouse-face help-echo button category field action)
+     title)
+    (propertize title 'local-map map 'help-echo "mouse-1: back to the top")))
+
+(defun mayhem--sticky-header-line ()
+  "Return the header line of a window pinning its page's heading.
+The page's own header line, its notice, comes first.  It starts with a
+stretch space past any line numbers, as the header line spans the
+fringe, so the copy lines up with the line it copies, and ends with one
+to the right edge, so the face `mayhem-sticky-title' spans the window.
+Never signals: redisplay evaluates it."
+  (condition-case nil
+      (let* ((notice (and header-line-format (format-mode-line header-line-format)))
+             (line (concat (propertize " " 'display
+                                       `(space :align-to ,(line-number-display-width 'columns)))
+                           (if (string-empty-p (or notice "")) "" (concat notice "  "))
+                           (string-replace "%" "%%" (mayhem--sticky-title))
+                           (propertize " " 'display '(space :align-to right)))))
+        (add-face-text-property 0 (length line) 'mayhem-sticky-title t line)
+        ;; One colour, not each segment's own.
+        (when (memq (face-attribute 'mayhem-sticky-title :underline nil t) '(nil unspecified))
+          (let ((color (or (face-foreground 'mayhem-label nil t) 'foreground-color)))
+            (add-face-text-property 0 (length line)
+                                    (list :underline (list :color color :position t))
+                                    nil line)))
+        line)
+    (error "")))
+
+(defun mayhem-sticky-top (event)
+  "Go to the top of the page whose header line EVENT clicked."
+  (interactive "e")
+  (let ((win (posn-window (event-start event))))
+    (with-selected-window win
+      (goto-char (point-min))
+      (set-window-start win (point-min)))))
+
+(defun mayhem--sticky-update (window &optional start)
+  "Pin the page's heading in WINDOW's header line when START is past it.
+START defaults to WINDOW's start.  A header line other than the pinned
+heading, set by another package, is left alone.  The heading's is told
+by `equal': a window state saved with its parameters gives back a copy."
+  (let ((param (window-parameter window 'header-line-format)))
+    (when (or (null param) (equal param mayhem--sticky-format))
+      (with-current-buffer (window-buffer window)
+        (set-window-parameter
+         window 'header-line-format
+         (and mayhem-sticky-title
+              (derived-mode-p 'mayhem-page-mode)
+              (> (or start (window-start window)) (mayhem--sticky-title-end))
+              mayhem--sticky-format))))))
+
+(defun mayhem--sticky-unpin (frame)
+  "Pin or unpin the heading of each pinning window of FRAME, for its buffer now.
+The pin is the window's: a page opened from a scrolled one would
+otherwise keep it, above the new page's own heading."
+  (dolist (win (window-list frame 'never))
+    (when (equal (window-parameter win 'header-line-format) mayhem--sticky-format)
+      (mayhem--sticky-update win))))
 
 (defun mayhem-open-page (name mode component &optional page)
   "Show the page buffer NAME, in MODE, with COMPONENT's vnode.

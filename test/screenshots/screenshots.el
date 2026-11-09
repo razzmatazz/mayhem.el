@@ -12,7 +12,9 @@
 ;;
 ;; The page is (KIND ARGS...), opened by `mayhem-KIND-open', or
 ;; (dashboard).  :press lists buttons to press first, by their text, or
-;; rows to press RET on, by a text on them.
+;; rows to press RET on, by a text on them.  :scroll LINE starts the
+;; window at that line, as one scrolled down sees the page: its heading
+;; pinned in the header line, which the text leads with too.
 ;; :name names its files, NAME.png and NAME.txt; it defaults to KIND.  To add a shot, add a
 ;; marker; to show other data, edit fixtures.el.  A resource
 ;; fixtures.el lacks fails the run, naming it.
@@ -136,16 +138,42 @@ it is pressed."
         (push (format "No button %S on %s" label (buffer-name))
               mayhem-screenshots--problems)))))
 
-(defun mayhem-screenshots--text (buffer)
-  "Return BUFFER's text, without trailing blanks."
+(defun mayhem-screenshots--text (buffer &optional window)
+  "Return BUFFER's text, without trailing blanks.
+With WINDOW, showing BUFFER, from WINDOW's start, led by its header
+line, if it has one."
   (with-current-buffer buffer
-    (replace-regexp-in-string
-     "[ \t]+$" "" (string-trim-right (buffer-substring-no-properties (point-min) (point-max))))))
+    (let ((header (and window (window-parameter window 'header-line-format))))
+      (replace-regexp-in-string
+       "[ \t]+$" ""
+       (string-trim-right
+        (concat (if header
+                    (concat (string-trim (format-mode-line header nil window buffer)) "\n")
+                  "")
+                (buffer-substring-no-properties (if window (window-start window) (point-min))
+                                                (point-max))))))))
 
-(defun mayhem-screenshots--png (buffer file)
-  "Save BUFFER, shown whole in a frame of its own, to FILE as PNG."
-  (let* ((lines (with-current-buffer buffer
-                  (count-lines (point-min) (point-max))))
+(defun mayhem-screenshots--line-start (buffer line)
+  "Return where LINE, counted from 1, starts in BUFFER."
+  (with-current-buffer buffer
+    (save-excursion
+      (goto-char (point-min))
+      (forward-line (1- line))
+      (point))))
+
+(defun mayhem-screenshots--scroll (window start)
+  "Start WINDOW at START, as scrolling there would, so its page pins its heading."
+  (set-window-start window start)
+  (with-current-buffer (window-buffer window)
+    (run-hook-with-args 'window-scroll-functions window start)))
+
+(defun mayhem-screenshots--png (buffer file &optional start)
+  "Save BUFFER, shown in a frame of its own from START to its end, to FILE as PNG.
+START defaults to BUFFER's start; past it, the frame has a line more,
+for the pinned heading."
+  (let* ((start (or start 1))
+         (lines (with-current-buffer buffer
+                  (+ (count-lines start (point-max)) (if (> start 1) 1 0))))
          (frame (make-frame `((minibuffer . nil) (width . ,(+ mayhem-max-width 2))
                               (height . ,(1+ lines)) (left-fringe . 0) (right-fringe . 0)
                               (internal-border-width . 16) (visibility . t)))))
@@ -153,7 +181,7 @@ it is pressed."
         (progn
           (set-window-buffer (frame-root-window frame) buffer)
           (with-selected-frame frame
-            (set-window-start nil 1)
+            (mayhem-screenshots--scroll (selected-window) start)
             (redisplay t))
           (make-directory (file-name-directory file) t)
           (let ((coding-system-for-write 'binary))
@@ -165,11 +193,12 @@ it is pressed."
 `format-time-string' reads it in C, past the advice."
   (string-to-number (format-time-string "%s.%N")))
 
-(defun mayhem-screenshots-shoot (page &optional press png)
+(defun mayhem-screenshots-shoot (page &optional press png scroll)
   "Return the text of PAGE, (KIND ARGS...), after pressing PRESS.
 KIND names the command `mayhem-KIND-open' that opens it; (dashboard)
 is `mayhem'.  PRESS is a list of the labels of buttons to press, in
-turn.  With PNG, a file name, save the page there too, when graphic."
+turn.  With PNG, a file name, save the page there too, when graphic.
+With SCROLL, a line number, show the page from that line on."
   (save-window-excursion
    (let ((start (mayhem-screenshots--clock)))
     (if (equal page '(dashboard))
@@ -180,12 +209,15 @@ turn.  With PNG, a file name, save the page there too, when graphic."
       (dolist (label press)
         (mayhem-screenshots--press buffer label)
         (mayhem-screenshots--settle buffer))
-      (when (and png (display-graphic-p))
-        (mayhem-screenshots--png buffer png))
+      (let ((from (and scroll (mayhem-screenshots--line-start buffer scroll))))
+        (when from
+          (mayhem-screenshots--scroll (selected-window) from))
+        (when (and png (display-graphic-p))
+          (mayhem-screenshots--png buffer png from)))
       ;; So a slow page shows.
       (princ (format "%5.2fs %S\n" (- (mayhem-screenshots--clock) start) page)
              #'external-debugging-output)
-      (prog1 (mayhem-screenshots--text buffer)
+      (prog1 (mayhem-screenshots--text buffer (and scroll (selected-window)))
         (kill-buffer buffer))))))
 
 (defconst mayhem-screenshots--marker "^<!-- screenshot: \\(.*\\) -->\n"
@@ -234,7 +266,8 @@ resource with no fixture: its shot shows the error."
                              (mayhem-screenshots-shoot
                               (car spec) (plist-get (cdr spec) :press)
                               (expand-file-name (concat name ".png")
-                                                mayhem-screenshots-directory)))))
+                                                mayhem-screenshots-directory)
+                              (plist-get (cdr spec) :scroll)))))
                 (when (member name names)
                   (push (format "Two shots are named %s; give one a :name" name)
                         mayhem-screenshots--problems))

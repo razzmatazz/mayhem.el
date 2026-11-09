@@ -148,6 +148,7 @@ SQLite file per Mayhem host; deleting it is safe.  How it works is in
 |---|---|---|
 | `mayhem-open-urls` | `t` | open web app links in mayhem.el |
 | `mayhem-max-width` | `100` | most columns a page takes; nil for the whole window |
+| `mayhem-sticky-title` | `t` | keep a page's heading in the header line once scrolled past it |
 | `mayhem-run-refresh-interval` | `10` | seconds between refreshes of a running run |
 | `mayhem-sync-fresh-for` | `30` | seconds a page's data is reused before refetching |
 | `mayhem-sync-settled-for` | a day | the same, for data that no longer changes |

@@ -82,6 +82,15 @@ A code run: how it went, its coverage, defects and tests.
 [As text](run.txt)
 <!-- /screenshot -->
 
+Scrolled down, the page's heading stays in view, pinned in the header
+line (`mayhem-sticky-title`):
+
+<!-- screenshot: (run "acme" "libpng" "fuzz-png" 42) :name "run-scrolled" :scroll 21 -->
+![run-scrolled](run-scrolled.png)
+
+[As text](run-scrolled.txt)
+<!-- /screenshot -->
+
 Its event log, from `Log`:
 
 <!-- screenshot: (run-log "acme" "libpng" "fuzz-png" 42) -->
