@@ -152,10 +152,34 @@ other mayhem page it showed is left."
   "Open the page shown in the web app, in a browser.
 A browser even when `mayhem-open-urls' would bring the link back here."
   (interactive)
-  (unless mayhem-page
-    (user-error "Mayhem: No web page for this buffer"))
-  (browse-url-with-browser-kind
-   'external (mayhem--page-url (alist-get 'url (mayhem--read-config)) mayhem-page)))
+  (browse-url-with-browser-kind 'external (mayhem--web-url (mayhem--this-page))))
+
+(defun mayhem--this-page ()
+  "Return this buffer's page, or signal a `user-error' if it has none."
+  (or mayhem-page (user-error "Mayhem: No web page for this buffer")))
+
+(defun mayhem--web-url (page)
+  "Return the link to PAGE in the configured web app."
+  (mayhem--page-url (alist-get 'url (mayhem--read-config)) page))
+
+(defun mayhem--short-ref (page)
+  "Return PAGE's path below the web app's host, if it has a short one, else nil.
+A workspace, project, target or run has, such as o/p/t/7 for a run."
+  (pcase page
+    (`(,(or 'workspace 'project 'target 'run) . ,args)
+     (mapconcat (lambda (arg) (format "%s" arg)) args "/"))))
+
+(defun mayhem-copy-url (&optional short)
+  "Copy the web app link to the page shown to the kill ring.
+With prefix argument SHORT, copy its short reference instead, such as
+o/p/t/7 for a run, where it has one (see `mayhem--short-ref')."
+  (interactive "P")
+  (let* ((page (mayhem--this-page))
+         (url (mayhem--web-url page))
+         (text (or (and short (mayhem--short-ref page)) url)))
+    (kill-new text)
+    (message "Mayhem: Copied %s%s" text
+             (if (and short (equal text url)) " (it has no short reference)" ""))))
 
 (defvar-local mayhem-views nil
   "The names of the page's two views, as (DEFAULT OTHER); nil if it has one.

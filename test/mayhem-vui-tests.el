@@ -138,5 +138,19 @@
   ;; A short one shows whole, with no button.
   (should (equal (mayhem-vui-tests--text (mayhem-block "Out" "a\nb\n" t)) "\nOut\na\nb\n")))
 
+(ert-deftest mayhem-vui-test-copy-url ()
+  (cl-letf (((symbol-function 'mayhem--read-config) (lambda () '((url . "https://h/")))))
+    (with-temp-buffer
+      (let (kill-ring)
+        (setq mayhem-page '(run "o" "p" "t" 7))
+        (mayhem-copy-url)
+        (mayhem-copy-url t)
+        (setq mayhem-page '(defect "o" "p" "t" 12 nil))
+        (mayhem-copy-url t)
+        (should (equal kill-ring '("https://h/o/p/t/-/defects/12" "o/p/t/7"
+                                   "https://h/o/p/t/7"))))
+      (setq mayhem-page nil)
+      (should-error (mayhem-copy-url) :type 'user-error))))
+
 (provide 'mayhem-vui-tests)
 ;;; mayhem-vui-tests.el ends here

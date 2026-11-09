@@ -45,11 +45,12 @@ Then clone this repository and load it:
 (keymap-global-set "C-c m" #'mayhem-jump)
 ```
 
-| Command | Opens |
-|---------|-------|
-| `M-x mayhem` | Your dashboard |
-| `M-x mayhem-jump` | A workspace, project or target, by name |
-| `M-x mayhem-browse-url` | A pasted web app link |
+| Command | Action |
+|---------|--------|
+| `M-x mayhem` | Open your dashboard |
+| `M-x mayhem-jump` | Open a workspace, project or target, by name |
+| `M-x mayhem-browse-url` | Open a pasted web app link |
+| `M-x mayhem-copy-url` | Copy the page's web app link (`C-u`: its short reference, as `o/p/t/7`) |
 
 [Using mayhem.el](docs/usage.md) walks through every page.
 
