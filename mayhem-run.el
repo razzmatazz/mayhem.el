@@ -32,9 +32,6 @@
 (require 'mayhem-defect)
 (require 'mayhem-mayhemfile)
 
-(declare-function mayhem-testcase-open "mayhem-testcase" (owner project target run sha256))
-(declare-function mayhem-testsuite-open "mayhem-testsuite" (owner project target run))
-(declare-function mayhem-testcases-open "mayhem-testsuite" (owner project target run))
 
 (defcustom mayhem-run-refresh-interval 10
   "Seconds between refetches of a run's page while the run is going."
@@ -184,8 +181,7 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
     (vui-fragment
      (mayhem-field "All" (mayhem-page-link (format "%d test case%s" all (if (= all 1) "" "s"))
                                            "RET: open every test case"
-                                           (lambda ()
-                                             (mayhem-testcases-open owner project target number))))
+                                           (list 'testcases owner project target number)))
      (mayhem-field "Regression" (format "%d of %d passing" (- regression failing) regression))
      (mayhem-field "New" (format "%d discovered" (- all regression)))
      (when starting
@@ -211,8 +207,7 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER."
                      (mayhem-page-link (format "%d test case%s" optimized
                                                (if (= optimized 1) "" "s"))
                                        "RET: open test suite"
-                                       (lambda ()
-                                         (mayhem-testsuite-open owner project target number)))
+                                       (list 'testsuite owner project target number))
                      " in the suite")))))
 
 (defun mayhem-run--chart (run progress now)
@@ -320,8 +315,7 @@ RUN is run NUMBER of TARGET of PROJECT of OWNER.  It lists the first
                      '(2 4 5) mayhem-run--test-header)))
          (mayhem-table lines failing
                        (lambda (test)
-                         (mayhem-testcase-open owner project target number
-                                               (alist-get 'sha256 test)))
+                         (list 'testcase owner project target number (alist-get 'sha256 test)))
                        "RET: open test case" mayhem-run--tests-shown "failing tests"))))))
 
 (vui-defcomponent mayhem-run-tests (owner project target number run)
@@ -629,7 +623,7 @@ which say why a run failed."
     (mayhem-field "Log"
                   (mayhem-page-link (format "%d event%s" n (if (= n 1) "" "s"))
                                     "RET: open the run's log"
-                                    (lambda () (mayhem-run-log-open owner project target number)))
+                                    (list 'run-log owner project target number))
                   (when (> errors 0)
                     (propertize (format "  %d error%s" errors (if (= errors 1) "" "s"))
                                 'face 'error))

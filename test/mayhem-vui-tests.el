@@ -152,5 +152,22 @@
       (setq mayhem-page nil)
       (should-error (mayhem-copy-url) :type 'user-error))))
 
+(ert-deftest mayhem-vui-test-copy-url-at-point ()
+  ;; A row or link's page or URL, else the buffer's page.
+  (cl-letf (((symbol-function 'mayhem--read-config) (lambda () '((url . "https://h/")))))
+    (with-temp-buffer
+      (vui-render (vui-fragment (mayhem-row "run\n" '(run "o" "p" "t" 7) "RET: x")
+                                (mayhem-link "ci" "https://ci.example/1")
+                                (vui-text "\nplain")))
+      (setq mayhem-page '(target "o" "p" "t"))
+      (let (kill-ring)
+        (dolist (pos '(1 5 9))
+          (goto-char pos)
+          (mayhem-copy-url))
+        (goto-char 1)
+        (mayhem-copy-url t)
+        (should (equal kill-ring '("o/p/t/7" "https://h/o/p/t" "https://ci.example/1"
+                                   "https://h/o/p/t/7")))))))
+
 (provide 'mayhem-vui-tests)
 ;;; mayhem-vui-tests.el ends here

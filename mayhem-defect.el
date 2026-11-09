@@ -24,7 +24,6 @@
 (require 'mayhem-sync)
 (require 'mayhem-vui)
 
-(declare-function mayhem-testcase-open "mayhem-testcase" (owner project target run sha256))
 
 (defconst mayhem-defect--fill-width 72
   "Column at which a defect's description is wrapped, at most.")
@@ -59,9 +58,7 @@ The defect is of TARGET of PROJECT of OWNER."
                       ", test case "
                       (mayhem-page-link (substring sha 0 (min 8 (length sha)))
                                         "RET: open test case"
-                                        (lambda ()
-                                          (mayhem-testcase-open owner project target run
-                                                                sha)))))))))
+                                        (list 'testcase owner project target run sha))))))))
 
 (defconst mayhem-defect--testcases-shown 5
   "Most test cases a defect's page lists until asked for all of them.")
@@ -89,8 +86,8 @@ The defect is of TARGET of PROJECT of OWNER.  It lists the first
          (mayhem-notice "No test cases")
        (mayhem-table lines testcases
                      (lambda (test)
-                       (mayhem-testcase-open owner project target (alist-get 'run_number test)
-                                             (alist-get 'sha256 test)))
+                       (list 'testcase owner project target (alist-get 'run_number test)
+                             (alist-get 'sha256 test)))
                      "RET: open test case" mayhem-defect--testcases-shown "test cases"))
      (when (> count (length testcases))
        (mayhem-notice (format "%d more in the web app" (- count (length testcases))))))))

@@ -31,8 +31,6 @@
 (define-derived-mode mayhem-target-mode mayhem-page-mode "Mayhem Target"
   "Major mode for a Mayhem target's page.")
 
-(declare-function mayhem-run-open "mayhem-run" (owner project target number))
-(declare-function mayhem-testsuite-open "mayhem-testsuite" (owner project target run))
 (declare-function mayhem-defect-open "mayhem-defect" (owner project target number &optional run))
 
 (defconst mayhem-target--run-header
@@ -76,7 +74,7 @@ TARGET is of PROJECT of OWNER; RUNS are the ones shown, newest first."
    (mayhem-columns (mapcar (lambda (run) (mayhem-target--run-cells run now)) runs)
                    '(2 3 5 6 7) mayhem-target--run-header)
    runs
-   (lambda (run) (mayhem-run-open owner project target (alist-get 'run_number run)))
+   (lambda (run) (list 'run owner project target (alist-get 'run_number run)))
    "RET: open run"))
 
 (defun mayhem-target--show-more (shown count what on-click)
@@ -131,10 +129,8 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
           (mayhem-field "Test suite"
                         (mayhem-page-link (format "%d test case%s" suite (if (= suite 1) "" "s"))
                                           "RET: open test suite"
-                                          (lambda ()
-                                            (mayhem-testsuite-open owner project target
-                                                                   (alist-get 'run_number
-                                                                              latest))))))))
+                                          (list 'testsuite owner project target
+                                                (alist-get 'run_number latest)))))))
      (mayhem-trend-view owner project target t)
      (vui-newline)
      (if runs

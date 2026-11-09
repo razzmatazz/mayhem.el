@@ -50,7 +50,7 @@ Then clone this repository and load it:
 | `M-x mayhem` | Open your dashboard |
 | `M-x mayhem-jump` | Open a workspace, project or target, by name |
 | `M-x mayhem-browse-url` | Open a pasted web app link |
-| `M-x mayhem-copy-url` | Copy the page's web app link (`C-u`: its short reference, as `o/p/t/7`) |
+| `M-x mayhem-copy-url` | Copy the link of the thing at point, or of the page (`C-u`: its short reference, as `o/p/t/7`) |
 
 [Using mayhem.el](docs/usage.md) walks through every page.
 
@@ -63,7 +63,7 @@ Then clone this repository and load it:
 | `q` | Back to the previous page |
 | `g` / `gr` | Refresh the page |
 | `C-c C-j` | Jump to a workspace, project or target |
-| `C-c C-o` | Open this page in the web app |
+| `C-c C-o` | Open the thing at point, or this page, in the web app |
 | `C-c C-v` | Another view, say a test case's bytes as hex or text |
 | `F` | Filter a list of every defect, run or test case |
 | `w` | Save the test case at point to a file |

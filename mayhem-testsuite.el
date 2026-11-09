@@ -137,7 +137,7 @@ case's first bytes, cut to the page."
                        (mayhem-row
                         (list (string-pad line width) "  "
                               (mayhem-fit (nth 2 file) bytes-width))
-                        (lambda () (mayhem-testcase-open owner project target run (car file)))
+                        (list 'testcase owner project target run (car file))
                         "RET: open test case"))
                      files (cdr lines)))))
 
@@ -160,8 +160,7 @@ as `run-testcases' has them, or nil before they land."
                         (propertize " of " 'face 'mayhem-label)
                         (mayhem-page-link (format "%d in the run" (length testcases))
                                           "RET: open every test case of the run"
-                                          (lambda ()
-                                            (mayhem-testcases-open owner project target run))))))
+                                          (list 'testcases owner project target run)))))
        (mayhem-field "Size" (file-size-human-readable
                              (apply #'+ (mapcar #'cadr files))))
        (when-let* ((sources (mayhem-testsuite--sources files info)))
@@ -264,7 +263,7 @@ RUN is a run of TARGET of PROJECT of OWNER."
      (mayhem-columns (mapcar (lambda (tc) (mayhem-testcases--cells tc now)) testcases)
                      '(3 6) mayhem-testcases--header)
      testcases
-     (lambda (tc) (mayhem-testcase-open owner project target run (alist-get 'sha256 tc)))
+     (lambda (tc) (list 'testcase owner project target run (alist-get 'sha256 tc)))
      "RET: open test case")))
 
 (vui-defcomponent mayhem-testcases-page (owner project target run)

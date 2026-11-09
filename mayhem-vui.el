@@ -149,18 +149,26 @@ other mayhem page it showed is left."
   "The page this buffer shows, as (KIND ARGS...); see `mayhem--url-page'.")
 
 (defun mayhem-browse ()
-  "Open the page shown in the web app, in a browser.
-A browser even when `mayhem-open-urls' would bring the link back here."
+  "Open what point is on, or else the page shown, in a browser.
+That is a row or link's page in the web app, or a link out such as a
+commit's; see `mayhem--link-at-point'.  A browser even when
+`mayhem-open-urls' would bring the link back here."
   (interactive)
-  (browse-url-with-browser-kind 'external (mayhem--web-url (mayhem--this-page))))
+  (browse-url-with-browser-kind 'external (mayhem--web-url (mayhem--link-at-point))))
 
-(defun mayhem--this-page ()
-  "Return this buffer's page, or signal a `user-error' if it has none."
-  (or mayhem-page (user-error "Mayhem: No web page for this buffer")))
+(defun mayhem--link-at-point ()
+  "Return what point links to, else the buffer's page, or signal a `user-error'.
+That is a page, as (KIND ARGS...), or a URL: a row's or link's
+`mayhem-links-to' property (see `mayhem-row'), else `mayhem-page'."
+  (or (get-text-property (point) 'mayhem-links-to)
+      mayhem-page
+      (user-error "Mayhem: Nothing here has a web page")))
 
-(defun mayhem--web-url (page)
-  "Return the link to PAGE in the configured web app."
-  (mayhem--page-url (alist-get 'url (mayhem--read-config)) page))
+(defun mayhem--web-url (link)
+  "Return LINK, a page or a URL, as a URL; a page's is in the configured web app."
+  (if (stringp link)
+      link
+    (mayhem--page-url (alist-get 'url (mayhem--read-config)) link)))
 
 (defun mayhem--short-ref (page)
   "Return PAGE's path below the web app's host, if it has a short one, else nil.
@@ -170,13 +178,14 @@ A workspace, project, target or run has, such as o/p/t/7 for a run."
      (mapconcat (lambda (arg) (format "%s" arg)) args "/"))))
 
 (defun mayhem-copy-url (&optional short)
-  "Copy the web app link to the page shown to the kill ring.
-With prefix argument SHORT, copy its short reference instead, such as
-o/p/t/7 for a run, where it has one (see `mayhem--short-ref')."
+  "Copy the link of what point is on, or else of the page shown, to the kill ring.
+That is as `mayhem-browse' opens.  With prefix argument SHORT, copy
+its short reference instead, such as o/p/t/7 for a run, where it has
+one (see `mayhem--short-ref')."
   (interactive "P")
-  (let* ((page (mayhem--this-page))
-         (url (mayhem--web-url page))
-         (text (or (and short (mayhem--short-ref page)) url)))
+  (let* ((link (mayhem--link-at-point))
+         (url (mayhem--web-url link))
+         (text (or (and short (mayhem--short-ref link)) url)))
     (kill-new text)
     (message "Mayhem: Copied %s%s" text
              (if (and short (equal text url)) " (it has no short reference)" ""))))
@@ -200,12 +209,8 @@ A page with two sets it in its mode, and renders the other while
   (message "Mayhem: Showing %s" (nth (if mayhem-other-view 1 0) mayhem-views)))
 
 (declare-function mayhem "mayhem" ())
+(declare-function mayhem-open "mayhem" (page))
 (declare-function mayhem-jump "mayhem" ())
-(declare-function mayhem-workspace-open "mayhem-workspace" (owner))
-(declare-function mayhem-project-open "mayhem-project" (owner project))
-(declare-function mayhem-target-open "mayhem-target" (owner project target))
-(declare-function mayhem-defect-open "mayhem-defect" (owner project target number &optional run))
-(declare-function mayhem-run-open "mayhem-run" (owner project target number))
 
 (defvar-keymap mayhem-page-mode-map
   :parent vui-mode-map
@@ -303,23 +308,39 @@ each string shown, and returns it to show."
                     (remq nil parts)))
      (vui-text (funcall decorate "\n")))))
 
+(defun mayhem--visit-function (on-visit)
+  "Return ON-VISIT, as `mayhem-row' takes it, as a function of no arguments."
+  (cond ((functionp on-visit) on-visit)
+        ((stringp on-visit) (lambda () (browse-url on-visit)))
+        (t (lambda () (mayhem-open on-visit)))))
+
+(defun mayhem--links-to (on-visit)
+  "Return what ON-VISIT, as `mayhem-row' takes it, links to, or nil."
+  (unless (functionp on-visit) on-visit))
+
 (defun mayhem-row (line on-visit help-echo)
   "Return a RET-able row showing LINE.
 LINE is a propertized string ending in newline, or the parts of a
-`mayhem-line'.  ON-VISIT is a function of no arguments that RET calls.
-HELP-ECHO reads \"RET: <imperative>\", such as \"RET: open project\"."
-  (let ((map (make-sparse-keymap))
-        (decorate (lambda (s)
-                    (let ((s (propertize s 'mouse-face 'highlight)) (pos 0))
-                      ;; Off the newline, else Emacs sees the rows as one
-                      ;; stretch of `highlight' and lights them all on hover.
-                      (while (string-match "\n" s pos)
-                        (remove-text-properties (match-beginning 0) (match-end 0)
-                                                '(mouse-face nil) s)
-                        (setq pos (match-end 0)))
-                      (mayhem--default-help-echo s help-echo)))))
-    (define-key map (kbd "RET") (lambda () (interactive) (funcall on-visit)))
-    (define-key map [mouse-1] (lambda () (interactive) (funcall on-visit)))
+`mayhem-line'.  ON-VISIT is what RET does: a page, as (KIND ARGS...),
+to open, a URL to follow, or a function of no arguments to call.  A
+page or URL is also what `mayhem-browse' and `mayhem-copy-url' take
+on the row, from its `mayhem-links-to' property.  HELP-ECHO reads
+\"RET: <imperative>\", such as \"RET: open project\"."
+  (let* ((map (make-sparse-keymap))
+         (visit (mayhem--visit-function on-visit))
+         (links-to (mayhem--links-to on-visit))
+         (decorate (lambda (s)
+                     (let ((s (propertize s 'mouse-face 'highlight 'mayhem-links-to links-to))
+                           (pos 0))
+                       ;; Off the newline, else Emacs sees the rows as one
+                       ;; stretch of `highlight' and lights them all on hover.
+                       (while (string-match "\n" s pos)
+                         (remove-text-properties (match-beginning 0) (match-end 0)
+                                                 '(mouse-face nil) s)
+                         (setq pos (match-end 0)))
+                       (mayhem--default-help-echo s help-echo)))))
+    (define-key map (kbd "RET") (lambda () (interactive) (funcall visit)))
+    (define-key map [mouse-1] (lambda () (interactive) (funcall visit)))
     (vui-region :keymap map
                 (if (stringp line)
                     (vui-text (funcall decorate line))
@@ -350,22 +371,22 @@ reads as known to be empty."
 
 (defun mayhem-page-link (text help-echo on-visit &optional face)
   "Return a vnode showing TEXT, in FACE or `link', that RET follows.
-Following it calls ON-VISIT, of no arguments.  HELP-ECHO reads
-\"RET: <imperative>\", such as \"RET: open run\"."
-  (vui-button text :no-decoration t :face (or face 'link)
-              :help-echo help-echo :on-click on-visit))
+ON-VISIT is what following it does, as for `mayhem-row'.  HELP-ECHO
+reads \"RET: <imperative>\", such as \"RET: open run\"."
+  (vui-button (propertize text 'mayhem-links-to (mayhem--links-to on-visit))
+    :no-decoration t :face (or face 'link)
+    :help-echo help-echo :on-click (mayhem--visit-function on-visit)))
 
 (defun mayhem-link (text url)
   "Return a vnode showing TEXT that RET opens URL with, through `browse-url'."
-  (mayhem-page-link text (concat "RET: open " url) (lambda () (browse-url url))))
+  (mayhem-page-link text (concat "RET: open " url) url))
 
 (defun mayhem-run-link (owner project target number &optional text face)
   "Return TEXT, or \"run #NUMBER\", linking to run NUMBER.
 NUMBER is a run of TARGET of PROJECT of OWNER.  FACE is as for
 `mayhem-page-link'."
   (mayhem-page-link (or text (format "run #%s" number)) "RET: open run"
-                    (lambda () (mayhem-run-open owner project target number))
-                    face))
+                    (list 'run owner project target number) face))
 
 (defconst mayhem-heading-part-width 24
   "Most columns a name takes in a page's heading; longer ones are cut.")
@@ -406,12 +427,9 @@ is cut in the middle, whole on hover."
          (parts (seq-filter
                  #'car
                  (list (list (or (mayhem--host) "Mayhem") nil nil)
-                       (list owner "RET: open workspace"
-                             (lambda () (mayhem-workspace-open owner)))
-                       (list project "RET: open project"
-                             (lambda () (mayhem-project-open owner project)))
-                       (list target "RET: open target"
-                             (lambda () (mayhem-target-open owner project target))))))
+                       (list owner "RET: open workspace" (list 'workspace owner))
+                       (list project "RET: open project" (list 'project owner project))
+                       (list target "RET: open target" (list 'target owner project target)))))
          (last (car (last parts))))
     (apply #'vui-fragment
            (append
@@ -643,8 +661,7 @@ commit link to their pages.  Nil when SCM names none of them."
   "Return IMAGE linking to its page when it has one, else plain.
 DIGEST, if known, goes in its `help-echo'."
   (if-let* ((url (mayhem--image-url image)))
-      (mayhem-page-link image (concat "RET: open " url (and digest (concat "\n" digest)))
-                        (lambda () (browse-url url)))
+      (mayhem-page-link image (concat "RET: open " url (and digest (concat "\n" digest))) url)
     (propertize image 'help-echo digest)))
 
 (defun mayhem-image-field (run)
@@ -791,11 +808,12 @@ is drawn as a heading, the others as buttons."
 
 (defun mayhem-table (lines items open help-echo &optional limit what)
   "Return LINES, from `mayhem-columns' with a header, as a table of ITEMS.
-The header is plain; each line after it is a RET-able row calling OPEN
-with its item.  HELP-ECHO is the rows'.  With LIMIT, the rows past it
-are a `mayhem-unfold-list''s, its button naming WHAT."
+The header is plain; each line after it is a RET-able row of the item,
+OPEN of which returns what RET on it does, as `mayhem-row' takes it:
+most often its page.  HELP-ECHO is the rows'.  With LIMIT, the rows
+past it are a `mayhem-unfold-list''s, its button naming WHAT."
   (let ((rows (seq-mapn (lambda (item line)
-                          (mayhem-row (concat line "\n") (lambda () (funcall open item)) help-echo))
+                          (mayhem-row (concat line "\n") (funcall open item) help-echo))
                         items (cdr lines))))
     (vui-fragment
      (vui-text (concat (car lines) "\n"))
@@ -900,7 +918,7 @@ asking, as `mayhem-table' has it."
                    '(2) mayhem-defect-header)
    defects
    (lambda (defect)
-     (mayhem-defect-open owner project target (alist-get 'defect_number defect) run))
+     (list 'defect owner project target (alist-get 'defect_number defect) run))
    "RET: open defect" limit "defects"))
 
 (defun mayhem-defect-ids (defects)

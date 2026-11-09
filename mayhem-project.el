@@ -22,7 +22,6 @@
 (require 'mayhem-sync)
 (require 'mayhem-vui)
 
-(declare-function mayhem-target-open "mayhem-target" (owner project target))
 
 (mayhem-sync-define-resource project (owner project)
   :fetch (lambda (done) (mayhem--fetch-project owner project done)))
@@ -63,8 +62,7 @@ then by severity, padded to COUNTS-WIDTH."
                         "  "
                         (propertize (or (mayhem--format-age (alist-get 'created_at run) now) "")
                                     'face 'mayhem-label))))))
-    (mayhem-row line (lambda () (mayhem-target-open owner project slug))
-                "RET: open target")))
+    (mayhem-row line (list 'target owner project slug) "RET: open target")))
 
 (defun mayhem-project--defects (info kind)
   "Return INFO's defects of KIND, \"active\" or \"fixed\", as \"9  3 high, 6 medium\"."

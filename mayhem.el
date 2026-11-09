@@ -65,7 +65,7 @@
                                        (propertize (format " %3d project%s" count
                                                            (if (= count 1) "" "s"))
                                                    'face 'mayhem-label))
-                                 (lambda () (mayhem-workspace-open owner))
+                                 (list 'workspace owner)
                                  "RET: open workspace"))
                    workspaces))))
 
@@ -128,6 +128,8 @@ It is plain text, to paste into a bug report; `g' runs it again."
     (`(workspace . ,args) (apply #'mayhem-workspace-open args))
     (`(project . ,args) (apply #'mayhem-project-open args))
     (`(target . ,args) (apply #'mayhem-target-open args))
+    (`(target-runs . ,args) (apply #'mayhem-target-runs-open args))
+    (`(target-defects . ,args) (apply #'mayhem-target-defects-open args))
     (`(run . ,args) (apply #'mayhem-run-open args))
     (`(run-log . ,args) (apply #'mayhem-run-log-open args))
     (`(defect . ,args) (apply #'mayhem-defect-open args))
