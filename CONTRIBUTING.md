@@ -24,6 +24,7 @@ Emacs.  Dependencies come from the `Package-Requires` header of
 | `make ci EMACS=29.1` | The same on another release |
 | `make ci-all` | 29.1, 30.2 and 31.1 at once, as CI does |
 | `make screenshots` | Redraw [docs/screenshots](docs/screenshots/README.md) from made-up data (see [Updating](docs/screenshots/README.md#updating)) |
+| `make update-architecture-md` | Redraw [docs/architecture.md](docs/architecture.md)'s module graph from the `require`s, as `make lint` checks |
 | `make bench` | Time `mayhem-jump`'s search on a large made-up cache (`BENCH_TARGETS=8000` for another size) |
 
 `make ci-all` must pass before you send changes.

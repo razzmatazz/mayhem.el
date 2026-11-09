@@ -2,7 +2,9 @@
 
 Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) (code
 conventions), [docs/user-interface-conventions.md](docs/user-interface-conventions.md)
-and [docs/using-vui.md](docs/using-vui.md) first.
+and [docs/using-vui.md](docs/using-vui.md) first.  See
+[docs/architecture.md](docs/architecture.md) for the modules and their
+dependency graph.
 
 ## Rules
 
@@ -17,6 +19,13 @@ and [docs/using-vui.md](docs/using-vui.md) first.
   tell a newcomer what a feature does, why, and how to use or extend it.
 - **Never edit source files through Emacs** (`eval-elisp`, buffer edits);
   the buffer and the file drift apart.  Use file tools or the shell.
+
+## Architecture
+
+- **After adding, removing or changing a `require`, run `make
+  update-architecture-md`**, which redraws the module graph from the
+  `require`s; `make lint` fails while it is out of date.
+- When a module is added, merged or moves layer, update "Layers" by hand.
 
 ## Screenshots
 
