@@ -9,6 +9,12 @@ ifeq ($(DOCKER),)
   $(error Neither docker nor podman found on PATH)
 endif
 
+# Podman's multi-stage builds ask the registry about a base image it has,
+# for some 30s a stage (containers/podman#27779), so one stored is used as
+# is.  BASE_IMAGE is the Dockerfiles' FROM.
+BASE_IMAGE := ubuntu:26.04
+NO_PULL = $(if $(findstring podman,$(DOCKER)),$(shell $(DOCKER) image inspect $(BASE_IMAGE) >/dev/null 2>&1 && echo --pull=never))
+
 # Every container runs as the host's user, with no capabilities nor
 # privileges to gain, and no network but where it fetches something.  The
 # tree is read-only but for what a check writes: .eldev, where Eldev keeps
@@ -25,7 +31,8 @@ RUN_ONLINE = $(DOCKER) run $(ISOLATED) -e CI \
 RUN = $(DOCKER) run $(ISOLATED) --network=none \
   -v "$(CURDIR)":/src:ro -v "$(CURDIR)/.eldev":/src/.eldev -w /src $(IMAGE)
 
-.PHONY: ci ci-all image deps clean compile lint test melpazoid screenshots bench
+.PHONY: ci ci-all image deps clean compile lint test melpazoid melpazoid-prepare \
+  melpazoid-image melpazoid-check screenshots bench
 
 # What ci runs at once.  ci-all runs melpazoid, which is the same on every
 # release, with 31.1's only.
@@ -33,15 +40,32 @@ CI_CHECKS ?= compile lint test melpazoid
 
 # Build the image and install the dependencies, then run compile, lint,
 # test and melpazoid in parallel, as they are independent.  Each can also
-# run on its own once ci has run.
+# run on its own once ci has run.  Each check's output goes to
+# .ci/EMACS-CHECK.log, as run at once they would interleave; the end is a
+# line per check, a failed one's findings under it: its log but for the
+# tests passed, the files compiled clean and the linter's progress.
+CI_NOISE := ^ *passed |: no warnings$$|^Indenting region|^Running linter|^$$
 ci: clean
 	$(MAKE) image
 	$(MAKE) deps
-	$(MAKE) -j4 $(CI_CHECKS)
+	@mkdir -p .ci
+	@for c in $(CI_CHECKS); do \
+	  ( $(MAKE) -s $$c > .ci/$(EMACS)-$$c.log 2>&1; echo $$? > .ci/$(EMACS)-$$c.status ) & \
+	done; \
+	wait; \
+	echo "== Emacs $(EMACS)"; \
+	failed=0; \
+	for c in $(CI_CHECKS); do \
+	  if [ "$$(cat .ci/$(EMACS)-$$c.status)" = 0 ]; then echo "$$c: ok"; \
+	  else failed=1; echo "$$c: failed, see .ci/$(EMACS)-$$c.log"; \
+	    grep -vE "$(CI_NOISE)" .ci/$(EMACS)-$$c.log | grep -v "^make" | sed "s/^/    /"; fi; \
+	done; \
+	exit $$failed
 
 # ci on every release CI runs, at once: each release has its own image,
 # and its own .eldev/VERSION.  Each run's output goes to .ci/VERSION.log;
-# a failed one's end is printed.
+# a failed one's checks are printed, as ci ends, or its end when it
+# failed before them, as when the image or the dependencies did.
 ci-all:
 	@mkdir -p .ci
 	@for v in $(EMACS_ALL); do \
@@ -54,12 +78,14 @@ ci-all:
 	for v in $(EMACS_ALL); do \
 	  if [ "$$(cat .ci/$$v.status)" = 0 ]; then echo "Emacs $$v: ok"; \
 	  else failed=1; echo "Emacs $$v: failed, see .ci/$$v.log"; \
-	    grep -E "\.el:[0-9]+: |FAILED|Error|melpazoid: " .ci/$$v.log | tail -20; fi; \
+	    if grep -q "^== Emacs" .ci/$$v.log; then \
+	      sed -n "/^== Emacs/,\$$p" .ci/$$v.log | sed 1d | grep -v "^make" | sed "s/^/  /"; \
+	    else tail -20 .ci/$$v.log; fi; fi; \
 	done; \
 	exit $$failed
 
 image:
-	$(DOCKER) build --build-arg EMACS=$(EMACS) -t $(IMAGE) .
+	$(DOCKER) build $(NO_PULL) --build-arg EMACS=$(EMACS) -t $(IMAGE) .
 
 # The linter too, as lint and test run at once, against the same .eldev.
 deps:
@@ -98,13 +124,20 @@ test:
 # so a function only some builds have shows.  It is built and run with
 # melpazoid's Makefile, from a copy of its checkout with the files the
 # first step wrote, and fails on a "━" section too.  Its make, under ci's
-# -j, would warn of the jobserver.
+# -j, would warn of the jobserver.  The steps are also targets of their
+# own: CI builds melpazoid's image between them, with its layers cached,
+# as building it compiles Emacs.  The layer installing the dependencies
+# is cached on _requirements.el, which names only `(vui "0.1")': the vui
+# that deps installed is added to it, so a new vui builds it again.
 MELPAZOID_COMMIT := fcf5d883c6ced74ba16963d48c9e9e0bf0a1ff37
 MELPAZOID_RECIPE := (mayhem :fetcher github :repo "razzmatazz/mayhem.el")
 MELPAZOID_MAKE = MAKEFLAGS= MFLAGS= $(MAKE) -s -C .ci/melpazoid-build DOCKER="$(DOCKER)" \
-  DOCKER_OUTPUT=--quiet PACKAGE_MAIN="$$(cat .ci/melpazoid-out/package-main)"
+  DOCKER_OUTPUT="$(NO_PULL)" PACKAGE_MAIN="$$(cat .ci/melpazoid-out/package-main)"
 
 melpazoid:
+	@$(MAKE) -s melpazoid-prepare && $(MAKE) -s melpazoid-image && $(MAKE) -s melpazoid-check
+
+melpazoid-prepare:
 	@mkdir -p .ci/melpazoid
 	@$(DOCKER) run $(ISOLATED) -v "$(CURDIR)/.ci/melpazoid:/melpazoid" -w /melpazoid $(IMAGE) \
 	  sh -c 'if [ ! -d .git ]; then git clone -q https://github.com/riscy/melpazoid .; fi; \
@@ -123,9 +156,21 @@ melpazoid:
 	  status=$$?; cat .ci/melpazoid-report.txt; \
 	  if [ $$status != 0 ] || grep -q '^━ ' .ci/melpazoid-report.txt; then \
 	    echo "melpazoid: found something, see above"; exit 1; fi
-	@cp -a .ci/melpazoid .ci/melpazoid-build && cp -a .ci/melpazoid-out/. .ci/melpazoid-build
-	@$(MELPAZOID_MAKE) image > /dev/null
-	@$(MELPAZOID_MAKE) test > .ci/melpazoid-test.txt 2>&1; cat .ci/melpazoid-test.txt; \
+	@cp -a .ci/melpazoid .ci/melpazoid-build && rm -rf .ci/melpazoid-build/pkg && \
+	  cp -a .ci/melpazoid-out/. .ci/melpazoid-build
+	@echo ";; $$(ls .eldev/$(EMACS)/packages | grep '^vui-' | sort | tail -1)" \
+	  >> .ci/melpazoid-build/_requirements.el
+
+# Its build's log shows only when the build fails.  Its FROM is
+# BASE_IMAGE too, so Podman skips the registry for it, as for ours.
+melpazoid-image:
+	@$(MELPAZOID_MAKE) image > .ci/melpazoid-image.txt 2>&1 || \
+	  { cat .ci/melpazoid-image.txt; echo "melpazoid: its image failed to build, see above"; exit 1; }
+
+# As melpazoid's `make test', without building its image again.
+melpazoid-check:
+	@$(DOCKER) run --rm --network=none --cap-drop all --security-opt=no-new-privileges \
+	  --pids-limit=50 melpazoid > .ci/melpazoid-test.txt 2>&1; cat .ci/melpazoid-test.txt; \
 	  if grep -q '^━ ' .ci/melpazoid-test.txt; then \
 	    echo "melpazoid: found something, see above"; exit 1; fi
 
@@ -146,7 +191,7 @@ SCREENSHOTS_IMAGE := mayhem-el-screenshots
 # under a virtual X display.  After compile, which checks the driver: a GUI
 # Emacs failing to load it would wait for good.
 screenshots: compile
-	$(DOCKER) build -q -t $(SCREENSHOTS_IMAGE) -f test/screenshots/Dockerfile .
+	$(DOCKER) build $(NO_PULL) -q -t $(SCREENSHOTS_IMAGE) -f test/screenshots/Dockerfile .
 	$(DOCKER) run $(ISOLATED) --init --network=none -v "$(CURDIR)":/src:ro \
 	  -v "$(CURDIR)/docs/screenshots":/src/docs/screenshots -w /src $(SCREENSHOTS_IMAGE) \
 	  test/screenshots/run.sh
