@@ -78,14 +78,10 @@ recreated rather than read in the old shape.")
   "The open store, or nil before first use.")
 
 (defun mayhem-sync--create (db)
-  "Create the tables of DB, dropping older ones, and return DB.
-Signal a `user-error' when DB was made by a newer mayhem.el."
+  "Create the tables of DB, dropping those of another schema, and return DB."
   (let ((version (caar (sqlite-select db "PRAGMA user_version"))))
-    (cond
-     ((> version mayhem-sync--schema)
-      (user-error "Mayhem: The sync store is from a newer mayhem.el; restart Emacs"))
-     ((< version mayhem-sync--schema)
-      ;; A cache, so there are no migrations.
+    ;; A cache, so there are no migrations.
+    (unless (= version mayhem-sync--schema)
       (sqlite-execute db "DROP TABLE IF EXISTS resource")
       (sqlite-execute db "DROP TABLE IF EXISTS file")
       (sqlite-execute db "CREATE TABLE resource (
@@ -97,7 +93,7 @@ Signal a `user-error' when DB was made by a newer mayhem.el."
       (condition-case err
           (sqlite-execute db "VACUUM")
         (error (message "Mayhem: Compacting the sync store failed: %s"
-                        (error-message-string err))))))
+                        (error-message-string err)))))
     db))
 
 (defun mayhem-sync--host ()

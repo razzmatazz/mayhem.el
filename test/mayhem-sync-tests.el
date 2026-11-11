@@ -84,10 +84,13 @@
       (should (equal (mayhem-sync-file "s1") bytes))
       (should-not (mayhem-sync-file "s2")))))
 
-(ert-deftest mayhem-sync-test-newer-schema-signals ()
-  (let ((db (sqlite-open nil)))
+(ert-deftest mayhem-sync-test-newer-schema-recreates ()
+  (let ((db (mayhem-sync--create (sqlite-open nil))))
+    (mayhem-sync--write db "k" '(data) 10.0)
     (sqlite-execute db (format "PRAGMA user_version = %d" (1+ mayhem-sync--schema)))
-    (should-error (mayhem-sync--create db) :type 'user-error)))
+    (mayhem-sync--create db)
+    (should (equal (caar (sqlite-select db "PRAGMA user_version")) mayhem-sync--schema))
+    (should (equal (caar (sqlite-select db "SELECT count(*) FROM resource")) 0))))
 
 (ert-deftest mayhem-sync-test-older-schema-compacts ()
   (let ((db (mayhem-sync--create (sqlite-open nil))))

@@ -212,11 +212,10 @@ CREATE TABLE file (
 The schema version is SQLite's `user_version`, compared with
 `mayhem-sync--schema` on opening:
 
-- **Older**: the tables are dropped and created afresh, then `VACUUM`
-  gives the dropped data's pages back to the disk.  The store is a
-  cache, so there are no migrations.
-- **Newer**: a `user-error`, since an older mayhem.el must not read data
-  shaped for a newer one; restart Emacs.
+- **Older or newer**: the tables are dropped and created afresh, then
+  `VACUUM` gives the dropped data's pages back to the disk.  The store
+  is a cache, so there are no migrations, and an older mayhem.el must
+  not read data shaped for a newer one.
 
 **Bump `mayhem-sync--schema` whenever a resource's data changes shape**
 (a field added, renamed or restructured), not only when the table
