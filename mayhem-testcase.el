@@ -134,7 +134,7 @@ RUN is a run of TARGET of PROJECT of OWNER."
   :render
   (let ((snapshot (mayhem-sync-use-resource
                    (list 'testcase owner project target run sha256))))
-    (vui-fragment
+    (mayhem-sticky-page
      (mayhem-target-page-heading
       (list (mayhem-run-link owner project target run nil '(link mayhem-section-heading))
             (format ", test case %s" (substring sha256 0 (min 8 (length sha256)))))

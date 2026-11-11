@@ -166,7 +166,7 @@ SOURCE is \"api\" or \"code\"."
   "The page of defect NUMBER of TARGET of PROJECT of OWNER, as RUN saw it."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'defect owner project target number run))))
-    (vui-fragment
+    (mayhem-sticky-page
      (mayhem-target-page-heading (format "defect !%s" number) owner project target)
      (vui-newline)
      (mayhem-snapshot-view snapshot "defect" (mayhem-defect--skeleton)

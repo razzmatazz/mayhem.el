@@ -75,7 +75,7 @@ Its heading is the Mayhem server's host."
   :render
   (let* ((snapshot (mayhem-sync-use-resource '(projects)))
          (workspaces (mayhem--workspaces (plist-get snapshot :data))))
-    (vui-fragment
+    (mayhem-sticky-page
      (mayhem-page-heading "dashboard" nil nil nil)
      (mayhem-snapshot-view (mayhem-sync-use-resource '(me)) "user"
                            (mayhem-skeleton '(("User        " 30)))

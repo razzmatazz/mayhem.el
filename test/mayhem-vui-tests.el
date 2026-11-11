@@ -169,63 +169,39 @@
         (should (equal kill-ring '("o/p/t/7" "https://h/o/p/t" "https://ci.example/1"
                                    "https://h/o/p/t/7")))))))
 
-(ert-deftest mayhem-vui-test-sticky-title ()
-  ;; The pinned heading is the first line, as plain text.
-  (with-temp-buffer
-    (insert (propertize "h/o/p" 'mouse-face 'highlight 'keymap 'x 'face 'bold)
-            "  target  \nbody\n")
-    (let ((title (mayhem--sticky-title)))
-      (should (equal title "h/o/p  target"))
-      (should (eq (get-text-property 0 'face title) 'bold))
-      (should-not (get-text-property 0 'mouse-face title))
-      (should-not (get-text-property 0 'keymap title)))))
+(ert-deftest mayhem-vui-test-heading-text ()
+  ;; A heading's text, links and all, with its faces.
+  (cl-letf (((symbol-function 'mayhem--host) (lambda () "h")))
+    (let ((text (mayhem--vnode-text
+                 (mayhem-target-page-heading
+                  (list (mayhem-run-link "o" "p" "t" 3 nil 'bold) ", tests") "o" "p" "t"))))
+      (should (equal text "h/o/p/t  target, run #3, tests\n"))
+      (should (eq (get-text-property 0 'face text) 'mayhem-section-heading))
+      (should (eq (get-text-property (string-search "run" text) 'face text) 'bold)))))
 
-(ert-deftest mayhem-vui-test-sticky-update ()
-  ;; A window pins the heading once scrolled past it, and leaves another
-  ;; header line be.
-  (with-temp-buffer
-    (mayhem-page-mode)
-    (let ((inhibit-read-only t))
-      (insert "Title\nline 2\nline 3\n"))
-    (let ((win (selected-window))
-          (old (window-buffer (selected-window))))
-      (unwind-protect
-          (progn
-            (set-window-buffer win (current-buffer))
-            (mayhem--sticky-update win 1)
-            (should-not (window-parameter win 'header-line-format))
-            (mayhem--sticky-update win 7)
-            (should (eq (window-parameter win 'header-line-format) mayhem--sticky-format))
-            (let ((mayhem-sticky-title nil))
-              (mayhem--sticky-update win 7))
-            (should-not (window-parameter win 'header-line-format))
-            (set-window-parameter win 'header-line-format "other")
-            (mayhem--sticky-update win 7)
-            (should (equal (window-parameter win 'header-line-format) "other"))
-            ;; A restored window state holds a copy of the pin.
-            (set-window-parameter win 'header-line-format (copy-tree mayhem--sticky-format))
-            (mayhem--sticky-update win 1)
-            (should-not (window-parameter win 'header-line-format)))
-        (set-window-parameter win 'header-line-format nil)
-        (set-window-buffer win old)))))
+(ert-deftest mayhem-vui-test-pin-line ()
+  ;; The pinned line follows the notice, is plain text, and a click on
+  ;; it goes to the top.
+  (let ((line (mayhem--pin-line
+               (concat (propertize "h/o" 'mouse-face 'highlight 'keymap 'x) "  target\n")
+               "Offline")))
+    (should (string-prefix-p "Offline  h/o  target " line))
+    (should-not (get-text-property 9 'mouse-face line))
+    (should-not (get-text-property 9 'keymap line))
+    (should (eq (lookup-key (get-text-property 9 'local-map line) [header-line mouse-1])
+                #'mayhem-sticky-top))
+    (should (equal (get-text-property (1- (length line)) 'display line)
+                   '(space :align-to right))))
+  (should (string-prefix-p "h/o " (mayhem--pin-line "h/o" ""))))
 
-(ert-deftest mayhem-vui-test-sticky-unpin-on-new-page ()
-  ;; A page opened in a window pinning another page's heading is not pinned.
-  (let ((win (selected-window))
-        (old (window-buffer (selected-window)))
-        (page (generate-new-buffer " *page*")))
-    (unwind-protect
-        (with-current-buffer page
-          (mayhem-page-mode)
-          (let ((inhibit-read-only t))
-            (insert "Title\nline 2\n"))
-          (set-window-buffer win page)
-          (set-window-parameter win 'header-line-format (copy-tree mayhem--sticky-format))
-          (mayhem--sticky-unpin (window-frame win))
-          (should-not (window-parameter win 'header-line-format)))
-      (set-window-parameter win 'header-line-format nil)
-      (set-window-buffer win old)
-      (kill-buffer page))))
+(ert-deftest mayhem-vui-test-page-pins ()
+  ;; A page is a sticky region pinning its heading, unless
+  ;; `mayhem-sticky-title' is nil.
+  (with-temp-buffer
+    (let ((heading (vui-text "Title\n")))
+      (should (string-prefix-p "Title " (vui-vnode-region-sticky (mayhem-sticky-page heading))))
+      (let ((mayhem-sticky-title nil))
+        (should-not (vui-vnode-region-sticky (mayhem-sticky-page heading)))))))
 
 (provide 'mayhem-vui-tests)
 ;;; mayhem-vui-tests.el ends here

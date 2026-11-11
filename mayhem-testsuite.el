@@ -185,7 +185,7 @@ as `run-testcases' has them, or nil before they land."
   :render
   (let ((suite (mayhem-sync-use-resource (list 'testsuite owner project target run)))
         (testcases (mayhem-sync-use-resource (list 'run-testcases owner project target run))))
-    (vui-fragment
+    (mayhem-sticky-page
      (mayhem-target-page-heading
       (list (mayhem-run-link owner project target run nil '(link mayhem-section-heading))
             ", test suite")
@@ -270,7 +270,7 @@ RUN is a run of TARGET of PROJECT of OWNER."
   "The page of every test case of RUN of TARGET of PROJECT of OWNER, newest first."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'run-testcases owner project target run))))
-    (vui-fragment
+    (mayhem-sticky-page
      (mayhem-target-page-heading
       (list (mayhem-run-link owner project target run nil '(link mayhem-section-heading))
             ", test cases")

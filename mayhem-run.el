@@ -667,7 +667,7 @@ hook."
   "The page of run NUMBER of TARGET of PROJECT of OWNER."
   :render
   (let ((snapshot (mayhem-run--use-run owner project target number)))
-    (vui-fragment
+    (mayhem-sticky-page
      (mayhem-target-page-heading (format "run #%s" number) owner project target)
      (vui-newline)
      (mayhem-snapshot-view snapshot "run" (mayhem-run--skeleton)
@@ -690,7 +690,7 @@ hook."
   "The page of the event log of run NUMBER of TARGET of PROJECT of OWNER."
   :render
   (let ((snapshot (mayhem-run--use-run owner project target number)))
-    (vui-fragment
+    (mayhem-sticky-page
      (mayhem-target-page-heading
       (list (mayhem-run-link owner project target number nil '(link mayhem-section-heading))
             ", log")

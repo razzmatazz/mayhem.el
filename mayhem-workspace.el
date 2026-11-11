@@ -87,7 +87,7 @@ workspace's, every page of them.")
   (let ((snapshot (mayhem-sync-combine
                    (mayhem-sync-use-resource '(projects))
                    (mayhem-sync-use-resource (list 'workspace-targets owner)))))
-    (vui-fragment
+    (mayhem-sticky-page
      (mayhem-page-heading "workspace" owner nil nil)
      (vui-newline)
      (mayhem-snapshot-view snapshot "workspace" (mayhem-workspace--skeleton)

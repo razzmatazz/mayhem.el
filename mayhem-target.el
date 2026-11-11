@@ -163,7 +163,7 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
   "The page of TARGET of PROJECT of OWNER."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'target owner project target))))
-    (vui-fragment
+    (mayhem-sticky-page
      (mayhem-page-heading (mayhem-target-kind
                            (alist-get 'type (alist-get 'target (plist-get snapshot :data))))
                           owner project target)
@@ -206,7 +206,7 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
   "The page of every defect of TARGET of PROJECT of OWNER, most severe first."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'target-defects owner project target))))
-    (vui-fragment
+    (mayhem-sticky-page
      (mayhem-target-page-heading "defects" owner project target)
      (vui-newline)
      (mayhem-snapshot-view
@@ -229,7 +229,7 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
   "The page of every run of TARGET of PROJECT of OWNER, newest first."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'target-runs owner project target))))
-    (vui-fragment
+    (mayhem-sticky-page
      (mayhem-target-page-heading "runs" owner project target)
      (vui-newline)
      (mayhem-snapshot-view

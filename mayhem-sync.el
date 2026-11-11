@@ -330,18 +330,25 @@ There is one when a refresh failed over shown data: the data stays."
 
 (defun mayhem-sync--show-notice (buf key snapshot)
   "Record in BUF the SNAPSHOT of KEY on its page, nil for none.
-Put in its header line the notice of the first snapshot that has one."
+Put in its header line the notice of the first snapshot that has one.
+A new one renders the page again, for the pinned heading it leads (see
+`mayhem-sticky-page'): later, as this runs in an effect of a render."
   (when (buffer-live-p buf)
     (with-current-buffer buf
       (setq mayhem-sync--snapshots
             (if snapshot
                 (cons (cons key snapshot) (assoc-delete-all key mayhem-sync--snapshots))
               (assoc-delete-all key mayhem-sync--snapshots)))
-      (setq header-line-format
-            (when-let* ((notice (seq-some (lambda (entry)
-                                            (mayhem-sync-header-notice (cdr entry)))
-                                          mayhem-sync--snapshots)))
-              (propertize notice 'face 'warning))))))
+      (let ((line (when-let* ((notice (seq-some (lambda (entry)
+                                                  (mayhem-sync-header-notice (cdr entry)))
+                                                mayhem-sync--snapshots)))
+                    (propertize notice 'face 'warning))))
+        (unless (equal-including-properties line header-line-format)
+          (setq header-line-format line)
+          (run-at-time 0 nil (lambda ()
+                               (when-let* (((buffer-live-p buf))
+                                           (instance (vui-get-instance buf)))
+                                 (vui-rerender instance)))))))))
 
 (defun mayhem-sync-use-resource (spec)
   "Return the snapshot of SPEC, as `mayhem-sync-read' gives it.

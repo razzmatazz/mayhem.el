@@ -68,6 +68,10 @@ users expect.
   `host/o/p/t  code target, run #7, test suite`.
 - A long name in a heading is cut in the middle (`mayhem-cut-middle`),
   whole on hover.
+- **The heading stays in view.**  Once a window is scrolled past it, a
+  copy shows in that window's header line, after any notice.  Wrap the
+  whole page in `mayhem-sticky-page` with its heading: vui's `:sticky`
+  region pins only while the window is inside it.
   A field naming another page (`Run  run #7`) links to it, with
   `mayhem-page-link` or `mayhem-run-link`.
 - **Say what a number is.**  Runs and defects are both numbered from 1
