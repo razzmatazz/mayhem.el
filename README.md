@@ -72,6 +72,7 @@ Then clone this repository and load it:
 
 - [Using mayhem.el](docs/usage.md): every page, options and caching, in detail
 - [Screenshots](docs/screenshots/README.md): every page, pictured
+- [CHANGELOG.md](CHANGELOG.md): what changed in each release
 - [Architecture](docs/architecture.md): the modules and how they depend on each other
 - [CONTRIBUTING.md](CONTRIBUTING.md): code conventions, building, testing, CI
 

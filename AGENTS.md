@@ -9,6 +9,10 @@ dependency graph.
 ## Rules
 
 - **Never commit or modify git state.**  The developer handles commits.
+- **Add a line to `CHANGELOG.md` for what a user would notice**
+  (features, key bindings, fixed bugs, supported Emacs or vui
+  versions): at the top of `## [Unreleased]`, worded for users, in the
+  style of the lines there.
 - **Run `make ci-all` after every change** and fix all errors and warnings:
   it runs `make ci` on every Emacs release CI tests, at once.
   Run it once at a time: parallel runs clobber each other's output.
