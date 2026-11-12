@@ -71,7 +71,10 @@ users expect.
 - **The heading stays in view.**  Once a window is scrolled past it, a
   copy shows in that window's header line, after any notice.  Wrap the
   whole page in `mayhem-sticky-page` with its heading: vui's `:sticky`
-  region pins only while the window is inside it.
+  region pins only while the window is inside it.  The copy keeps to
+  the page's width.
+- **So does the page's status**, leading the copy: pass it as
+  `:status`, such as a run's status or a defect's state and severity.
   A field naming another page (`Run  run #7`) links to it, with
   `mayhem-page-link` or `mayhem-run-link`.
 - **Say what a number is.**  Runs and defects are both numbered from 1

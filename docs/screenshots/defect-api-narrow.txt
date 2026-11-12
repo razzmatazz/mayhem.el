@@ -1,0 +1,22 @@
+open  high  app.mayhem.security/acme/billing-api/api  targe…
+Description
+The server answered 500 to a request it should have refused.
+
+Request
+PUT /invoices/1042 HTTP/1.1
+Host: localhost:8080
+Content-Type: application/json
+
+{"amount": "1e309", "currency": "USD"}
+
+Response
+HTTP/1.1 500 Internal Server Error
+Content-Type: application/json
+
+{"error": "internal", "detail": "OverflowError: cannot convert float infinity to integer"}
+
+Stack trace
+app/invoices.py:88 in update_invoice
+    amount = int(float(body["amount"]) * 100)
+app/server.py:41 in dispatch
+    return handler(request)

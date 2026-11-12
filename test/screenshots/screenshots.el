@@ -14,7 +14,8 @@
 ;; (dashboard).  :press lists buttons to press first, by their text, or
 ;; rows to press RET on, by a text on them.  :scroll LINE starts the
 ;; window at that line, as one scrolled down sees the page: its heading
-;; pinned in the header line, which the text leads with too.
+;; pinned in the header line, which the text leads with too.  :width
+;; COLUMNS narrows the page.
 ;; :name names its files, NAME.png and NAME.txt; it defaults to KIND.  To add a shot, add a
 ;; marker; to show other data, edit fixtures.el.  A resource
 ;; fixtures.el lacks fails the run, naming it.
@@ -193,14 +194,16 @@ for the pinned heading."
 `format-time-string' reads it in C, past the advice."
   (string-to-number (format-time-string "%s.%N")))
 
-(defun mayhem-screenshots-shoot (page &optional press png scroll)
+(defun mayhem-screenshots-shoot (page &optional press png scroll width)
   "Return the text of PAGE, (KIND ARGS...), after pressing PRESS.
 KIND names the command `mayhem-KIND-open' that opens it; (dashboard)
 is `mayhem'.  PRESS is a list of the labels of buttons to press, in
 turn.  With PNG, a file name, save the page there too, when graphic.
-With SCROLL, a line number, show the page from that line on."
+With SCROLL, a line number, show the page from that line on, and with
+WIDTH, WIDTH columns wide."
   (save-window-excursion
-   (let ((start (mayhem-screenshots--clock)))
+   (let ((start (mayhem-screenshots--clock))
+         (mayhem-max-width (or width mayhem-max-width)))
     (if (equal page '(dashboard))
         (mayhem)
       (apply (intern (format "mayhem-%s-open" (car page))) (cdr page)))
@@ -267,7 +270,8 @@ resource with no fixture: its shot shows the error."
                               (car spec) (plist-get (cdr spec) :press)
                               (expand-file-name (concat name ".png")
                                                 mayhem-screenshots-directory)
-                              (plist-get (cdr spec) :scroll)))))
+                              (plist-get (cdr spec) :scroll)
+                              (plist-get (cdr spec) :width)))))
                 (when (member name names)
                   (push (format "Two shots are named %s; give one a :name" name)
                         mayhem-screenshots--problems))

@@ -167,6 +167,8 @@ LATEST is the latest run of TARGET of PROJECT of OWNER."
      (mayhem-page-heading (mayhem-target-kind
                            (alist-get 'type (alist-get 'target (plist-get snapshot :data))))
                           owner project target)
+     :status (when-let* ((latest (alist-get 'latest (plist-get snapshot :data))))
+               (mayhem-run-status latest))
      (vui-newline)
      (mayhem-snapshot-view snapshot "target" (mayhem-target--skeleton)
                            (lambda (data) (mayhem-target--render owner project target data))))))

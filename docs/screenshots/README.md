@@ -48,6 +48,14 @@ its latest runs and most severe defects.
 [As text](target.txt)
 <!-- /screenshot -->
 
+Scrolled down, after its latest run's status:
+
+<!-- screenshot: (target "acme" "libpng" "fuzz-png") :name "target-scrolled" :scroll 20 -->
+![target-scrolled](target-scrolled.png)
+
+[As text](target-scrolled.txt)
+<!-- /screenshot -->
+
 With `▶ Trend` unfolded:
 
 <!-- screenshot: (target "acme" "libpng" "fuzz-png") :name "target-trend" :press ("▶ Trend") -->
@@ -83,7 +91,7 @@ A code run: how it went, its coverage, defects and tests.
 <!-- /screenshot -->
 
 Scrolled down, the page's heading stays in view, pinned in the header
-line (`mayhem-sticky-title`):
+line (`mayhem-sticky-title`), after the run's status:
 
 <!-- screenshot: (run "acme" "libpng" "fuzz-png" 42) :name "run-scrolled" :scroll 21 -->
 ![run-scrolled](run-scrolled.png)
@@ -97,6 +105,14 @@ Its event log, from `Log`:
 ![run-log](run-log.png)
 
 [As text](run-log.txt)
+<!-- /screenshot -->
+
+Scrolled down:
+
+<!-- screenshot: (run-log "acme" "libpng" "fuzz-png" 42) :name "run-log-scrolled" :scroll 8 -->
+![run-log-scrolled](run-log-scrolled.png)
+
+[As text](run-log-scrolled.txt)
 <!-- /screenshot -->
 
 An API run has its endpoints instead:
@@ -118,6 +134,14 @@ and its backtrace.
 [As text](defect-code.txt)
 <!-- /screenshot -->
 
+Scrolled down, after its state and severity:
+
+<!-- screenshot: (defect "acme" "libpng" "fuzz-png" 12 42) :name "defect-code-scrolled" :scroll 19 -->
+![defect-code-scrolled](defect-code-scrolled.png)
+
+[As text](defect-code-scrolled.txt)
+<!-- /screenshot -->
+
 An API defect, with the HTTP exchange that showed it and the server's
 stack trace:
 
@@ -125,6 +149,14 @@ stack trace:
 ![defect-api](defect-api.png)
 
 [As text](defect-api.txt)
+<!-- /screenshot -->
+
+Narrow, the pinned heading cut to fit:
+
+<!-- screenshot: (defect "acme" "billing-api" "api" 3 7) :name "defect-api-narrow" :scroll 14 :width 60 -->
+![defect-api-narrow](defect-api-narrow.png)
+
+[As text](defect-api-narrow.txt)
 <!-- /screenshot -->
 
 ## Test cases

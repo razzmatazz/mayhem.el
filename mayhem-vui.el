@@ -280,15 +280,22 @@ Only text and buttons, in fragments, as `mayhem-page-heading' builds."
          (propertize (vui-vnode-button-label vnode) 'face (vui-vnode-button-face vnode)))
         (t "")))
 
-(defun mayhem--pin-line (pin notice)
-  "Return the header line pinning PIN, after NOTICE when non-nil.
-It ends with a stretch space to the right edge, so the face
-`mayhem-sticky-title' spans the window.  Links in PIN are plain text,
-as it is not in the buffer: a click on it goes to the top."
-  (let ((line (concat (if (and notice (not (string-empty-p notice))) (concat notice "  ") "")
-                      (string-trim-right pin)
-                      (propertize " " 'display '(space :align-to right))))
-        (map (make-sparse-keymap)))
+(defun mayhem--pin-line (pin notice width &optional status)
+  "Return the header line pinning PIN, after NOTICE and STATUS when non-nil.
+It is cut to WIDTH columns, PIN first, and filled to that column, so the
+face `mayhem-sticky-title' spans the page.  Links in PIN are plain
+text, as it is not in the buffer: a click on it goes to the top."
+  (let* ((lead (mapconcat (lambda (s) (concat s "  "))
+                          (seq-remove (lambda (s) (or (null s) (string-empty-p s)))
+                                      (list notice status))
+                          ""))
+         (line (concat (truncate-string-to-width
+                        (concat lead (truncate-string-to-width
+                                      (string-trim-right pin)
+                                      (max 0 (- width (string-width lead))) nil nil "…"))
+                        width nil nil "…")
+                       (propertize " " 'display `(space :align-to ,width))))
+         (map (make-sparse-keymap)))
     (define-key map [header-line mouse-1] #'mayhem-sticky-top)
     (remove-list-of-text-properties
      0 (length line) '(keymap local-map mouse-face help-echo button category field action)
@@ -304,14 +311,18 @@ as it is not in the buffer: a click on it goes to the top."
 (defun mayhem-sticky-page (heading &rest children)
   "Return a page: HEADING, from `mayhem-page-heading', then CHILDREN.
 Each window scrolled past HEADING shows a copy of it in the header
-line, after the page's notice (see `mayhem-sync--show-notice').  The
-copy goes once the window starts past the page, so this must be the
-whole page."
-  (vui-region :sticky (and mayhem-sticky-title
-                           (mayhem--pin-line (mayhem--vnode-text heading)
-                                             (and (stringp header-line-format)
-                                                  header-line-format)))
-              heading children))
+line, after the page's notice (see `mayhem-sync--show-notice') and the
+STATUS of :status STATUS, if CHILDREN start with it.  The copy goes once
+the window starts past the page, so this must be the whole page."
+  (let ((status (when (eq (car children) :status)
+                  (prog1 (cadr children) (setq children (cddr children))))))
+    (vui-region :sticky (and mayhem-sticky-title
+                             (mayhem--pin-line (mayhem--vnode-text heading)
+                                               (and (stringp header-line-format)
+                                                    header-line-format)
+                                               (mayhem-page-width)
+                                               status))
+                heading children)))
 
 (defun mayhem-sticky-top (event)
   "Go to the top of the page whose header line EVENT clicked."

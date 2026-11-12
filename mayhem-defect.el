@@ -162,12 +162,21 @@ SOURCE is \"api\" or \"code\"."
    (mayhem-notice "TEST CASE  RUN  TIME" 'mayhem-label)
    (mayhem-skeleton '((24) (24) (24)))))
 
+(defun mayhem-defect--pin-status (defect)
+  "Return the status DEFECT's page pins: its state and severity."
+  (let ((level (alist-get 'severity_level defect)))
+    (string-join (delq nil (list (alist-get 'state defect)
+                                 (and level (propertize level 'face
+                                                        (mayhem-defect-severity-face level)))))
+                 "  ")))
+
 (vui-defcomponent mayhem-defect-page (owner project target number run)
   "The page of defect NUMBER of TARGET of PROJECT of OWNER, as RUN saw it."
   :render
   (let ((snapshot (mayhem-sync-use-resource (list 'defect owner project target number run))))
     (mayhem-sticky-page
      (mayhem-target-page-heading (format "defect !%s" number) owner project target)
+     :status (mayhem-defect--pin-status (alist-get 'defect (plist-get snapshot :data)))
      (vui-newline)
      (mayhem-snapshot-view snapshot "defect" (mayhem-defect--skeleton)
                            (lambda (data)

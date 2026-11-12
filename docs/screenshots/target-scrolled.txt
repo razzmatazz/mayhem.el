@@ -1,0 +1,11 @@
+completed  app.mayhem.security/acme/libpng/fuzz-png  code target
+Defects (6)
+2 high, 2 medium active in the latest run #42
+
+ID   SEVERITY     TITLE                              CWE      STATE  SEEN     AGE
+!12  high    8.2  Out-of-bounds Read                 CWE-125         run #42  2 hours ago
+!13  high    7.5  Integer Overflow or Wraparound     CWE-190         run #42  2 hours ago
+!10  medium  6.5  Uncontrolled Resource Consumption  CWE-400         run #42  2 hours ago
+!9   medium  5.9  NULL Pointer Dereference           CWE-476         run #42  2 hours ago
+!8   medium  5.5  Divide By Zero                     CWE-369  fixed  run #37  8 days ago
+[Show all 6 defects]

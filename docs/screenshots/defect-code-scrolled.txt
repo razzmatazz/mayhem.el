@@ -1,0 +1,19 @@
+open  high  app.mayhem.security/acme/libpng/fuzz-png  code target, defect !12
+TEST CASE  RUN  TIME
+5f2c9e0a   #42  41ms
+0e53d920   #40  37ms
+27d35c5c   #38  52ms
+
+Reproduce
+MAYHEM_TRIAGING=1 /out/png_read_fuzzer /testsuite/5f2c9e0a
+
+Backtrace
+#0  png_read_IDAT_data
+      pngrutil.c:4182:17
+#1  png_read_row
+      pngread.c:528:4
+#2  png_read_image
+      pngread.c:742:10
+#3  LLVMFuzzerTestOneInput
+      contrib/oss-fuzz/libpng_read_fuzzer.cc:182:3
+#4  fuzzer::Fuzzer::ExecuteCallback

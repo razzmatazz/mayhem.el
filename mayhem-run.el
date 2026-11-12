@@ -663,12 +663,20 @@ hook."
           (lambda () (cancel-timer timer)))))
     snapshot))
 
+(defun mayhem-run--pin-status (snapshot)
+  "Return the status a run's page pins, SNAPSHOT its data's, or nil."
+  (when-let* ((run (alist-get 'run (plist-get snapshot :data))))
+    (concat (mayhem-run-status run)
+            (when (alist-get 'has_critical_errors run)
+              (propertize "  critical errors" 'face 'error)))))
+
 (vui-defcomponent mayhem-run-page (owner project target number)
   "The page of run NUMBER of TARGET of PROJECT of OWNER."
   :render
   (let ((snapshot (mayhem-run--use-run owner project target number)))
     (mayhem-sticky-page
      (mayhem-target-page-heading (format "run #%s" number) owner project target)
+     :status (mayhem-run--pin-status snapshot)
      (vui-newline)
      (mayhem-snapshot-view snapshot "run" (mayhem-run--skeleton)
                            (lambda (data)
@@ -695,6 +703,7 @@ hook."
       (list (mayhem-run-link owner project target number nil '(link mayhem-section-heading))
             ", log")
       owner project target)
+     :status (mayhem-run--pin-status snapshot)
      (vui-newline)
      (mayhem-snapshot-view snapshot "run"
                            (mayhem-skeleton (make-list 8 '(8 "  " 14 "  " 40)))

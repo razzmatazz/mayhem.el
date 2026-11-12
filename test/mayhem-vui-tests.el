@@ -184,22 +184,43 @@
   ;; it goes to the top.
   (let ((line (mayhem--pin-line
                (concat (propertize "h/o" 'mouse-face 'highlight 'keymap 'x) "  target\n")
-               "Offline")))
+               "Offline" 80)))
     (should (string-prefix-p "Offline  h/o  target " line))
     (should-not (get-text-property 9 'mouse-face line))
     (should-not (get-text-property 9 'keymap line))
     (should (eq (lookup-key (get-text-property 9 'local-map line) [header-line mouse-1])
                 #'mayhem-sticky-top))
     (should (equal (get-text-property (1- (length line)) 'display line)
-                   '(space :align-to right))))
-  (should (string-prefix-p "h/o " (mayhem--pin-line "h/o" ""))))
+                   '(space :align-to 80))))
+  (should (string-prefix-p "h/o " (mayhem--pin-line "h/o" "" 80))))
+
+(ert-deftest mayhem-vui-test-pin-line-status ()
+  ;; The status leads, after the notice; the heading gives way to the
+  ;; page's width first.
+  (let ((pin (lambda (width &optional notice)
+               (substring-no-properties
+                (mayhem--pin-line "h/o/p/t  target, run #3\n" notice width "failed")))))
+    (should (equal (funcall pin 80) "failed  h/o/p/t  target, run #3 "))
+    (should (equal (funcall pin 80 "Offline") "Offline  failed  h/o/p/t  target, run #3 "))
+    (should (equal (funcall pin 20) "failed  h/o/p/t  ta… "))
+    (should (equal (funcall pin 5) "fail… "))
+    (should (equal (substring-no-properties (mayhem--pin-line "h/o" nil 80 ""))
+                   "h/o "))))
 
 (ert-deftest mayhem-vui-test-page-pins ()
-  ;; A page is a sticky region pinning its heading, unless
-  ;; `mayhem-sticky-title' is nil.
+  ;; A page is a sticky region pinning its heading, led by its status,
+  ;; unless `mayhem-sticky-title' is nil.
   (with-temp-buffer
     (let ((heading (vui-text "Title\n")))
       (should (string-prefix-p "Title " (vui-vnode-region-sticky (mayhem-sticky-page heading))))
+      (let ((page (mayhem-sticky-page heading :status "open" (vui-text "body"))))
+        (should (string-prefix-p "open  Title " (vui-vnode-region-sticky page)))
+        (should (= (length (vui-vnode-region-children page)) 2)))
+      ;; It keeps to the page's width, not the window's.
+      (cl-letf (((symbol-function 'mayhem-page-width) (lambda () 3)))
+        (should (equal (get-text-property 3 'display
+                                          (vui-vnode-region-sticky (mayhem-sticky-page heading)))
+                       '(space :align-to 3))))
       (let ((mayhem-sticky-title nil))
         (should-not (vui-vnode-region-sticky (mayhem-sticky-page heading)))))))
 
